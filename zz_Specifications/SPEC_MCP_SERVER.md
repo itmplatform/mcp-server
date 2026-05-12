@@ -712,9 +712,43 @@ ITM.MCP/
 
 ## 8. Deployment
 
-### 8.1 Local Development (stdio)
+### 8.1 Local Development
 
-Developers configure their AI client to spawn the MCP server as a local process:
+**npm scripts:**
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `npm run dev` | `tsx watch src/server.ts` | Start MCP server in dev mode (HTTP on port 6160, auto-reload on changes) |
+| `npm run build` | `tsc` | Compile TypeScript to `dist/` |
+| `npm start` | `node dist/server.js` | Start compiled server (stdio mode, used by AI clients) |
+| `npm test` | `vitest` | Run unit tests |
+| `npm run test:e2e` | `vitest run --config vitest.e2e.config.ts` | Run E2E tests against local services (see Section 15) |
+
+**Development mode (`npm run dev`):**
+
+Starts the MCP server with Streamable HTTP transport on **port 6160**. This allows testing with curl, the MCP Inspector, or any HTTP client. The server reads configuration from `.env` (or environment variables):
+
+```env
+ITM_API_URL=http://localhost/ITM.API
+ITM_COMPANY=testsmarter
+ITM_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+The dev server is the primary way to verify tools during development. Start it, test with curl (Section 15), and stop it with Ctrl+C. It can be restarted freely between test runs.
+
+**Port assignment -- 6160:** Follows the existing local port sequence (see [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md)):
+
+| Service | Port |
+|---------|------|
+| AI Generator | 6128 |
+| DataServiceModel | 6139 |
+| DataMart | 6142 |
+| PM Pilot | 6150 |
+| **MCP Server** | **6160** |
+
+**stdio mode (AI client usage):**
+
+When an AI client spawns the MCP server, it connects via stdio (stdin/stdout). The client passes environment variables in its config file:
 
 ```json
 {
@@ -733,28 +767,16 @@ Developers configure their AI client to spawn the MCP server as a local process:
 }
 ```
 
-For production use, point at the production API:
+stdio works against any ITM Platform environment. Change `ITM_API_URL` to point at a different target:
 
-```json
-{
-  "mcpServers": {
-    "itm-platform": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["./dist/server.js"],
-      "env": {
-        "ITM_API_URL": "https://api.itmplatform.com",
-        "ITM_COMPANY": "mycompany",
-        "ITM_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+| Target | `ITM_API_URL` |
+|--------|---------------|
+| Local | `http://localhost/ITM.API` |
+| Stage | `https://newapi.itmplatform.com` |
+| Demo | `https://demoapi.itmplatform.com` |
+| Production | `https://api.itmplatform.com` |
 
-stdio works against any ITM Platform environment (local, stage, production). The API key provides the same authentication and permission scoping regardless of environment.
-
-To generate an API key: log into ITM Platform, go to My Profile, and click Generate API Key. The key is shown once -- copy it immediately.
+To generate an API key: log into ITM Platform, go to My Profile, and click Generate API Key. The key is shown once -- copy it immediately. Credentials and URLs: see [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md).
 
 ### 8.2 Production (Streamable HTTP)
 
@@ -763,6 +785,7 @@ Hosted as an HTTP service alongside the existing API:
 | Environment | URL | API target |
 |-------------|-----|------------|
 | Local | `http://localhost:6160/mcp` | `http://localhost/ITM.API` |
+| Demo | `https://mcp-demo.itmplatform.com/mcp` | `https://demoapi.itmplatform.com` |
 | Stage | `https://mcp-stage.itmplatform.com/mcp` | `https://newapi.itmplatform.com` |
 | Production | `https://mcp.itmplatform.com/mcp` | `https://api.itmplatform.com` |
 
@@ -894,23 +917,423 @@ These must be resolved before the MCP server can go to production:
 | 9 | Resources (DataMart entity schemas, field hints in tool descriptions) | ITM.MCP | ⬜ To do |
 | 10 | Prompts (`/project_status`, `/portfolio_overview`, `/risk_analysis`, `/team_workload`) | ITM.MCP | ⬜ To do |
 | 11 | `query_datamart` tool with query guard validation | ITM.MCP | ⬜ To do |
-| 12 | Documentation (usage guide, per-client config examples) | ITM.MCP | ⬜ To do |
+| 12 | E2E tests -- verify all Phase 1 tools against local services with curl and `npm run test:e2e` (Section 15) | ITM.MCP | ⬜ To do |
+| 13 | Documentation (usage guide, per-client config examples) | ITM.MCP | ⬜ To do |
 
 ### Phase 2 -- Writes + Streamable HTTP
 
 | # | Step | Repo | Status |
 |---|------|------|--------|
-| 13 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
-| 14 | OAuth authorization server (authorize, token, exchange endpoints) | ITM.Account | ⬜ To do |
-| 15 | OAuth login/consent page | ITM.Web | ⬜ To do |
-| 16 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ⬜ To do |
-| 17 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ⬜ To do |
-| 18 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ⬜ To do |
+| 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
+| 15 | OAuth authorization server (authorize, token, exchange endpoints) | ITM.Account | ⬜ To do |
+| 16 | OAuth login/consent page | ITM.Web | ⬜ To do |
+| 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ⬜ To do |
+| 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ⬜ To do |
+| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ⬜ To do |
+| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15) | ITM.MCP | ⬜ To do |
 
 ### Phase 3 -- Advanced
 
 | # | Step | Repo | Status |
 |---|------|------|--------|
-| 19 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
-| 20 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
-| 21 | Extension management tools | ITM.MCP | ⬜ To do |
+| 21 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
+| 22 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
+| 23 | Extension management tools | ITM.MCP | ⬜ To do |
+| 24 | E2E tests -- verify AiGenerator integration, bulk operations (Section 15) | ITM.MCP | ⬜ To do |
+
+---
+
+## 15. E2E Testing
+
+E2E tests verify MCP tools against real local services. They are not mocked -- they call the actual gateway, DataMart, and v2 REST endpoints running on the developer's machine.
+
+### 15.1 Prerequisites
+
+The following services must be running locally before E2E tests. Verify each one:
+
+| Service | URL | Verify with |
+|---------|-----|-------------|
+| ITM.API (gateway) | `http://localhost/ITM.API/` | `curl http://localhost/ITM.API/testsmarter/login/daniel.piret@itmplatform.com1/1` |
+| DataMart | `http://localhost:6142/` | Accessed through gateway -- no direct check needed |
+| ITM Platform Web | `http://localhost/ITM.Web/` | Browse in browser |
+
+Credentials, URLs, and connection details: [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md).
+
+**API key for testing:** Generate from My Profile in ITM Platform (local), or use the login endpoint to get a session token first. The MCP server needs the API key as `ITM_API_KEY` in `.env`.
+
+### 15.2 Server Lifecycle
+
+```bash
+# Start the MCP server in HTTP dev mode (port 6160)
+npm run dev
+
+# The server logs "MCP server listening on http://localhost:6160/mcp" when ready.
+# Stop with Ctrl+C. Restart freely between test runs.
+```
+
+The dev server auto-reloads on code changes. For a clean-build test:
+
+```bash
+npm run build && npm start -- --http --port 6160
+```
+
+### 15.3 MCP Session Setup (curl)
+
+All E2E tests follow the Streamable HTTP protocol: POST JSON-RPC 2.0 messages to `http://localhost:6160/mcp`.
+
+**Step 1 -- Initialize the session:**
+
+```bash
+curl -s -D - -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {"name": "e2e-test", "version": "1.0.0"}
+    }
+  }'
+```
+
+The response includes a `Mcp-Session-Id` header. Save it for all subsequent requests.
+
+Expected response body:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2025-11-25",
+    "capabilities": { "tools": {}, "resources": {}, "prompts": {} },
+    "serverInfo": { "name": "itm-platform", "version": "1.0.0" }
+  }
+}
+```
+
+**Step 2 -- Send the initialized notification:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{"jsonrpc": "2.0", "method": "notifications/initialized"}'
+```
+
+**Step 3 -- List available tools (sanity check):**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}'
+```
+
+Verify all Phase 1 tools are listed (search_projects, get_project, etc.).
+
+### 15.4 Phase 1 E2E Test Cases
+
+After session setup, test each tool. All curl commands use the same endpoint and session header. Replace `<session-id>` with the value from Step 1.
+
+**Auth verification (implicit):** If `npm run dev` starts without errors, identity resolution succeeded. If the API key is invalid or the user is a blocked Team Member, the server exits with an error message at startup.
+
+**search_projects -- find projects by name:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 10,
+    "method": "tools/call",
+    "params": {
+      "name": "search_projects",
+      "arguments": {"query": "test", "limit": 5}
+    }
+  }'
+```
+
+Expected: `result.content` contains an array of projects with `id`, `name`, `statusLabel`. Verify count <= 5.
+
+**get_project -- single project with subcomponents:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 11,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project",
+      "arguments": {"projectId": 75868, "include": ["tasks", "risks", "budget"]}
+    }
+  }'
+```
+
+Expected: project fields (`id`, `name`, `statusLabel`, `percentComplete`) plus requested subcomponent arrays. Use a known project ID from the local database.
+
+**list_project_tasks:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 12,
+    "method": "tools/call",
+    "params": {
+      "name": "list_project_tasks",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+Expected: array of tasks with `taskId`, `name`, `statusLabel`, `assignedTo`.
+
+**get_project_risks:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 13,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project_risks",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+Expected: array of risks (may be empty if project has none -- that is a valid result).
+
+**get_project_issues:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 14,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project_issues",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+**get_project_budget:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 15,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project_budget",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+Expected: budget objects (`budgetTopDown`, `budgetBottomUp`, `budgetActual`, `budgetPeriodEndClose`).
+
+**get_project_purchases / get_project_revenues:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 16,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project_purchases",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 17,
+    "method": "tools/call",
+    "params": {
+      "name": "get_project_revenues",
+      "arguments": {"projectId": 75868}
+    }
+  }'
+```
+
+**aggregate_portfolio -- portfolio-level analytics:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 18,
+    "method": "tools/call",
+    "params": {
+      "name": "aggregate_portfolio",
+      "arguments": {
+        "groupBy": "statusLabel",
+        "metrics": ["count", "avgProgress"]
+      }
+    }
+  }'
+```
+
+Expected: grouped aggregation results (e.g., `{"_id": "In Progress", "count": 12, "avgProgress": 45.2}`).
+
+**search_users -- find users (v2 REST):**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 19,
+    "method": "tools/call",
+    "params": {
+      "name": "search_users",
+      "arguments": {"query": "daniel", "limit": 5}
+    }
+  }'
+```
+
+Expected: array of users with `userId`, `name`, `email`.
+
+**get_user -- single user (v2 REST):**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 20,
+    "method": "tools/call",
+    "params": {
+      "name": "get_user",
+      "arguments": {"userId": 1}
+    }
+  }'
+```
+
+**get_reference_data -- status/type lists (v2 REST):**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 21,
+    "method": "tools/call",
+    "params": {
+      "name": "get_reference_data",
+      "arguments": {"entity": "projectstatuses"}
+    }
+  }'
+```
+
+Expected: array of status objects with `id`, `name`.
+
+**query_datamart -- raw GraphQL (advanced):**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 22,
+    "method": "tools/call",
+    "params": {
+      "name": "query_datamart",
+      "arguments": {
+        "operation": "components",
+        "where": {"componentType": {"$eq": "project"}, "percentComplete": {"$gte": 50}},
+        "project": {"id": 1, "name": 1, "percentComplete": 1},
+        "limit": 5
+      }
+    }
+  }'
+```
+
+Expected: array of projects with >= 50% completion. Verify the query validator rejects disallowed operators (test with `$lookup` or `$where` -- should return an error).
+
+**Negative test -- blocked operator:**
+
+```bash
+curl -s -X POST http://localhost:6160/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0", "id": 23,
+    "method": "tools/call",
+    "params": {
+      "name": "query_datamart",
+      "arguments": {
+        "operation": "aggregateComponents",
+        "pipeline": [{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}]
+      }
+    }
+  }'
+```
+
+Expected: error response indicating `$lookup` is not allowed.
+
+### 15.5 Phase 2 E2E Additions
+
+Phase 2 adds write tool tests and OAuth verification:
+
+| Test | What to verify |
+|------|---------------|
+| `create_task` | Task appears in project via `list_project_tasks` after creation |
+| `update_task` | Changed fields reflected in subsequent `get_project` call |
+| `create_risk` / `create_issue` | New items appear in `get_project_risks` / `get_project_issues` |
+| `update_project` | PATCH fields reflected in `get_project` |
+| Stale-after-write | Immediately after a write, a DataMart read may return stale data. Verify with a v2 REST read (which reflects the write immediately), then wait ~10 seconds and verify DataMart catches up. |
+| OAuth flow | Initialize session with OAuth Bearer token instead of API key. Verify identity resolution and tool access. |
+
+Write tests must clean up after themselves -- delete or revert any entities they create to avoid polluting the local database.
+
+### 15.6 Automated E2E Tests
+
+The manual curl tests above are codified as automated tests in `tests/e2e/`:
+
+```
+tests/e2e/
+  setup.ts           # Start MCP server, initialize session, export session helpers
+  teardown.ts        # Stop MCP server, clean up test data
+  auth.e2e.test.ts   # Identity resolution, PM-only rejection, Team Member rejection
+  projects.e2e.test.ts   # search_projects, get_project
+  tasks.e2e.test.ts      # list_project_tasks
+  financials.e2e.test.ts # budget, purchases, revenues
+  risks-issues.e2e.test.ts  # get_project_risks, get_project_issues
+  portfolio.e2e.test.ts  # aggregate_portfolio
+  users.e2e.test.ts      # search_users, get_user
+  reference.e2e.test.ts  # get_reference_data
+  datamart.e2e.test.ts   # query_datamart + validator negative tests
+```
+
+Run with:
+
+```bash
+npm run test:e2e
+```
+
+The test runner starts the MCP server on port 6160 (if not already running), runs all test files, and reports results. Tests use the same HTTP calls as the curl examples above, wrapped in Vitest assertions.
+
+**Test configuration:** `vitest.e2e.config.ts` sets a longer timeout (30 seconds per test), points at the E2E test directory, and reads `.env.test` for test-specific credentials if needed.
