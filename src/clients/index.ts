@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import { createDataMartClient, type DataMartClient } from './datamart-client.js';
 import { createRestClient, type RestClient } from './rest-client.js';
 
@@ -5,6 +6,7 @@ export interface ClientConfig {
   apiUrl: string;
   company: string;
   authHeaders: Record<string, string>;
+  log?: Logger;
 }
 
 export interface Clients {

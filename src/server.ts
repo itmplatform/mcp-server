@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { logger } from './logger.js';
+import { createLogger } from './logger.js';
 import { resolveIdentity } from './auth/api-key-auth.js';
 import { createClients, type Clients } from './clients/index.js';
 import { registerProjectTools } from './tools/projects.js';
@@ -21,6 +21,8 @@ import { registerProjectStatusPrompt } from './prompts/project-status.js';
 import { registerPortfolioOverviewPrompt } from './prompts/portfolio-overview.js';
 import { registerTeamWorkloadPrompt } from './prompts/team-workload.js';
 import { registerRiskAnalysisPrompt } from './prompts/risk-analysis.js';
+
+const log = createLogger('mcp');
 
 function createMcpServer(clients: Clients): McpServer {
   const server = new McpServer(
@@ -50,14 +52,14 @@ function createMcpServer(clients: Clients): McpServer {
 }
 
 async function main() {
-  logger.info('ITM Platform MCP server starting...');
+  log.info('ITM Platform MCP server starting...');
 
   let userContext;
   try {
     userContext = await resolveIdentity();
-    logger.info({ userId: userContext.userId, email: userContext.email, access: userContext.dataMartAccess }, 'Identity resolved');
+    log.info({ userId: userContext.userId, email: userContext.email, access: userContext.dataMartAccess }, 'Identity resolved');
   } catch (err) {
-    logger.fatal({ err }, 'Failed to resolve identity');
+    log.fatal({ err }, 'Failed to resolve identity');
     process.exit(1);
   }
 
@@ -65,6 +67,7 @@ async function main() {
     apiUrl: process.env.ITM_API_URL!,
     company: userContext.company,
     authHeaders: userContext.authHeaders,
+    log,
   });
 
   const useHttp = process.env.PORT || process.argv.includes('--http');
@@ -118,7 +121,7 @@ async function main() {
         res.end();
       }
       } catch (err) {
-        logger.error({ err }, 'HTTP request error');
+        log.error({ err }, 'HTTP request error');
         if (!res.headersSent) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Internal server error' }));
@@ -127,17 +130,17 @@ async function main() {
     });
 
     httpServer.listen(port, () => {
-      logger.info(`MCP server listening on http://localhost:${port}/mcp`);
+      log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/mcp`);
     });
   } else {
     const server = createMcpServer(clients);
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    logger.info('MCP server connected via stdio');
+    log.info({ transport: 'stdio' }, 'MCP server connected via stdio');
   }
 }
 
 main().catch((err) => {
-  logger.fatal({ err }, 'Unhandled error');
+  log.fatal({ err }, 'Unhandled error');
   process.exit(1);
 });

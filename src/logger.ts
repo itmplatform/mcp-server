@@ -1,8 +1,41 @@
-import pino from 'pino';
+import pino, { type Logger } from 'pino';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-export const logger = pino({
-  level: process.env.LOG_LEVEL ?? 'info',
-  transport: process.env.NODE_ENV !== 'production'
-    ? { target: 'pino-pretty', options: { destination: 2 } }
-    : undefined,
-}, process.env.NODE_ENV === 'production' ? pino.destination(2) : undefined);
+const LOG_DIR = join(process.cwd(), 'logs');
+const LOG_FILE = join(LOG_DIR, 'mcp.log');
+
+export function createLogger(service: string): Logger {
+  const level = process.env.LOG_LEVEL || 'info';
+  const isTest = process.env.NODE_ENV === 'test';
+
+  const targets: pino.TransportTargetOptions[] = [
+    {
+      target: 'pino-pretty',
+      options: {
+        singleLine: true,
+        translateTime: 'HH:MM:ss.l',
+        ignore: 'pid,hostname',
+        colorize: true,
+        destination: 2,
+      },
+      level,
+    },
+  ];
+
+  if (!isTest) {
+    mkdirSync(LOG_DIR, { recursive: true });
+    targets.push({
+      target: 'pino-roll',
+      options: { file: LOG_FILE, size: '10m', limit: { count: 5 } },
+      level,
+    });
+  }
+
+  return pino({
+    level,
+    base: { service, app: 'ITM.MCP' },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    transport: { targets },
+  });
+}
