@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createDataMartClient } from './datamart-client.js';
 
+function mockLogger() {
+  return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+}
+
 describe('DataMartClient', () => {
   const originalFetch = globalThis.fetch;
   const config = { apiUrl: 'http://localhost/ITM.API', company: 'acme', authHeaders: { 'Authorization': 'Bearer key-123' } };
@@ -89,5 +93,67 @@ describe('DataMartClient', () => {
     const client = createDataMartClient(config);
     await expect(client.query({ query: 'query { components { items } }', variables: {} }))
       .rejects.toThrow('Validation error');
+  });
+
+  describe('logging', () => {
+    it('logs debug on successful request with requestId and duration', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { components: [] } }),
+      });
+
+      const client = createDataMartClient({ ...config, log });
+      await client.query({ query: 'query { components { items } }', variables: {} });
+
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: expect.stringMatching(/^[0-9a-f-]+$/), ms: expect.any(Number) }),
+        expect.stringContaining('DataMart'),
+      );
+    });
+
+    it('logs error on HTTP failure', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      const client = createDataMartClient({ ...config, log });
+      await expect(client.query({ query: 'q', variables: {} })).rejects.toThrow();
+
+      expect(log.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 500 }),
+        expect.stringContaining('DataMart'),
+      );
+    });
+
+    it('logs error on GraphQL errors', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ errors: [{ message: 'Bad query' }], data: null }),
+      });
+
+      const client = createDataMartClient({ ...config, log });
+      await expect(client.query({ query: 'q', variables: {} })).rejects.toThrow();
+
+      expect(log.error).toHaveBeenCalledWith(
+        expect.objectContaining({ graphqlError: 'Bad query' }),
+        expect.stringContaining('DataMart'),
+      );
+    });
+
+    it('works without a logger', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { items: [] } }),
+      });
+
+      const client = createDataMartClient(config);
+      const result = await client.query({ query: 'q', variables: {} });
+      expect(result).toEqual({ items: [] });
+    });
   });
 });

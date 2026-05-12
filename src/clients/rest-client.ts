@@ -1,7 +1,10 @@
+import type { Logger } from 'pino';
+
 export interface RestClientConfig {
   apiUrl: string;
   company: string;
   authHeaders: Record<string, string>;
+  log?: Logger;
 }
 
 export interface RestClient {
@@ -15,8 +18,11 @@ export function createRestClient(config: RestClientConfig): RestClient {
     ...config.authHeaders,
     'Content-Type': 'application/json',
   };
+  const log = config.log;
 
   async function request(method: string, path: string, body?: unknown): Promise<unknown> {
+    const start = Date.now();
+
     const response = await fetch(`${baseUrl}/${path}`, {
       method,
       headers,
@@ -24,10 +30,13 @@ export function createRestClient(config: RestClientConfig): RestClient {
     });
 
     if (!response.ok) {
+      log?.error({ method, path, status: response.status, ms: Date.now() - start }, 'REST request failed');
       throw new Error(`REST request failed: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    log?.debug({ method, path, ms: Date.now() - start }, 'REST request OK');
+    return result;
   }
 
   return {

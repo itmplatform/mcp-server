@@ -2,69 +2,74 @@
 
 > For cross-cutting documentation (debugging, database schema, environments, API versioning, build commands), see the [parent README](../README.md#documentation-index).
 
-MCP (Model Context Protocol) server for ITM Platform. Exposes project management data and operations to AI assistants (Claude, ChatGPT, VS Code Copilot, Cursor, etc.) through a universal protocol.
+MCP (Model Context Protocol) server for ITM Platform. Exposes project management data to AI assistants -- Claude, ChatGPT, VS Code Copilot, Cursor, JetBrains -- through a universal open protocol.
+
+**Status:** Phase 1 complete -- read-only, stdio transport. 15 tools, 6 resources, 4 prompts. 76 unit tests, 18 E2E tests.
 
 See [House Rules](../House-rules.md) for coding conventions.
 
-## Quick Start
+## How it works
+
+MCP is a JSON-RPC 2.0 protocol that lets AI assistants discover and call tools on external servers. The AI client (Claude Desktop, VS Code, etc.) spawns the MCP server as a **child process** connected via stdin/stdout. The server stays running for the session's lifetime -- you never start it manually.
+
+```
+You ask: "Which projects are behind schedule?"
+  |
+  v
+AI Client (Claude Desktop / VS Code / Cursor)
+  |  1. Spawns ITM.MCP as a child process at session start
+  |  2. Discovers tools via JSON-RPC handshake
+  |  3. The AI model decides which tools to call based on your question
+  |  4. Sends tool calls over stdin, reads results from stdout
+  |
+  v
+ITM.MCP Server (child process, stdin/stdout)
+  |  - Authenticates once at startup using your API key
+  |  - Receives tool calls, queries ITM APIs, returns results
+  |  - Stays alive until the AI client closes
+  |
+  v
+ITM.API Gateway --> DataMart (GraphQL) + v2 REST (users, reference data)
+```
+
+**Key point:** The AI model never sees your credentials. Auth is handled by the MCP server process. The model only sees tool names, descriptions, and results.
+
+### Three MCP primitives
+
+| Primitive | Who controls it | What it does | Example |
+|-----------|----------------|--------------|---------|
+| **Tools** | AI model decides when to call | Executable read/write operations | `search_projects`, `get_project_budget` |
+| **Resources** | Client app loads as context | Read-only reference data (schemas, docs) | `itm://schema/component` |
+| **Prompts** | User triggers a workflow template | Pre-composed multi-tool request | `/project_status` fetches project + tasks + risks + budget in one shot |
+
+## Quick start
 
 ```bash
 npm install
 cp .env.sample .env   # edit with your credentials
-npm test              # run unit tests (76 tests)
-npm run dev           # start HTTP dev server on port 6160 (requires .env)
+npm test              # unit tests (76 tests)
 npm run build         # compile TypeScript to dist/
-npm start             # start in stdio mode (for AI clients)
-npm run test:e2e      # run E2E tests (requires local ITM.API + DataMart)
+npm run dev           # HTTP dev server on port 6160 (for testing with curl)
+npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
 ```
 
-## Architecture
+## AI client configuration
 
-```
-AI Client (Claude / ChatGPT / VS Code / Cursor)
-   |
-   |  MCP Protocol (JSON-RPC 2.0)
-   |  Transport: Streamable HTTP (prod) or stdio (local dev)
-   |
-   v
-+------------------+
-|   ITM.MCP        |  TypeScript + @modelcontextprotocol/sdk
-|   Server         |  15 Tools, 6 Resources, 4 Prompts
-+--------+---------+
-         |
-         |  HTTP (Bearer API key auth)
-         |
-         v
-+------------------+     +------------------+     +--------------------+
-|  ITM.API         |---->|  ITM.Tasks       |     |  ITM.DataMart      |
-|  Gateway         |---->|  ITM.Account     |     |  (GraphQL)         |
-+------------------+     +------------------+     +--------------------+
-```
+The config tells the AI client how to spawn the MCP server. All clients use the same pattern: a command, args, and three environment variables.
 
-## AI Client Configuration
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ITM_API_URL` | Yes | ITM.API gateway URL |
+| `ITM_COMPANY` | Yes | Company/tenant slug |
+| `ITM_API_KEY` | Yes* | Per-user API key (generate from My Profile in ITM Platform) |
+| `ITM_TOKEN` | Yes* | Session token (alternative to API key, useful for dev) |
+| `LOG_LEVEL` | No | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+
+\* One of `ITM_API_KEY` or `ITM_TOKEN` is required.
 
 ### Claude Desktop
 
-```json
-{
-  "mcpServers": {
-    "itm-platform": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["./dist/server.js"],
-      "env": {
-        "ITM_API_URL": "http://localhost/ITM.API",
-        "ITM_COMPANY": "testsmarter",
-        "ITM_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-### Claude Code
-
-Add to `.claude/settings.json` or `.mcp.json`:
+Edit `claude_desktop_config.json`:
 
 ```json
 {
@@ -83,53 +88,36 @@ Add to `.claude/settings.json` or `.mcp.json`:
 }
 ```
 
+### Claude Code
+
+Add to `.claude/settings.json` or `.mcp.json` -- same JSON structure as above.
+
 ### VS Code (Copilot)
 
-Add to `.vscode/mcp.json`:
+Add to `.vscode/mcp.json` -- same JSON structure as above.
 
-```json
-{
-  "mcpServers": {
-    "itm-platform": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["./dist/server.js"],
-      "env": {
-        "ITM_API_URL": "http://localhost/ITM.API",
-        "ITM_COMPANY": "testsmarter",
-        "ITM_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
+### Cursor / JetBrains
 
-### Cursor
+Add to `.cursor/mcp.json` or IDE MCP settings -- same JSON structure as above.
 
-Add to `.cursor/mcp.json` with the same format as VS Code above.
+## Tools (Phase 1 -- read-only)
 
-### JetBrains IDEs
-
-Configure in IDE MCP settings with the same environment variables.
-
-## Tools (Phase 1 -- Read-Only)
-
-### DataMart-backed (component reads)
+### DataMart-backed (fast, single-query reads)
 
 | Tool | Description |
 |------|-------------|
 | `search_projects` | Find projects by name, status, type, date range |
-| `get_project` | Full project details with optional subcomponents |
 | `search_services` | Find services by name, status, type, date range |
+| `get_project` | Full project details with optional subcomponents (tasks, risks, budget, etc.) |
 | `get_service` | Full service details with optional subcomponents |
-| `list_project_tasks` | List tasks for a project |
-| `get_project_risks` | List risks for a project |
-| `get_project_issues` | List issues for a project |
-| `get_project_budget` | Budget summary (4 budget types) |
+| `list_project_tasks` | Tasks for a project |
+| `get_project_risks` | Risks for a project |
+| `get_project_issues` | Issues for a project |
+| `get_project_budget` | Budget summary (top-down, bottom-up, actual, period-end close) |
 | `get_project_purchases` | Purchase orders for a project |
 | `get_project_revenues` | Revenue items for a project |
-| `aggregate_portfolio` | Portfolio analytics (group, count, sum, avg) |
-| `query_datamart` | Raw DataMart query (advanced, with validation) |
+| `aggregate_portfolio` | Portfolio analytics -- group, count, sum, avg across all projects |
+| `query_datamart` | Raw DataMart query for advanced analysis (validated, safe operators only) |
 
 ### v2 REST-backed (users, reference data)
 
@@ -137,34 +125,61 @@ Configure in IDE MCP settings with the same environment variables.
 |------|-------------|
 | `search_users` | Find team members |
 | `get_user` | User details |
-| `get_reference_data` | Status lists, types, priorities |
+| `get_reference_data` | Status lists, types, priorities for any entity |
 
 ## Prompts
 
-| Prompt | Description |
+Workflow templates the user can trigger. The MCP server returns a pre-composed message that instructs the AI to call the right tools.
+
+| Prompt | What it does |
 |--------|-------------|
-| `/project_status` | Status report for a project |
-| `/portfolio_overview` | Portfolio health overview |
-| `/team_workload` | Team workload analysis |
-| `/risk_analysis` | Risk assessment for a project |
+| `/project_status` | Fetches project + tasks + risks + budget, asks AI to summarize |
+| `/portfolio_overview` | Aggregates projects by status/methodology/budget, asks AI for health overview |
+| `/team_workload` | Fetches users + assignments, asks AI for workload analysis |
+| `/risk_analysis` | Fetches risks + issues + budget, asks AI for risk assessment |
 
-## Environment Variables
+## Architecture
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ITM_API_URL` | Yes | Base URL for ITM.API gateway |
-| `ITM_COMPANY` | Yes | Company/tenant slug |
-| `ITM_API_KEY` | One required | Per-user API key (from ITM Platform profile page) |
-| `ITM_TOKEN` | One required | Session token (alternative to API key for dev; see `.env.sample`) |
-| `PORT` | No | HTTP port for dev mode (default: 6160) |
-| `LOG_LEVEL` | No | Pino log level (default: info) |
+```
+src/
+  server.ts                # MCP server bootstrap (stdio + HTTP)
+  logger.ts                # Pino logger factory (stderr + rotating file in logs/mcp.log)
+  auth/
+    effective-user-context.ts  # User identity resolved at startup
+    api-key-auth.ts            # API key auth, calls /resolve/identity
+    license-resolver.ts        # License type -> access level
+  clients/
+    datamart-client.ts     # DataMart GraphQL through gateway
+    rest-client.ts         # v2 REST through gateway
+  tools/                   # One file per tool group
+  resources/               # Schema + calendar resources
+  prompts/                 # Workflow templates
+  validation/
+    query-validator.ts     # Allowlist of safe MongoDB operators
+```
+
+## Access control
+
+| License type | Access |
+|-------------|--------|
+| CompanyAdmin | Full |
+| FullUser | Full |
+| ProjectManager | Blocked in Phase 1 (requires gateway PM-scope injection -- Phase 2) |
+| TeamMember | Blocked |
+
+## Logging
+
+Uses [Pino](https://getpino.io/) (same as DataMart and MSTeamsBot). Logs go to two destinations:
+
+- **stderr** -- pretty-printed, colorized (stdout is reserved for the MCP JSON-RPC protocol)
+- **`logs/mcp.log`** -- rotating file, 10 MB max, keeps 5 old files (skipped in test)
+
+Set `LOG_LEVEL` in `.env` to control verbosity (`debug`, `info`, `warn`, `error`; default: `info`). All log entries include `{ service: 'mcp', app: 'ITM.MCP' }` base fields and ISO timestamps.
+
+HTTP clients (DataMart, REST) log at `debug` level on success (with duration in ms) and `error` on failure.
 
 ## Specification
 
-Full discovery, architecture decisions, phased capabilities, and implementation details:
+Full design, architecture decisions, phased rollout, and E2E test details:
 
 - [SPEC_MCP_SERVER.md](zz_Specifications/SPEC_MCP_SERVER.md)
-
-## Status
-
-**Phase 1 complete** -- Read-only tools over stdio transport. 15 tools, 6 resources, 4 prompts. 76 unit tests, 18 E2E tests passing.

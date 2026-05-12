@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRestClient } from './rest-client.js';
 
+function mockLogger() {
+  return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+}
+
 describe('RestClient', () => {
   const originalFetch = globalThis.fetch;
   const config = { apiUrl: 'http://localhost/ITM.API', company: 'acme', authHeaders: { 'Authorization': 'Bearer key-123' } };
@@ -58,5 +62,67 @@ describe('RestClient', () => {
 
     const client = createRestClient(config);
     await expect(client.get('nonexistent')).rejects.toThrow('404');
+  });
+
+  describe('logging', () => {
+    it('logs debug on successful GET with path and duration', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{ id: 1 }]),
+      });
+
+      const client = createRestClient({ ...config, log });
+      await client.get('projectstatuses');
+
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'GET', path: 'projectstatuses', ms: expect.any(Number) }),
+        expect.stringContaining('REST'),
+      );
+    });
+
+    it('logs debug on successful POST', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      const client = createRestClient({ ...config, log });
+      await client.post('AllUsers', { page: 1 });
+
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'POST', path: 'AllUsers', ms: expect.any(Number) }),
+        expect.stringContaining('REST'),
+      );
+    });
+
+    it('logs error on HTTP failure', async () => {
+      const log = mockLogger();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      const client = createRestClient({ ...config, log });
+      await expect(client.get('bad')).rejects.toThrow();
+
+      expect(log.error).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'GET', path: 'bad', status: 500 }),
+        expect.stringContaining('REST'),
+      );
+    });
+
+    it('works without a logger', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      });
+
+      const client = createRestClient(config);
+      const result = await client.get('test');
+      expect(result).toEqual({ ok: true });
+    });
   });
 });
