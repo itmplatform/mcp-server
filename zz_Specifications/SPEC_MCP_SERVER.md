@@ -1,7 +1,8 @@
 # ITM Platform MCP Server
 
-> **Status:** Pre-development -- specification and discovery
-> **Date:** 2026-05-08
+> **Status:** Pre-development -- specification and discovery  
+> **Date:** 2026-05-08  
+> **Phases:** 1 Read-Only (stdio) ⬜ | 2 Writes + HTTP ⬜ | 3 Advanced ⬜
 
 ---
 
@@ -643,7 +644,7 @@ The typed tools (`search_projects`, `get_project`, etc.) compose safe DataMart q
 | File uploads | Binary handling in MCP is awkward; defer |
 | v1 endpoints | Legacy; v2 covers the same entities |
 | v2 REST for component reads | DataMart is faster, denormalized, and supports aggregation; v2 REST adds gateway overhead and requires multiple round trips |
-| PMPilot as a tool | PMPilot and MCP are different products. PMPilot is a stateful assistant with curated workflows and conversation memory; MCP is a typed capability layer. Shared logic (query validators, license interpreter) should be extracted into a shared package, not exposed as a tool. |
+| PMPilot as a tool | PMPilot and MCP are different products. PMPilot is a stateful assistant with curated workflows and conversation memory; MCP is a typed capability layer. Query validation logic is copied (not shared via package) between repos with sync comments -- see Section 12. |
 
 ---
 
@@ -703,7 +704,7 @@ ITM.MCP/
 | Runtime | Node.js | Matches existing Node.js services |
 | HTTP client | `axios` or native `fetch` | Calls ITM v2 REST API |
 | Validation | `zod` | Already used in ITM.DataMart; validates tool inputs |
-| Query guards | `@itm/datamart-query-guard` | Shared package extracted from PMPilot (see Section 12) |
+| Query guards | `src/validation/query-validator.ts` | Copied from PMPilot's `validators.js` with sync comments (see Section 12) |
 | Testing | `vitest` | Already used in ITM.DataMart and ITM.PMPilot |
 | Build | `tsc` | TypeScript compiler, same as ITM.DataMart |
 
@@ -841,10 +842,10 @@ These must be resolved before the MCP server can go to production:
 
 | Blocker | Detail | Repo | Status |
 |---------|--------|------|--------|
-| Identity resolution endpoint | `POST /v2/{co}/resolve/identity` must be built. Returns userId, accountId, email, languageId, licenseTypeIds, computed dataMartAccess, pmScopeUserId. Both phases depend on it. See Section 3.7. | ITM.Account | Done |
-| DataMart query validator | `query_datamart` must not ship without validation guards. Extract PMPilot's `validators.js` (~150 lines, zero deps) into `@itm/datamart-query-guard`. Allowed operators: `$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, `$regex`, `$options`, `$exists`, `$not`, `$and`, `$or`, `$nor`. Note: `$not` is allowed by DataMart's `validate.ts` but not in PMPilot's current allow-list -- the shared package must include it. Allowed aggregation stages: `$match`, `$project`, `$group`, `$sort`, `$limit`, `$skip`, `$unwind`, `$addFields`, `$set`, `$unset`. Banned: `$lookup`, `$merge`, `$out`, `$function`, `$accumulator`, `$where` (JS execution), `$facet` (DoS surface). Enforce `$limit` on every aggregation (max 1000). | ITM.PMPilot (extract) + ITM.MCP | To extract |
-| Gateway PM-scope injection | The gateway must compute `X-PM-Scope-User-Id` from the authenticated user's license type and inject it, so DataMart does not rely on client-supplied headers. Requires adding license type to the gateway's `UserAccount` object (currently only has UserId, AccountId, LanguageId, IsCompanyAdmin). Until this ships, PM-only users are blocked from stdio. Phase 2 HTTP is unaffected (server-side, trusted zone). | ITM.API | Prerequisite for PM stdio access |
-| License policy verification | DataMart's `accessService.ts` already defines allowed license types as `[0, 1, 2]` (CompanyAdmin, FullUser, ProjectManager). PM-scoped access works in production via PMPilot. Verify this matches the spec and remove any stale TODOs. | ITM.DataMart | To verify (low risk -- code already read, included for completeness) |
+| Identity resolution endpoint | `POST /v2/{co}/resolve/identity` must be built. Returns userId, accountId, email, languageId, licenseTypeIds, computed dataMartAccess, pmScopeUserId. Both phases depend on it. See Section 3.7. | ITM.Account | ✅ Done |
+| DataMart query validator | `query_datamart` must not ship without validation guards. Copy PMPilot's `inference/datamart/validators.js` (~150 lines, zero deps) into `src/validation/query-validator.ts` (ported to TypeScript). Both files carry sync comments pointing to each other. Allowed operators: `$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, `$regex`, `$options`, `$exists`, `$not`, `$and`, `$or`, `$nor`. Note: `$not` is allowed by DataMart's `validate.ts` but not in PMPilot's current allow-list -- the MCP copy must add it. Allowed aggregation stages: `$match`, `$project`, `$group`, `$sort`, `$limit`, `$skip`, `$unwind`, `$addFields`, `$set`, `$unset`. Banned: `$lookup`, `$merge`, `$out`, `$function`, `$accumulator`, `$where` (JS execution), `$facet` (DoS surface). Enforce `$limit` on every aggregation (max 1000). | ITM.MCP (+ sync comment in ITM.PMPilot) | ⬜ To do |
+| Gateway PM-scope injection | The gateway must compute `X-PM-Scope-User-Id` from the authenticated user's license type and inject it, so DataMart does not rely on client-supplied headers. Requires adding license type to the gateway's `UserAccount` object (currently only has UserId, AccountId, LanguageId, IsCompanyAdmin). Until this ships, PM-only users are blocked from stdio. Phase 2 HTTP is unaffected (server-side, trusted zone). | ITM.API | ⬜ Prerequisite for PM stdio |
+| License policy verification | DataMart's `accessService.ts` already defines allowed license types as `[0, 1, 2]` (CompanyAdmin, FullUser, ProjectManager). PM-scoped access works in production via PMPilot. Verify this matches the spec and remove any stale TODOs. | ITM.DataMart | ⬜ To verify (low risk) |
 
 ---
 
@@ -858,8 +859,8 @@ These must be resolved before the MCP server can go to production:
 | **OAuth authorization server** | Build in ITM.Account, do not delegate to Auth0/Azure AD. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. | ITM already owns user identity, SSO mapping, and license interpretation. Delegating creates a sync problem. |
 | **Phase 2 token model** | OAuth-to-session-token exchange at MCP boundary via `POST /v2/{co}/auth/exchange-token`. Session token TTL capped at OAuth token expiry. MCP uses the resulting session token for gateway calls. | Smallest gateway change. Keeps gateway's existing trust model intact. No god-key / service account. |
 | **stdio PM restriction** | Phase 1 stdio restricted to CompanyAdmin and FullUser. PM-only users blocked until gateway PM-scope injection ships. Phase 2 HTTP supports PMs (server-side, trusted zone). | Simplest correct solution. No PM-scope headers needed for full-access users. Avoids lateral PM-to-PM access via client-supplied headers. |
-| **PMPilot overlap** | Complementary channels, not nested. PMPilot owns prompt engineering, conversation memory, ITM-specific UX. MCP owns typed tools/resources/prompts that compose DataMart and v2 REST safely. Extract shared logic into `@itm/datamart-query-guard` package. | Clear ownership. Shared extraction avoids duplication. |
-| **DataMart query validation** | Extract from PMPilot into `@itm/datamart-query-guard` shared package. Single source of truth, single review when MongoDB allow-list changes. | PMPilot's `validators.js` is ~150 lines, zero external deps, well-tested. Trivially extractable. |
+| **PMPilot overlap** | Complementary channels, not nested. PMPilot owns prompt engineering, conversation memory, ITM-specific UX. MCP owns typed tools/resources/prompts that compose DataMart and v2 REST safely. Query validation logic is copied between repos with sync comments. | Clear ownership. Copy-with-sync avoids introducing a shared package pattern that does not exist in the Node.js repos today. |
+| **DataMart query validation** | Copy PMPilot's `validators.js` into ITM.MCP as `src/validation/query-validator.ts` (TypeScript port). Both files carry sync comments pointing to each other so changes in one prompt updates in the other. | ~150 lines, zero deps. A shared npm package is not justified for two consumers and would introduce a new dependency pattern. If a third consumer appears, reconsider. |
 | **OpenAPI usage** | Hand-curate Phase 1 tools (14 tools). Use OpenAPI for zod schema generation and input validation. Audit OpenAPI coverage before Phase 2 writes. | Auto-generated tool schemas are too granular for LLMs. |
 | **Extension system** | Not in scope for Phases 1-3. MCP is an outbound capability surface; extensions are inbound. Push notifications (SSE for real-time updates) is a future feature. | Orthogonal concern. Revisit when streaming/notifications are on the roadmap. |
 | **Product naming** | User-facing: `ITM Platform`. Repo: `ITM.MCP`. | Matches existing naming pattern (Teams bot is `ITM Platform`). |
@@ -876,20 +877,40 @@ These must be resolved before the MCP server can go to production:
 
 ---
 
-## 14. Next Steps
+## 14. Phase Tracker
 
-1. ~~**Build identity resolution endpoint**~~ -- Done. `POST /v2/{co}/resolve/identity` in ITM.Account. Returns computed `dataMartAccess` and `pmScopeUserId`, not just raw license types. Phase 1 prerequisite. (ITM.Account)
-2. **Extract shared query validator** -- `@itm/datamart-query-guard` from PMPilot's `validators.js`. Add banned stages (`$lookup`, `$merge`, `$out`, `$function`, `$accumulator`, `$where`). Publish as internal package. (ITM.PMPilot)
-3. **Initialize the repo** -- `npm init`, install `@modelcontextprotocol/sdk`, set up TypeScript + Vitest
-4. **Build auth layer** -- EffectiveUserContext, API key auth (Phase 1), identity resolution call, license interpreter, PM-only user rejection
-5. **Verify release blockers** -- Verify DataMart license policy matches spec; clean up stale TODOs
-6. **Build gateway client** -- Single HTTP client that routes all calls (DataMart and v2 REST) through the API Gateway with `Authorization: Bearer {api_key}`
-7. **Implement Phase 1 DataMart tools** -- Start with `search_projects` and `get_project` as proof of concept; verify with stdio transport
-8. **Implement Phase 1 REST tools** -- `search_users`, `get_user`, `get_reference_data`
-9. **Add resources** -- DataMart entity schemas as MCP Resources; embed compact field hints in tool descriptions
-10. **Add prompts** -- `/project_status`, `/portfolio_overview`, `/risk_analysis`, `/team_workload`
-11. **Add `query_datamart` advanced tool** -- Raw GraphQL with `@itm/datamart-query-guard` validation
-12. **Build gateway PM-scope injection** -- Add license type to gateway's `UserAccount` object; compute and inject `X-PM-Scope-User-Id` from authenticated user. Unblocks PM users for stdio. (ITM.API)
-13. **Build OAuth authorization server** -- Authorization + token + exchange endpoints in ITM.Account; OAuth-aware login page in ITM.Web; metadata endpoints. (ITM.Account, ITM.Web)
-14. **Streamable HTTP transport** -- Protected resource metadata, OAuth token validation, token exchange flow. Verify PM-scope propagation E2E. (ITM.MCP)
-15. **Documentation** -- Usage guide for end users configuring their AI clients, per-client config examples
+### Phase 1 -- Read-Only (stdio)
+
+| # | Step | Repo | Status |
+|---|------|------|--------|
+| 1 | Identity resolution endpoint (`POST /v2/{co}/resolve/identity`) | ITM.Account | ✅ DONE |
+| 2 | Copy query validator from PMPilot's `validators.js` into `src/validation/query-validator.ts`; add sync comments to both files | ITM.MCP + ITM.PMPilot | ✅ Done |
+| 3 | Verify DataMart license policy matches spec (Section 12) | ITM.DataMart | ⬜ To do |
+| 4 | Initialize repo (`npm init`, SDK, TypeScript, Vitest) | ITM.MCP | ⬜ To do |
+| 5 | Auth layer (EffectiveUserContext, API key auth, license interpreter, PM-only rejection) | ITM.MCP | ⬜ To do |
+| 6 | Gateway client (single HTTP client for DataMart + v2 REST through gateway) | ITM.MCP | ⬜ To do |
+| 7 | DataMart tools (`search_projects`, `get_project`, tasks, risks, issues, budget, portfolio) | ITM.MCP | ⬜ To do |
+| 8 | REST tools (`search_users`, `get_user`, `get_reference_data`) | ITM.MCP | ⬜ To do |
+| 9 | Resources (DataMart entity schemas, field hints in tool descriptions) | ITM.MCP | ⬜ To do |
+| 10 | Prompts (`/project_status`, `/portfolio_overview`, `/risk_analysis`, `/team_workload`) | ITM.MCP | ⬜ To do |
+| 11 | `query_datamart` tool with query guard validation | ITM.MCP | ⬜ To do |
+| 12 | Documentation (usage guide, per-client config examples) | ITM.MCP | ⬜ To do |
+
+### Phase 2 -- Writes + Streamable HTTP
+
+| # | Step | Repo | Status |
+|---|------|------|--------|
+| 13 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
+| 14 | OAuth authorization server (authorize, token, exchange endpoints) | ITM.Account | ⬜ To do |
+| 15 | OAuth login/consent page | ITM.Web | ⬜ To do |
+| 16 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ⬜ To do |
+| 17 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ⬜ To do |
+| 18 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ⬜ To do |
+
+### Phase 3 -- Advanced
+
+| # | Step | Repo | Status |
+|---|------|------|--------|
+| 19 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
+| 20 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
+| 21 | Extension management tools | ITM.MCP | ⬜ To do |
