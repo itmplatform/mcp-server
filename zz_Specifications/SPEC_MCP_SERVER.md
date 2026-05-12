@@ -1,8 +1,8 @@
 # ITM Platform MCP Server
 
-> **Status:** Pre-development -- specification and discovery  
-> **Date:** 2026-05-08  
-> **Phases:** 1 Read-Only (stdio) ⬜ | 2 Writes + HTTP ⬜ | 3 Advanced ⬜
+> **Status:** Phase 1 complete -- 76 unit tests, 18 E2E tests passing  
+> **Date:** 2026-05-12  
+> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⬜ | 3 Advanced ⬜
 
 ---
 
@@ -67,7 +67,7 @@ MCP authentication resolves to a single context object at the MCP boundary. All 
 
 ```ts
 interface EffectiveUserContext {
-  source: "api-key" | "oauth";      // how the user was authenticated
+  source: "api-key" | "token";       // how the user was authenticated
   company: string;                   // tenant slug (e.g. "acme")
   accountId: number;                 // numeric account ID
   userId: number;                    // numeric user ID
@@ -76,11 +76,11 @@ interface EffectiveUserContext {
   licenseTypeIds: number[];          // all license type IDs for the user
   dataMartAccess: "full" | "pm-scoped" | "none";
   pmScopeUserId?: number;           // set only when dataMartAccess is "pm-scoped"
-  sessionToken?: string;            // internal gateway session token (Phase 2 only)
+  authHeaders: Record<string, string>; // auth headers injected into all gateway requests
 }
 ```
 
-The API key (Phase 1) or session token (Phase 2) is held by the HTTP client layer and injected into every gateway request. Neither is exposed to tools -- tools only see the context object.
+The auth headers (`Authorization: Bearer {api_key}` or `Token: {session_token}`) are held in the context and injected into every gateway request via the client layer. Neither raw credentials nor headers are exposed to tools -- tools only see the context object.
 
 ### 3.2 How MCP Auth Differs from Existing Systems
 
@@ -144,7 +144,8 @@ User provides API key and company slug as environment variables:
 |----------|----------|---------|
 | `ITM_API_URL` | Yes | Base URL for ITM.API gateway (local, stage, or production) |
 | `ITM_COMPANY` | Yes | Company/tenant slug |
-| `ITM_API_KEY` | Yes | Per-user API key (generated from ITM Platform profile page). Used as `Authorization: Bearer` for all gateway calls. |
+| `ITM_API_KEY` | One required | Per-user API key (generated from ITM Platform profile page). Used as `Authorization: Bearer` for all gateway calls. |
+| `ITM_TOKEN` | One required | Session token (alternative to API key). Used as `Token` header for all gateway calls. Useful for development when no API key is configured; obtain via the GUID login endpoint. |
 
 **Startup flow:**
 
@@ -654,16 +655,19 @@ The typed tools (`search_projects`, `get_project`, etc.) compose safe DataMart q
 ITM.MCP/
   src/
     server.ts              # MCP server bootstrap (stdio + HTTP transports)
+    logger.ts              # Pino logger to stderr (stdout reserved for MCP stdio protocol)
     auth/
-      effective-user-context.ts  # EffectiveUserContext type and builder
-      api-key-auth.ts            # Phase 1: API key auth, calls identity resolution endpoint
+      effective-user-context.ts  # EffectiveUserContext type
+      api-key-auth.ts            # Phase 1: API key / session token auth, calls identity resolution endpoint
       oauth-auth.ts              # Phase 2: OAuth 2.1 token validation + exchange
       oauth-metadata.ts          # Phase 2: /.well-known/oauth-protected-resource
       license-resolver.ts        # License type interpretation (licenseTypeIds -> dataMartAccess)
     clients/
+      index.ts             # createClients() factory (single entry point)
       datamart-client.ts   # DataMart GraphQL client (through gateway)
       rest-client.ts       # v2 REST HTTP client (through gateway)
     tools/
+      graphql-queries.ts   # Fixed GraphQL query templates, default projections, clampLimit()
       projects.ts          # search_projects, get_project (DataMart-backed)
       services.ts          # search_services, get_service (DataMart-backed)
       tasks.ts             # list_project_tasks (DataMart-backed)
@@ -702,7 +706,7 @@ ITM.MCP/
 | Language | TypeScript | Best MCP SDK support; matches ITM.DataMart and ITM.PMPilot |
 | MCP SDK | `@modelcontextprotocol/sdk` | Official, Tier 1, full primitive support |
 | Runtime | Node.js | Matches existing Node.js services |
-| HTTP client | `axios` or native `fetch` | Calls ITM v2 REST API |
+| HTTP client | Native `fetch` | Calls ITM v2 REST API (no axios dependency) |
 | Validation | `zod` | Already used in ITM.DataMart; validates tool inputs |
 | Query guards | `src/validation/query-validator.ts` | Copied from PMPilot's `validators.js` with sync comments (see Section 12) |
 | Testing | `vitest` | Already used in ITM.DataMart and ITM.PMPilot |
@@ -718,7 +722,7 @@ ITM.MCP/
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `npm run dev` | `tsx watch src/server.ts` | Start MCP server in dev mode (HTTP on port 6160, auto-reload on changes) |
+| `npm run dev` | `cross-env PORT=6160 node --env-file=.env --import tsx src/server.ts` | Start MCP server in dev mode (HTTP on port 6160, loads `.env`) |
 | `npm run build` | `tsc` | Compile TypeScript to `dist/` |
 | `npm start` | `node dist/server.js` | Start compiled server (stdio mode, used by AI clients) |
 | `npm test` | `vitest` | Run unit tests |
@@ -731,7 +735,9 @@ Starts the MCP server with Streamable HTTP transport on **port 6160**. This allo
 ```env
 ITM_API_URL=http://localhost/ITM.API
 ITM_COMPANY=testsmarter
+# Use ONE of the following:
 ITM_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+# ITM_TOKEN=your-session-token-here
 ```
 
 The dev server is the primary way to verify tools during development. Start it, test with curl (Section 15), and stop it with Ctrl+C. It can be restarted freely between test runs.
@@ -868,7 +874,7 @@ These must be resolved before the MCP server can go to production:
 | Identity resolution endpoint | `POST /v2/{co}/resolve/identity` must be built. Returns userId, accountId, email, languageId, licenseTypeIds, computed dataMartAccess, pmScopeUserId. Both phases depend on it. See Section 3.7. | ITM.Account | ✅ Done |
 | DataMart query validator | `query_datamart` must not ship without validation guards. Copy PMPilot's `inference/datamart/validators.js` (~150 lines, zero deps) into `src/validation/query-validator.ts` (ported to TypeScript). Both files carry sync comments pointing to each other. Allowed operators: `$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, `$regex`, `$options`, `$exists`, `$not`, `$and`, `$or`, `$nor`. Note: `$not` is allowed by DataMart's `validate.ts` but not in PMPilot's current allow-list -- the MCP copy must add it. Allowed aggregation stages: `$match`, `$project`, `$group`, `$sort`, `$limit`, `$skip`, `$unwind`, `$addFields`, `$set`, `$unset`. Banned: `$lookup`, `$merge`, `$out`, `$function`, `$accumulator`, `$where` (JS execution), `$facet` (DoS surface). Enforce `$limit` on every aggregation (max 1000). | ITM.MCP (+ sync comment in ITM.PMPilot) | ⬜ To do |
 | Gateway PM-scope injection | The gateway must compute `X-PM-Scope-User-Id` from the authenticated user's license type and inject it, so DataMart does not rely on client-supplied headers. Requires adding license type to the gateway's `UserAccount` object (currently only has UserId, AccountId, LanguageId, IsCompanyAdmin). Until this ships, PM-only users are blocked from stdio. Phase 2 HTTP is unaffected (server-side, trusted zone). | ITM.API | ⬜ Prerequisite for PM stdio |
-| License policy verification | DataMart's `accessService.ts` already defines allowed license types as `[0, 1, 2]` (CompanyAdmin, FullUser, ProjectManager). PM-scoped access works in production via PMPilot. Verify this matches the spec and remove any stale TODOs. | ITM.DataMart | ⬜ To verify (low risk) |
+| License policy verification | DataMart's `accessService.ts` already defines allowed license types as `[0, 1, 2]` (CompanyAdmin, FullUser, ProjectManager). PM-scoped access works in production via PMPilot. Verified: matches spec. | ITM.DataMart | ✅ Verified |
 
 ---
 
@@ -908,17 +914,17 @@ These must be resolved before the MCP server can go to production:
 |---|------|------|--------|
 | 1 | Identity resolution endpoint (`POST /v2/{co}/resolve/identity`) | ITM.Account | ✅ DONE |
 | 2 | Copy query validator from PMPilot's `validators.js` into `src/validation/query-validator.ts`; add sync comments to both files | ITM.MCP + ITM.PMPilot | ✅ Done |
-| 3 | Verify DataMart license policy matches spec (Section 12) | ITM.DataMart | ⬜ To do |
-| 4 | Initialize repo (`npm init`, SDK, TypeScript, Vitest) | ITM.MCP | ⬜ To do |
-| 5 | Auth layer (EffectiveUserContext, API key auth, license interpreter, PM-only rejection) | ITM.MCP | ⬜ To do |
-| 6 | Gateway client (single HTTP client for DataMart + v2 REST through gateway) | ITM.MCP | ⬜ To do |
-| 7 | DataMart tools (`search_projects`, `get_project`, tasks, risks, issues, budget, portfolio) | ITM.MCP | ⬜ To do |
-| 8 | REST tools (`search_users`, `get_user`, `get_reference_data`) | ITM.MCP | ⬜ To do |
-| 9 | Resources (DataMart entity schemas, field hints in tool descriptions) | ITM.MCP | ⬜ To do |
-| 10 | Prompts (`/project_status`, `/portfolio_overview`, `/risk_analysis`, `/team_workload`) | ITM.MCP | ⬜ To do |
-| 11 | `query_datamart` tool with query guard validation | ITM.MCP | ⬜ To do |
-| 12 | E2E tests -- verify all Phase 1 tools against local services with curl and `npm run test:e2e` (Section 15) | ITM.MCP | ⬜ To do |
-| 13 | Documentation (usage guide, per-client config examples) | ITM.MCP | ⬜ To do |
+| 3 | Verify DataMart license policy matches spec (Section 12) | ITM.DataMart | ✅ Done |
+| 4 | Initialize repo (`npm init`, SDK, TypeScript, Vitest) | ITM.MCP | ✅ Done |
+| 5 | Auth layer (EffectiveUserContext, API key auth, license interpreter, PM-only rejection) | ITM.MCP | ✅ Done |
+| 6 | Gateway client (single HTTP client for DataMart + v2 REST through gateway) | ITM.MCP | ✅ Done |
+| 7 | DataMart tools (`search_projects`, `get_project`, tasks, risks, issues, budget, portfolio) | ITM.MCP | ✅ Done |
+| 8 | REST tools (`search_users`, `get_user`, `get_reference_data`) | ITM.MCP | ✅ Done |
+| 9 | Resources (DataMart entity schemas, field hints in tool descriptions) | ITM.MCP | ✅ Done |
+| 10 | Prompts (`/project_status`, `/portfolio_overview`, `/risk_analysis`, `/team_workload`) | ITM.MCP | ✅ Done |
+| 11 | `query_datamart` tool with query guard validation | ITM.MCP | ✅ Done |
+| 12 | E2E tests -- verify all Phase 1 tools against local services with curl and `npm run test:e2e` (Section 15) | ITM.MCP | ✅ Done |
+| 13 | Documentation (usage guide, per-client config examples) | ITM.MCP | ✅ Done |
 
 ### Phase 2 -- Writes + Streamable HTTP
 
@@ -959,7 +965,7 @@ The following services must be running locally before E2E tests. Verify each one
 
 Credentials, URLs, and connection details: [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md).
 
-**API key for testing:** Generate from My Profile in ITM Platform (local), or use the login endpoint to get a session token first. The MCP server needs the API key as `ITM_API_KEY` in `.env`.
+**Credentials for testing:** Either generate an API key from My Profile in ITM Platform (set `ITM_API_KEY` in `.env`), or obtain a session token via the GUID login endpoint `GET /{company}/login/{guid}` and set `ITM_TOKEN` in `.env`. Only one is needed.
 
 ### 15.2 Server Lifecycle
 
@@ -971,7 +977,7 @@ npm run dev
 # Stop with Ctrl+C. Restart freely between test runs.
 ```
 
-The dev server auto-reloads on code changes. For a clean-build test:
+For a clean-build test:
 
 ```bash
 npm run build && npm start -- --http --port 6160
@@ -1009,7 +1015,7 @@ Expected response body:
   "id": 1,
   "result": {
     "protocolVersion": "2025-11-25",
-    "capabilities": { "tools": {}, "resources": {}, "prompts": {} },
+    "capabilities": { "tools": { "listChanged": true }, "resources": { "listChanged": true }, "prompts": { "listChanged": true } },
     "serverInfo": { "name": "itm-platform", "version": "1.0.0" }
   }
 }
@@ -1020,6 +1026,7 @@ Expected response body:
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{"jsonrpc": "2.0", "method": "notifications/initialized"}'
 ```
@@ -1029,6 +1036,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}'
 ```
@@ -1046,6 +1054,7 @@ After session setup, test each tool. All curl commands use the same endpoint and
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 10,
@@ -1064,6 +1073,7 @@ Expected: `result.content` contains an array of projects with `id`, `name`, `sta
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 11,
@@ -1082,6 +1092,7 @@ Expected: project fields (`id`, `name`, `statusLabel`, `percentComplete`) plus r
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 12,
@@ -1100,6 +1111,7 @@ Expected: array of tasks with `taskId`, `name`, `statusLabel`, `assignedTo`.
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 13,
@@ -1118,6 +1130,7 @@ Expected: array of risks (may be empty if project has none -- that is a valid re
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 14,
@@ -1134,6 +1147,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 15,
@@ -1152,6 +1166,7 @@ Expected: budget objects (`budgetTopDown`, `budgetBottomUp`, `budgetActual`, `bu
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 16,
@@ -1166,6 +1181,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 17,
@@ -1182,6 +1198,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 18,
@@ -1203,6 +1220,7 @@ Expected: grouped aggregation results (e.g., `{"_id": "In Progress", "count": 12
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 19,
@@ -1221,6 +1239,7 @@ Expected: array of users with `userId`, `name`, `email`.
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 20,
@@ -1237,6 +1256,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 21,
@@ -1255,6 +1275,7 @@ Expected: array of status objects with `id`, `name`.
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 22,
@@ -1278,6 +1299,7 @@ Expected: array of projects with >= 50% completion. Verify the query validator r
 ```bash
 curl -s -X POST http://localhost:6160/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{
     "jsonrpc": "2.0", "id": 23,
@@ -1315,9 +1337,8 @@ The manual curl tests above are codified as automated tests in `tests/e2e/`:
 
 ```
 tests/e2e/
-  setup.ts           # Start MCP server, initialize session, export session helpers
-  teardown.ts        # Stop MCP server, clean up test data
-  auth.e2e.test.ts   # Identity resolution, PM-only rejection, Team Member rejection
+  setup.ts           # Connect to running server (or spawn one), initialize MCP session, export helpers
+  auth.e2e.test.ts   # Session initialization, tool listing verification
   projects.e2e.test.ts   # search_projects, get_project
   tasks.e2e.test.ts      # list_project_tasks
   financials.e2e.test.ts # budget, purchases, revenues
