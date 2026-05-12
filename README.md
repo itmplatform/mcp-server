@@ -4,7 +4,7 @@
 
 MCP (Model Context Protocol) server for ITM Platform. Exposes project management data to AI assistants -- Claude, ChatGPT, VS Code Copilot, Cursor, JetBrains -- through a universal open protocol.
 
-**Status:** Phase 1 complete -- read-only, stdio transport. 15 tools, 6 resources, 4 prompts. 76 unit tests, 18 E2E tests.
+**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scaffolding and audit logging infrastructure in place. 124 unit tests, 23 E2E tests.
 
 See [House Rules](../House-rules.md) for coding conventions.
 
@@ -47,7 +47,7 @@ ITM.API Gateway --> DataMart (GraphQL) + v2 REST (users, reference data)
 ```bash
 npm install
 cp .env.sample .env   # edit with your credentials
-npm test              # unit tests (76 tests)
+npm test              # unit tests (124 tests)
 npm run build         # compile TypeScript to dist/
 npm run dev           # HTTP dev server on port 6160 (for testing with curl)
 npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
@@ -127,6 +127,18 @@ Add to `.cursor/mcp.json` or IDE MCP settings -- same JSON structure as above.
 | `get_user` | User details |
 | `get_reference_data` | Status lists, types, priorities for any entity |
 
+### Write tools (Phase 2 -- v2 REST-backed)
+
+| Tool | Description |
+|------|-------------|
+| `create_task` | Create a new task in a project |
+| `update_task` | PATCH task fields (status, dates, assignee, progress) |
+| `create_risk` | Log a new risk in a project |
+| `create_issue` | Log a new issue in a project |
+| `update_project` | PATCH project fields (name, status, dates, priority) |
+
+Write tools return confirmed state from v2 REST (source of truth). Subsequent DataMart reads may lag 5-60 seconds due to eventual consistency -- this is noted in every write response.
+
 ## Prompts
 
 Workflow templates the user can trigger. The MCP server returns a pre-composed message that instructs the AI to call the right tools.
@@ -142,16 +154,21 @@ Workflow templates the user can trigger. The MCP server returns a pre-composed m
 
 ```
 src/
-  server.ts                # MCP server bootstrap (stdio + HTTP)
+  server.ts                # MCP server bootstrap (stdio + HTTP, per-session auth)
   logger.ts                # Pino logger factory (stderr + rotating file in logs/mcp.log)
   auth/
-    effective-user-context.ts  # User identity resolved at startup
+    effective-user-context.ts  # User identity type
     api-key-auth.ts            # API key auth, calls /resolve/identity
     license-resolver.ts        # License type -> access level
+    oauth-auth.ts              # Phase 2: OAuth token exchange
+    oauth-metadata.ts          # Phase 2: /.well-known/oauth-protected-resource
+    token-extraction.ts        # Bearer token extraction from headers
   clients/
     datamart-client.ts     # DataMart GraphQL through gateway
-    rest-client.ts         # v2 REST through gateway
+    rest-client.ts         # v2 REST through gateway (GET, POST, PATCH)
+    audit-client.ts        # Phase 2: audit logging (fire-and-forget)
   tools/                   # One file per tool group
+    write-tools.ts         # Phase 2: create/update tools (task, risk, issue, project)
   resources/               # Schema + calendar resources
   prompts/                 # Workflow templates
   validation/

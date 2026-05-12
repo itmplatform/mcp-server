@@ -125,4 +125,33 @@ describe('RestClient', () => {
       expect(result).toEqual({ ok: true });
     });
   });
+
+  it('PATCH sends body as JSON with PATCH method', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 42, Name: 'Updated Task' }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = createRestClient(config);
+    const body = { Name: 'Updated Task' };
+    const result = await client.patch('projects/100/tasks/42', body);
+
+    const call = mockFetch.mock.calls[0];
+    expect(call[0]).toBe('http://localhost/ITM.API/v2/acme/projects/100/tasks/42');
+    expect(call[1].method).toBe('PATCH');
+    expect(JSON.parse(call[1].body)).toEqual(body);
+    expect(result).toEqual({ id: 42, Name: 'Updated Task' });
+  });
+
+  it('PATCH throws on non-200 response', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+    });
+
+    const client = createRestClient(config);
+    await expect(client.patch('projects/100', { Name: 'x' })).rejects.toThrow('400');
+  });
 });

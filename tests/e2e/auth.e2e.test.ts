@@ -25,6 +25,7 @@ describe('auth and session', () => {
       'search_users', 'get_user',
       'get_reference_data',
       'query_datamart',
+      'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
     ];
 
     for (const name of expectedTools) {

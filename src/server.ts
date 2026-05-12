@@ -15,16 +15,28 @@ import { registerPortfolioTools } from './tools/portfolio.js';
 import { registerDataMartTool } from './tools/datamart.js';
 import { registerUserTools } from './tools/users.js';
 import { registerReferenceDataTools } from './tools/reference-data.js';
+import { registerWriteTools } from './tools/write-tools.js';
 import { registerSchemaResources } from './resources/schemas.js';
 import { registerCalendarResources } from './resources/calendars.js';
 import { registerProjectStatusPrompt } from './prompts/project-status.js';
 import { registerPortfolioOverviewPrompt } from './prompts/portfolio-overview.js';
 import { registerTeamWorkloadPrompt } from './prompts/team-workload.js';
 import { registerRiskAnalysisPrompt } from './prompts/risk-analysis.js';
+import { buildProtectedResourceMetadata } from './auth/oauth-metadata.js';
+import { extractBearerToken } from './auth/token-extraction.js';
+import { exchangeToken, buildEffectiveUserContextFromExchange, type OAuthConfig } from './auth/oauth-auth.js';
+import { createAuditClient } from './clients/audit-client.js';
+import type { EffectiveUserContext } from './auth/effective-user-context.js';
 
 const log = createLogger('mcp');
 
-function createMcpServer(clients: Clients): McpServer {
+interface WriteUserContext {
+  userId: number;
+  accountId: number;
+  aiClientId: string;
+}
+
+function createMcpServer(clients: Clients, writeCtx: WriteUserContext): McpServer {
   const server = new McpServer(
     { name: 'itm-platform', version: '1.0.0' },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -39,6 +51,7 @@ function createMcpServer(clients: Clients): McpServer {
   registerDataMartTool(server, clients);
   registerUserTools(server, clients);
   registerReferenceDataTools(server, clients);
+  registerWriteTools(server, clients, writeCtx);
 
   registerSchemaResources(server, clients);
   registerCalendarResources(server, clients);
@@ -51,10 +64,39 @@ function createMcpServer(clients: Clients): McpServer {
   return server;
 }
 
+function buildClientsForUser(userContext: EffectiveUserContext): Clients {
+  const auditEnabled = process.env.ITM_AUDIT_ENABLED === 'true';
+  const audit = auditEnabled
+    ? createAuditClient({
+        apiUrl: process.env.ITM_API_URL!,
+        company: userContext.company,
+        authHeaders: userContext.authHeaders,
+        log,
+      })
+    : undefined;
+
+  return createClients({
+    apiUrl: process.env.ITM_API_URL!,
+    company: userContext.company,
+    authHeaders: userContext.authHeaders,
+    log,
+  }, audit);
+}
+
+function getOAuthConfig(): OAuthConfig | undefined {
+  const authUrl = process.env.ITM_AUTH_URL;
+  const audience = process.env.MCP_SERVER_URL;
+  if (!authUrl || !audience) return undefined;
+  return {
+    tokenExchangeUrl: `${authUrl}/auth/exchange-token`,
+    audience,
+  };
+}
+
 async function main() {
   log.info('ITM Platform MCP server starting...');
 
-  let userContext;
+  let userContext: EffectiveUserContext;
   try {
     userContext = await resolveIdentity();
     log.info({ userId: userContext.userId, email: userContext.email, access: userContext.dataMartAccess }, 'Identity resolved');
@@ -63,12 +105,8 @@ async function main() {
     process.exit(1);
   }
 
-  const clients = createClients({
-    apiUrl: process.env.ITM_API_URL!,
-    company: userContext.company,
-    authHeaders: userContext.authHeaders,
-    log,
-  });
+  const clients = buildClientsForUser(userContext);
+  const oauthConfig = getOAuthConfig();
 
   const useHttp = process.env.PORT || process.argv.includes('--http');
 
@@ -76,8 +114,24 @@ async function main() {
     const port = parseInt(process.env.PORT ?? '6160', 10);
     const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
 
+    if (oauthConfig) {
+      log.info('OAuth configured -- per-session auth enabled');
+    } else {
+      log.info('OAuth not configured -- using startup identity for all sessions');
+    }
+
     const httpServer = createServer(async (req, res) => {
       try {
+      if (req.method === 'GET' && req.url === '/.well-known/oauth-protected-resource') {
+        const metadata = buildProtectedResourceMetadata({
+          mcpServerUrl: process.env.MCP_SERVER_URL ?? `http://localhost:${port}`,
+          authorizationServerUrl: process.env.ITM_AUTH_URL ?? '',
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(metadata));
+        return;
+      }
+
       if (req.method === 'POST' && req.url === '/mcp') {
         const body = await new Promise<string>((resolve) => {
           let data = '';
@@ -92,7 +146,34 @@ async function main() {
         if (sessionId && sessions.has(sessionId)) {
           transport = sessions.get(sessionId)!.transport;
         } else if (!sessionId && parsed.method === 'initialize') {
-          const server = createMcpServer(clients);
+          let sessionClients = clients;
+          let sessionUserContext = userContext;
+          const aiClientId = parsed.params?.clientInfo?.name ?? 'unknown';
+
+          if (oauthConfig) {
+            const oauthToken = extractBearerToken(req.headers as Record<string, string | undefined>);
+            if (oauthToken) {
+              try {
+                const exchangeResult = await exchangeToken(oauthToken, oauthConfig, log);
+                sessionUserContext = buildEffectiveUserContextFromExchange(exchangeResult);
+                sessionClients = buildClientsForUser(sessionUserContext);
+                log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
+              } catch (err) {
+                log.error({ err }, 'OAuth token exchange failed');
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Authentication failed' }));
+                return;
+              }
+            }
+          }
+
+          const writeCtx: WriteUserContext = {
+            userId: sessionUserContext.userId,
+            accountId: sessionUserContext.accountId,
+            aiClientId,
+          };
+
+          const server = createMcpServer(sessionClients, writeCtx);
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             enableJsonResponse: true,
@@ -104,6 +185,7 @@ async function main() {
           await transport.handleRequest(req, res, parsed);
           if (transport.sessionId) {
             sessions.set(transport.sessionId, { server, transport });
+            log.debug({ sessionId: transport.sessionId, aiClientId }, 'Session created');
           }
           return;
         } else {
@@ -133,7 +215,12 @@ async function main() {
       log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/mcp`);
     });
   } else {
-    const server = createMcpServer(clients);
+    const writeCtx: WriteUserContext = {
+      userId: userContext.userId,
+      accountId: userContext.accountId,
+      aiClientId: 'stdio',
+    };
+    const server = createMcpServer(clients, writeCtx);
     const transport = new StdioServerTransport();
     await server.connect(transport);
     log.info({ transport: 'stdio' }, 'MCP server connected via stdio');

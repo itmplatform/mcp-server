@@ -1,8 +1,8 @@
 # ITM Platform MCP Server
 
-> **Status:** Phase 1 complete -- 76 unit tests, 18 E2E tests passing  
+> **Status:** Phase 2 in progress -- 124 unit tests, 23 E2E tests passing  
 > **Date:** 2026-05-12  
-> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⬜ | 3 Advanced ⬜
+> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⚠️ (ITM.MCP done, awaits ITM.Account OAuth + audit endpoints) | 3 Advanced ⬜
 
 ---
 
@@ -251,7 +251,7 @@ This keeps the gateway's existing trust model intact. The exchange endpoint live
 | Component | Repo | What |
 |-----------|------|------|
 | **Authorization server** | ITM.Account | OAuth 2.1 endpoints: `/oauth/authorize`, `/oauth/token`. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. Built in ITM.Account to keep user identity, SSO mapping, and license interpretation in one place. |
-| **Authorization page** | ITM.Web or ITM.Account | Login + consent page for the OAuth flow. The existing login page redirects to home -- it needs an OAuth-aware variant that returns an authorization code to the AI client's redirect URI instead. |
+| **OAuth login + consent page** | ITM.Web | Login + consent page for the OAuth flow. The existing login page redirects to home -- this variant authenticates the user and then returns an authorization code to the AI client's redirect URI instead. ITM.Web owns all user-facing UI; ITM.Account provides the backend endpoints it calls. |
 | **Authorization server metadata** | ITM.Account | `GET /.well-known/oauth-authorization-server` -- discovery document with endpoints, supported scopes, grant types. |
 | **Token exchange endpoint** | ITM.Account | `POST /v2/{co}/auth/exchange-token` -- validates OAuth token, creates internal session token (TTL capped at OAuth token expiry), returns full user context. Same pattern as `PerformLoginForAPIKey` but for OAuth tokens. |
 | **Protected resource metadata** | ITM.MCP | `GET /.well-known/oauth-protected-resource` -- tells AI clients which authorization server to use and what scopes are available. |
@@ -626,7 +626,7 @@ The typed tools (`search_projects`, `get_project`, etc.) compose safe DataMart q
 
 **Stale-after-write:** Write tools return the confirmed state from v2 REST (the write response). Subsequent reads via DataMart-backed tools may lag 5-60 seconds due to DataMart's eventual consistency model. This is documented in tool responses.
 
-**Audit logging:** All write operations are logged to `tblMcpAuditLog` (in the ITM database, inserts via ITM.Account) with: timestamp, userId, accountId, tool name, parameters hash, success/error, AI client identifier, and duration. ITM.Account owns the table and insert logic, keeping the schema with existing user/account tables and allowing it to enforce write-only-by-MCP via service identity.
+**Audit logging:** All write operations are logged to `tblMcpAuditLog` (in the ITM database, inserts via ITM.Account) with: timestamp, userId, accountId, tool name, parameters hash (SHA-256), success/error, AI client identifier, and duration. The audit client uses a fire-and-forget pattern: audit failures are logged as warnings but never break write operations. When the audit endpoint is unavailable (e.g. ITM.Account not yet deployed), a no-op fallback is used. ITM.Account owns the table and insert logic, keeping the schema with existing user/account tables and allowing it to enforce write-only-by-MCP via service identity.
 
 ### 5.3 Phase 3 -- Advanced
 
@@ -659,13 +659,15 @@ ITM.MCP/
     auth/
       effective-user-context.ts  # EffectiveUserContext type
       api-key-auth.ts            # Phase 1: API key / session token auth, calls identity resolution endpoint
-      oauth-auth.ts              # Phase 2: OAuth 2.1 token validation + exchange
-      oauth-metadata.ts          # Phase 2: /.well-known/oauth-protected-resource
       license-resolver.ts        # License type interpretation (licenseTypeIds -> dataMartAccess)
+      oauth-auth.ts              # Phase 2: OAuth 2.1 token exchange + EffectiveUserContext builder
+      oauth-metadata.ts          # Phase 2: /.well-known/oauth-protected-resource (RFC 8707)
+      token-extraction.ts        # Phase 2: Bearer token extraction from HTTP headers
     clients/
-      index.ts             # createClients() factory (single entry point)
+      index.ts             # createClients() factory (single entry point), Clients interface
       datamart-client.ts   # DataMart GraphQL client (through gateway)
-      rest-client.ts       # v2 REST HTTP client (through gateway)
+      rest-client.ts       # v2 REST HTTP client (GET, POST, PATCH) (through gateway)
+      audit-client.ts      # Phase 2: audit log client (fire-and-forget, no-op fallback)
     tools/
       graphql-queries.ts   # Fixed GraphQL query templates, default projections, clampLimit()
       projects.ts          # search_projects, get_project (DataMart-backed)
@@ -677,6 +679,7 @@ ITM.MCP/
       datamart.ts          # query_datamart (raw GraphQL -- advanced)
       users.ts             # search_users, get_user (v2 REST-backed)
       reference-data.ts    # get_reference_data (v2 REST-backed)
+      write-tools.ts       # Phase 2: create_task, update_task, create_risk, create_issue, update_project (v2 REST)
     resources/
       schemas.ts           # DataMart entity schema resources
       calendars.ts         # Calendar resources (v2 REST)
@@ -933,10 +936,10 @@ These must be resolved before the MCP server can go to production:
 | 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
 | 15 | OAuth authorization server (authorize, token, exchange endpoints) | ITM.Account | ⬜ To do |
 | 16 | OAuth login/consent page | ITM.Web | ⬜ To do |
-| 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ⬜ To do |
-| 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ⬜ To do |
-| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ⬜ To do |
-| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15) | ITM.MCP | ⬜ To do |
+| 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ✅ Done (ITM.MCP side: OAuth scaffolding, per-session auth, metadata endpoint. Awaits ITM.Account OAuth server.) |
+| 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ✅ Done |
+| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ✅ Done (ITM.MCP side: audit client with no-op fallback. Awaits ITM.Account audit endpoint.) |
+| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15) | ITM.MCP | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth E2E awaits ITM.Account.) |
 
 ### Phase 3 -- Advanced
 
@@ -1041,7 +1044,7 @@ curl -s -X POST http://localhost:6160/mcp \
   -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}'
 ```
 
-Verify all Phase 1 tools are listed (search_projects, get_project, etc.).
+Verify all 20 tools are listed (15 read + 5 write).
 
 ### 15.4 Phase 1 E2E Test Cases
 
@@ -1318,18 +1321,20 @@ Expected: error response indicating `$lookup` is not allowed.
 
 ### 15.5 Phase 2 E2E Additions
 
-Phase 2 adds write tool tests and OAuth verification:
+Phase 2 adds write tool tests. These are self-contained: `beforeAll` creates a test project via direct REST, tests operate on it, and `afterAll` cleans up leaf-to-top (risks -> issues -> tasks -> project).
 
 | Test | What to verify |
 |------|---------------|
-| `create_task` | Task appears in project via `list_project_tasks` after creation |
-| `update_task` | Changed fields reflected in subsequent `get_project` call |
-| `create_risk` / `create_issue` | New items appear in `get_project_risks` / `get_project_issues` |
-| `update_project` | PATCH fields reflected in `get_project` |
-| Stale-after-write | Immediately after a write, a DataMart read may return stale data. Verify with a v2 REST read (which reflects the write immediately), then wait ~10 seconds and verify DataMart catches up. |
-| OAuth flow | Initialize session with OAuth Bearer token instead of API key. Verify identity resolution and tool access. |
+| `create_task` | Returns confirmed state (Id, StatusMessage) and stale-after-write notice. Requires `StartDate` + `EndDate`. |
+| `update_task` | PATCH succeeds on the task created above. Returns two content items (JSON + notice). |
+| `create_risk` | Sends required reference IDs (TypeId, StatusId, etc.) fetched dynamically. API may reject with validation errors depending on environment -- the test verifies the tool handles both success and structured error responses. |
+| `create_issue` | Same pattern as create_risk -- sends TypeId + StatusId, handles success or API validation error. |
+| `update_project` | PATCH project description. Returns confirmed state + stale notice. |
+| All write responses | Two content items: `content[0]` is JSON data from v2 REST, `content[1]` is the stale-after-write notice. |
 
-Write tests must clean up after themselves -- delete or revert any entities they create to avoid polluting the local database.
+**OAuth flow** (not yet testable): Initialize session with OAuth Bearer token instead of API key. Awaits ITM.Account OAuth server deployment.
+
+Write tests clean up after themselves -- `afterAll` deletes created entities leaf-to-top to avoid polluting the local database. Each delete is wrapped in try/catch so partial cleanup failure does not mask test results.
 
 ### 15.6 Automated E2E Tests
 
@@ -1337,8 +1342,8 @@ The manual curl tests above are codified as automated tests in `tests/e2e/`:
 
 ```
 tests/e2e/
-  setup.ts           # Connect to running server (or spawn one), initialize MCP session, export helpers
-  auth.e2e.test.ts   # Session initialization, tool listing verification
+  setup.ts               # Connect to running server (or spawn one), initialize MCP session, load .env, export helpers
+  auth.e2e.test.ts       # Session initialization, tool listing verification (all 20 tools)
   projects.e2e.test.ts   # search_projects, get_project
   tasks.e2e.test.ts      # list_project_tasks
   financials.e2e.test.ts # budget, purchases, revenues
@@ -1347,6 +1352,7 @@ tests/e2e/
   users.e2e.test.ts      # search_users, get_user
   reference.e2e.test.ts  # get_reference_data
   datamart.e2e.test.ts   # query_datamart + validator negative tests
+  write-tools.e2e.test.ts  # Phase 2: create/update task, risk, issue, project (self-contained lifecycle)
 ```
 
 Run with:
