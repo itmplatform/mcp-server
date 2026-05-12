@@ -10,6 +10,7 @@ export interface RestClientConfig {
 export interface RestClient {
   get(path: string): Promise<unknown>;
   post(path: string, body: unknown): Promise<unknown>;
+  patch(path: string, body: unknown): Promise<unknown>;
 }
 
 export function createRestClient(config: RestClientConfig): RestClient {
@@ -42,5 +43,6 @@ export function createRestClient(config: RestClientConfig): RestClient {
   return {
     get: (path: string) => request('GET', path),
     post: (path: string, body: unknown) => request('POST', path, body),
+    patch: (path: string, body: unknown) => request('PATCH', path, body),
   };
 }
