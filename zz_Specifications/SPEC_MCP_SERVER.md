@@ -230,7 +230,8 @@ AI client sends:  Authorization: Bearer {oauth_token}
   v
 MCP server:
   1. Validates OAuth token (signature, audience, expiry)
-  2. Calls POST /v2/{co}/auth/exchange-token with the OAuth token
+  2. Calls POST {ITM_AUTH_URL}/auth/exchange-token with the OAuth token
+     (global endpoint, no company prefix -- company is inside the JWT)
      --> { sessionToken, userId, accountId, email, languageId, licenseTypeIds, dataMartAccess, pmScopeUserId }
   3. Builds EffectiveUserContext with sessionToken
   4. sessionToken.expiresAt = min(oauthToken.exp, ITM_SESSION_MAX_TTL)
@@ -250,13 +251,13 @@ This keeps the gateway's existing trust model intact. The exchange endpoint live
 
 | Component | Repo | What |
 |-----------|------|------|
-| **Authorization server** | ITM.Account | OAuth 2.1 endpoints: `/oauth/authorize`, `/oauth/token`. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. Built in ITM.Account to keep user identity, SSO mapping, and license interpretation in one place. |
+| **Authorization server** | ITM.Account | OAuth 2.1 endpoints: `/oauth/authorize`, `/oauth/token`. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. Built in ITM.Account to keep user identity, SSO mapping, and license interpretation in one place. Exposed publicly via a thin proxy controller in ITM.API (see [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_OAUTH_AUTHORIZATION_SERVER.md), Section 3.1). |
 | **OAuth login + consent page** | ITM.Web | Login + consent page for the OAuth flow. The existing login page redirects to home -- this variant authenticates the user and then returns an authorization code to the AI client's redirect URI instead. ITM.Web owns all user-facing UI; ITM.Account provides the backend endpoints it calls. |
-| **Authorization server metadata** | ITM.Account | `GET /.well-known/oauth-authorization-server` -- discovery document with endpoints, supported scopes, grant types. |
-| **Token exchange endpoint** | ITM.Account | `POST /v2/{co}/auth/exchange-token` -- validates OAuth token, creates internal session token (TTL capped at OAuth token expiry), returns full user context. Same pattern as `PerformLoginForAPIKey` but for OAuth tokens. |
-| **Protected resource metadata** | ITM.MCP | `GET /.well-known/oauth-protected-resource` -- tells AI clients which authorization server to use and what scopes are available. |
+| **Authorization server metadata** | ITM.Account | `GET /.well-known/oauth-authorization-server` -- discovery document with endpoints, supported scopes, grant types. Served at the issuer URL (e.g., `https://api.itmplatform.com/.well-known/oauth-authorization-server`) via ITM.API proxy. |
+| **Token exchange endpoint** | ITM.Account | `POST /auth/exchange-token` -- global endpoint (no company prefix; company is extracted from the JWT claims). Validates OAuth token, creates internal session token (TTL capped at OAuth token expiry), returns full user context. Same pattern as `PerformLoginForAPIKey` but for OAuth tokens. Proxied through ITM.API. |
+| **Protected resource metadata** | ITM.MCP | `GET /.well-known/oauth-protected-resource` -- tells AI clients which authorization server to use (`ITM_AUTH_URL`, e.g., `https://api.itmplatform.com`) and what scopes are available. |
 | **Token validation** | ITM.MCP | Validate incoming OAuth Bearer tokens, check audience and scopes, return 401/403 as appropriate. |
-| **Dynamic client registration** | ITM.Account | RFC 7591 support so unknown AI clients (ChatGPT, future tools) can register automatically. Can be Phase 2 scope. |
+| **Dynamic client registration** | ITM.Account | RFC 7591 support so unknown AI clients can register automatically. Optional/fallback -- current MCP auth guidance prefers Client ID Metadata Documents. Can be deferred past Phase 2. |
 
 **Security requirements per MCP spec:**
 - PKCE mandatory (S256 code challenge)
@@ -781,8 +782,8 @@ stdio works against any ITM Platform environment. Change `ITM_API_URL` to point 
 | Target | `ITM_API_URL` |
 |--------|---------------|
 | Local | `http://localhost/ITM.API` |
-| Stage | `https://newapi.itmplatform.com` |
-| Demo | `https://demoapi.itmplatform.com` |
+| Stage | `https://new-api.itmplatform.com` |
+| Demo | `https://demo-api.itmplatform.com` |
 | Production | `https://api.itmplatform.com` |
 
 To generate an API key: log into ITM Platform, go to My Profile, and click Generate API Key. The key is shown once -- copy it immediately. Credentials and URLs: see [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md).
@@ -794,8 +795,8 @@ Hosted as an HTTP service alongside the existing API:
 | Environment | URL | API target |
 |-------------|-----|------------|
 | Local | `http://localhost:6160/mcp` | `http://localhost/ITM.API` |
-| Demo | `https://mcp-demo.itmplatform.com/mcp` | `https://demoapi.itmplatform.com` |
-| Stage | `https://mcp-stage.itmplatform.com/mcp` | `https://newapi.itmplatform.com` |
+| Demo | `https://mcp-demo.itmplatform.com/mcp` | `https://demo-api.itmplatform.com` |
+| Stage | `https://mcp-stage.itmplatform.com/mcp` | `https://new-api.itmplatform.com` |
 | Production | `https://mcp.itmplatform.com/mcp` | `https://api.itmplatform.com` |
 
 Single hosted endpoint for all tenants. Tenant resolved from OAuth token claims.
@@ -889,7 +890,7 @@ These must be resolved before the MCP server can go to production:
 |----------|-----------|-----------|
 | **Multi-tenant model** | Multi-tenant for HTTP (single URL, tenant from OAuth claims). Single-tenant per process for stdio (tenant from `ITM_COMPANY` env var). | Operationally simpler than per-tenant hostnames. Isolation is at the token/identity layer, not the URL. |
 | **OAuth authorization server** | Build in ITM.Account, do not delegate to Auth0/Azure AD. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. | ITM already owns user identity, SSO mapping, and license interpretation. Delegating creates a sync problem. |
-| **Phase 2 token model** | OAuth-to-session-token exchange at MCP boundary via `POST /v2/{co}/auth/exchange-token`. Session token TTL capped at OAuth token expiry. MCP uses the resulting session token for gateway calls. | Smallest gateway change. Keeps gateway's existing trust model intact. No god-key / service account. |
+| **Phase 2 token model** | OAuth-to-session-token exchange at MCP boundary via `POST /auth/exchange-token` through the ITM.API proxy. Session token TTL capped at OAuth token expiry. MCP uses the resulting session token for gateway calls. | Smallest gateway change. Keeps gateway's existing trust model intact. No god-key / service account. |
 | **stdio PM restriction** | Phase 1 stdio restricted to CompanyAdmin and FullUser. PM-only users blocked until gateway PM-scope injection ships. Phase 2 HTTP supports PMs (server-side, trusted zone). | Simplest correct solution. No PM-scope headers needed for full-access users. Avoids lateral PM-to-PM access via client-supplied headers. |
 | **PMPilot overlap** | Complementary channels, not nested. PMPilot owns prompt engineering, conversation memory, ITM-specific UX. MCP owns typed tools/resources/prompts that compose DataMart and v2 REST safely. Query validation logic is copied between repos with sync comments. | Clear ownership. Copy-with-sync avoids introducing a shared package pattern that does not exist in the Node.js repos today. |
 | **DataMart query validation** | Copy PMPilot's `validators.js` into ITM.MCP as `src/validation/query-validator.ts` (TypeScript port). Both files carry sync comments pointing to each other so changes in one prompt updates in the other. | ~150 lines, zero deps. A shared npm package is not justified for two consumers and would introduce a new dependency pattern. If a third consumer appears, reconsider. |
