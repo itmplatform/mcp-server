@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createDataMartClient } from './datamart-client.js';
+import { createDataMartClient } from '../../../src/clients/datamart-client.js';
 
 function mockLogger() {
   return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { buildSearchProjectsVariables, buildGetProjectProjection } from './projects.js';
+import { buildSearchProjectsVariables, buildGetProjectProjection } from '../../../src/tools/projects.js';
 
 describe('buildSearchProjectsVariables', () => {
   it('builds variables with name regex filter', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAggregationPipeline } from './portfolio.js';
+import { buildAggregationPipeline } from '../../../src/tools/portfolio.js';
 
 describe('buildAggregationPipeline', () => {
   it('builds a pipeline with $match, $group, $sort, $limit', () => {

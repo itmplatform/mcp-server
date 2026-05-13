@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractBearerToken } from './token-extraction.js';
+import { extractBearerToken } from '../../../src/auth/token-extraction.js';
 
 describe('extractBearerToken', () => {
   it('extracts token from Bearer authorization header', () => {
