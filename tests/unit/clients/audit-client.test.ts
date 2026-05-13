@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createAuditClient, createNoOpAuditClient, hashParameters, type AuditEntry } from './audit-client.js';
+import { createAuditClient, createNoOpAuditClient, hashParameters, type AuditEntry } from '../../../src/clients/audit-client.js';
 
 function mockLogger() {
   return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;

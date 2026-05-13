@@ -232,13 +232,13 @@ MCP server:
   1. Validates OAuth token (signature, audience, expiry)
   2. Calls POST {ITM_AUTH_URL}/auth/exchange-token with the OAuth token
      (global endpoint, no company prefix -- company is inside the JWT)
-     --> { sessionToken, userId, accountId, email, languageId, licenseTypeIds, dataMartAccess, pmScopeUserId }
-  3. Builds EffectiveUserContext with sessionToken
+     --> { sessionToken, userId, accountId, email, languageId, licenseTypeIds, dataMartAccess, pmScopeUserId, scope }
+  3. Parses scope into grantedScopes array, builds EffectiveUserContext
   4. sessionToken.expiresAt = min(oauthToken.exp, ITM_SESSION_MAX_TTL)
-  5. All subsequent gateway calls use Authorization: Bearer {sessionToken}
+  5. All subsequent gateway calls use the `token` header (not `Authorization: Bearer`)
   |
   v
-Gateway receives a normal session token -- no changes needed
+Gateway receives a normal session token via the `token` header -- no changes needed
 ```
 
 The session token's TTL is capped at the OAuth token's expiry so the MCP session does not outlive the OAuth grant.
@@ -290,6 +290,28 @@ Mirrors the proven PMPilot/DataMart model:
 **PM-scope trust boundary:** DataMart trusts the `X-PM-Scope-User-Id` header without re-validating it against the authenticated caller (`directAccessControl.ts` assumes the upstream service has already determined scope). The resolver check confirms the *supplied* userId is a manager of the component -- it does not verify the *authenticated caller* is that user. This means a PM with stdio access could set another PM's userId and see their projects.
 
 **Phase 1 decision: stdio restricted to CompanyAdmin and FullUser.** PM-only users are blocked at startup until the gateway computes and injects `X-PM-Scope-User-Id` from the authenticated user's license type (see Section 12). CompanyAdmin and FullUser do not use PM-scope headers -- they get full access -- so the trust boundary issue does not apply to them. Phase 2 HTTP is unaffected because the hosted MCP server runs server-side inside the trust zone (same as PMPilot).
+
+### 3.6.1 OAuth Scope Enforcement
+
+ITM.MCP enforces OAuth scopes at the MCP resource-server boundary. `/auth/exchange-token` requires `mcp:read` and returns the granted `scope`. ITM.MCP stores parsed scopes in `EffectiveUserContext`, sends exchanged session tokens to ITM.API using the `token` header, and requires `mcp:write` before exposing or executing write tools. ITM.API gateway rights remain the business-permission enforcement layer; OAuth scopes are the user-consent layer.
+
+**Scope model:** Coarse scopes only -- `mcp:read` and `mcp:write`. Fine-grained per-tool scopes (e.g., `task:create`) are deferred; they add consent and implementation complexity with no clear benefit for the first MCP server. Coarse scopes can be narrowed later without breaking existing grants.
+
+**Changes required in ITM.MCP:**
+
+| Change | File | Detail |
+|--------|------|--------|
+| Add `scope` to exchange result | `oauth-auth.ts` | Add `scope: string` to `TokenExchangeResult` interface |
+| Store parsed scopes in context | `oauth-auth.ts` | Parse space-separated `scope` into `grantedScopes: string[]` on `EffectiveUserContext` |
+| Fix downstream auth header | `oauth-auth.ts` | Change `Authorization: Bearer {sessionToken}` to `token: {sessionToken}` |
+| Conditional tool registration | `server.ts` | OAuth sessions without `mcp:write`: register read tools only. API-key/stdio sessions: register all tools unconditionally |
+| Dispatch guard (defense in depth) | `server.ts` or middleware | A `WRITE_TOOL_NAMES` set (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`). If a `tools/call` reaches a write tool without `mcp:write`, return `insufficient_scope` error per MCP spec |
+
+**Why conditional registration matters:** In MCP, `tools/list` tells the AI model what it can do. If write tools appear in the list but fail when called, the model wastes tokens attempting them and the user sees confusing errors. Hiding write tools from sessions without `mcp:write` gives AI clients a clean experience.
+
+**API-key/stdio backward compatibility:** When `source === 'api-key'`, no OAuth scopes exist. All tools are registered unconditionally, preserving Phase 1 behavior.
+
+**Deployment gate:** The E2E seed client in ITM.Account starts with `scope: 'mcp:read'` only. After this scope enforcement is merged and verified in ITM.MCP, update the seed data to `'mcp:read mcp:write'`.
 
 ### 3.7 Cross-Repo Dependency: Identity Resolution Endpoint
 
@@ -801,6 +823,8 @@ Hosted as an HTTP service alongside the existing API:
 
 Single hosted endpoint for all tenants. Tenant resolved from OAuth token claims.
 
+`MCP_SERVER_URL` must be set to the exact hosted MCP URL, including the `/mcp` path, and must match the corresponding ITM.Account `OAuthAllowedResources` value. ITM.Account uses the same value as the OAuth `resource` parameter and JWT `aud` claim.
+
 ### 8.3 Deployment Pipeline
 
 Follow the same pattern as ITM.DataMart:
@@ -905,7 +929,7 @@ These must be resolved before the MCP server can go to production:
 | Question | Context |
 |----------|---------|
 | Gateway rate limiting disabled | The gateway has WebApiThrottle configured in `Web.prod.config` (3/sec, 100/min, 3000/hr, 10000/day) but the handler is commented out in `WebApiConfig.cs`. Decide: (a) re-enable gateway throttling as defense in depth, or (b) rely entirely on MCP-side throttling. Either way, MCP must implement its own rate limiting. |
-| OAuth scope design | What scopes should the OAuth server define? Options: `mcp:read`, `mcp:write`, `mcp:admin` (coarse) vs per-tool scopes (fine-grained). Coarse is simpler; fine-grained enables step-up authorization. |
+| OAuth scope design | **Resolved.** Coarse scopes: `mcp:read` and `mcp:write`. Fine-grained per-tool scopes deferred -- they add consent complexity with no clear benefit for the first MCP server. Coarse scopes can be narrowed later without breaking existing grants. See Section 3.6.1 for enforcement design. |
 | DataMart localization | Labels are stored at sync time in the account's language. Is multi-language label storage on the DataMart roadmap, or should MCP document this as a known limitation and move on? |
 
 ---
@@ -932,24 +956,34 @@ These must be resolved before the MCP server can go to production:
 
 ### Phase 2 -- Writes + Streamable HTTP
 
+Steps 15--16 and 19 follow a four-phase cross-repo implementation sequence defined in [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_OAUTH_AUTHORIZATION_SERVER.md). The phases and their dependencies are:
+
+| OAuth Phase | Maps to step(s) below | Depends on |
+|-------------|----------------------|------------|
+| 1. Gateway Prerequisites (ITM.Web: proxy controller, token DA fix, audit route) | Part of step 15 | None |
+| 2. OAuth Authorization Server (ITM.Account: endpoints, DB, JWT, session tokens) | Step 15, step 19 | OAuth Phase 1 |
+| 3. Login & Consent UI (ITM.Web: OAuthLogin/Consent/Error pages) | Step 16 | OAuth Phase 2 |
+| 4. Full Browser E2E (Playwright: complete OAuth flow) | Step 20 (OAuth portion) | OAuth Phases 1+2+3 |
+
 | # | Step | Repo | Status |
 |---|------|------|--------|
 | 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
-| 15 | OAuth authorization server (authorize, token, exchange endpoints) | ITM.Account | ⬜ To do |
-| 16 | OAuth login/consent page | ITM.Web | ⬜ To do |
+| 15 | OAuth authorization server (authorize, token, exchange endpoints) -- includes gateway prerequisites (OAuth Phase 1) and server implementation (OAuth Phase 2) | ITM.Web + ITM.Account | ⬜ To do |
+| 16 | OAuth login/consent page (OAuth Phase 3) | ITM.Web | ⬜ To do |
 | 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ✅ Done (ITM.MCP side: OAuth scaffolding, per-session auth, metadata endpoint. Awaits ITM.Account OAuth server.) |
 | 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ✅ Done |
-| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) | ITM.Account + ITM.MCP | ✅ Done (ITM.MCP side: audit client with no-op fallback. Awaits ITM.Account audit endpoint.) |
-| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15) | ITM.MCP | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth E2E awaits ITM.Account.) |
+| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) -- included in OAuth Phase 2 | ITM.Account + ITM.MCP | ✅ Done (ITM.MCP side: audit client with no-op fallback. Awaits ITM.Account audit endpoint.) |
+| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15). OAuth browser E2E is OAuth Phase 4. | ITM.MCP | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth E2E awaits OAuth Phase 4.) |
+| 21 | OAuth scope enforcement: `scope` in TokenExchangeResult, `grantedScopes` in EffectiveUserContext, `token` header fix, conditional write-tool registration, dispatch guard (Section 3.6.1) | ITM.MCP | ⬜ To do (blocked by OAuth Phase 2; deploy with `mcp:read` only until merged) |
 
 ### Phase 3 -- Advanced
 
 | # | Step | Repo | Status |
 |---|------|------|--------|
-| 21 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
-| 22 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
-| 23 | Extension management tools | ITM.MCP | ⬜ To do |
-| 24 | E2E tests -- verify AiGenerator integration, bulk operations (Section 15) | ITM.MCP | ⬜ To do |
+| 22 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
+| 23 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
+| 24 | Extension management tools | ITM.MCP | ⬜ To do |
+| 25 | E2E tests -- verify AiGenerator integration, bulk operations (Section 15) | ITM.MCP | ⬜ To do |
 
 ---
 

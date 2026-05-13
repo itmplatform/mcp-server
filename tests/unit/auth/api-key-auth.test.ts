@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { resolveIdentity } from './api-key-auth.js';
+import { resolveIdentity } from '../../../src/auth/api-key-auth.js';
 
 const VALID_IDENTITY_RESPONSE = {
   userId: 456,

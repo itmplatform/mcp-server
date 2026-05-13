@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildDataMartQueryBody } from './datamart.js';
-import { validateDataMartQuery } from '../validation/query-validator.js';
+import { buildDataMartQueryBody } from '../../../src/tools/datamart.js';
+import { validateDataMartQuery } from '../../../src/validation/query-validator.js';
 
 describe('buildDataMartQueryBody', () => {
   it('builds components query with where and limit', () => {

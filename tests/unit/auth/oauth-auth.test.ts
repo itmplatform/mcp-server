@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exchangeToken, buildEffectiveUserContextFromExchange, type TokenExchangeResult } from './oauth-auth.js';
+import { exchangeToken, buildEffectiveUserContextFromExchange, type TokenExchangeResult } from '../../../src/auth/oauth-auth.js';
 
 function sampleExchangeResult(): TokenExchangeResult {
   return {

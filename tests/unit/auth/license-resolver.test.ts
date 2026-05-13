@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveLicenseAccess } from './license-resolver.js';
+import { resolveLicenseAccess } from '../../../src/auth/license-resolver.js';
 
 describe('resolveLicenseAccess', () => {
   it('returns full access for CompanyAdmin (type 0)', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildProtectedResourceMetadata } from './oauth-metadata.js';
+import { buildProtectedResourceMetadata } from '../../../src/auth/oauth-metadata.js';
 
 describe('buildProtectedResourceMetadata', () => {
   it('builds metadata with correct structure', () => {

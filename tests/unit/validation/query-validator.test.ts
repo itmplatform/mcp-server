@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateDataMartQuery } from './query-validator.js';
+import { validateDataMartQuery } from '../../../src/validation/query-validator.js';
 
 describe('query-validator smoke test', () => {
   it('accepts a valid components query', () => {

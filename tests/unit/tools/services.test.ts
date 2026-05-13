@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSearchServicesVariables } from './services.js';
+import { buildSearchServicesVariables } from '../../../src/tools/services.js';
 
 describe('buildSearchServicesVariables', () => {
   it('uses componentType service', () => {

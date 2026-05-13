@@ -3,8 +3,8 @@ import {
   buildWriteResponse, auditWrap, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
   splitCreateIssueArgs, splitUpdateProjectArgs,
-} from './write-tools.js';
-import type { Clients } from '../clients/index.js';
+} from '../../../src/tools/write-tools.js';
+import type { Clients } from '../../../src/clients/index.js';
 
 function createMockClients(overrides?: Partial<{ postResult: unknown; patchResult: unknown }>): Clients {
   return {
