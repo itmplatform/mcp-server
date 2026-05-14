@@ -1,24 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  buildWriteResponse, buildInsufficientScopeResponse, auditWrap, STALE_AFTER_WRITE_NOTICE,
+  buildWriteResponse, buildInsufficientScopeResponse, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
   splitCreateIssueArgs, splitUpdateProjectArgs,
 } from '../../../src/tools/write-tools.js';
-import type { Clients } from '../../../src/clients/index.js';
-
-function createMockClients(overrides?: Partial<{ postResult: unknown; patchResult: unknown }>): Clients {
-  return {
-    datamart: { query: vi.fn() },
-    rest: {
-      get: vi.fn(),
-      post: vi.fn().mockResolvedValue(overrides?.postResult ?? { Id: 1, Name: 'Created' }),
-      patch: vi.fn().mockResolvedValue(overrides?.patchResult ?? { Id: 1, Name: 'Updated' }),
-    },
-    audit: { log: vi.fn().mockResolvedValue(undefined) },
-  } as unknown as Clients;
-}
-
-const userContext = { userId: 456, accountId: 123, aiClientId: 'test-client' };
 
 describe('buildInsufficientScopeResponse', () => {
   it('returns isError true with insufficient_scope message', () => {
@@ -49,69 +34,6 @@ describe('buildWriteResponse', () => {
     expect(response.content[1].text).toContain('DataMart');
     expect(response.content[1].text).toContain('5-60 seconds');
     expect(response.content[1].text).toBe(STALE_AFTER_WRITE_NOTICE);
-  });
-});
-
-describe('auditWrap', () => {
-  it('calls audit.log with success=true on successful operation', async () => {
-    const clients = createMockClients();
-    const result = await auditWrap(clients, 'create_task', { projectId: 1 }, userContext, async () => 'ok');
-
-    expect(result).toBe('ok');
-    expect(clients.audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toolName: 'create_task',
-        userId: 456,
-        accountId: 123,
-        success: true,
-        aiClientId: 'test-client',
-      }),
-    );
-  });
-
-  it('calls audit.log with success=false on failure and re-throws', async () => {
-    const clients = createMockClients();
-    const error = new Error('REST failed');
-
-    await expect(
-      auditWrap(clients, 'update_task', { taskId: 1 }, userContext, async () => { throw error; }),
-    ).rejects.toThrow('REST failed');
-
-    expect(clients.audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toolName: 'update_task',
-        success: false,
-        error: 'REST failed',
-      }),
-    );
-  });
-
-  it('measures durationMs', async () => {
-    const clients = createMockClients();
-    await auditWrap(clients, 'create_task', {}, userContext, async () => {
-      await new Promise(r => setTimeout(r, 10));
-      return 'done';
-    });
-
-    const entry = (clients.audit.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(entry.durationMs).toBeGreaterThanOrEqual(0);
-    expect(typeof entry.durationMs).toBe('number');
-  });
-
-  it('does not throw when audit.log fails (fire-and-forget)', async () => {
-    const clients = createMockClients();
-    (clients.audit.log as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('audit down'));
-
-    const result = await auditWrap(clients, 'create_task', {}, userContext, async () => 'ok');
-    expect(result).toBe('ok');
-  });
-
-  it('includes parametersHash as SHA-256 hex', async () => {
-    const clients = createMockClients();
-    await auditWrap(clients, 'create_task', { projectId: 100 }, userContext, async () => 'ok');
-
-    const entry = (clients.audit.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(entry.parametersHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 

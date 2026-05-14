@@ -4,7 +4,7 @@
 
 MCP (Model Context Protocol) server for ITM Platform. Exposes project management data to AI assistants -- Claude, ChatGPT, VS Code Copilot, Cursor, JetBrains -- through a universal open protocol.
 
-**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scope enforcement, audit logging, and token exchange in place. 134 unit tests, 23 E2E tests.
+**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scope enforcement, audit logging, and token exchange in place. 137 unit tests, 23 E2E tests.
 
 See [House Rules](../House-rules.md) for coding conventions.
 
@@ -155,6 +155,7 @@ Workflow templates the user can trigger. The MCP server returns a pre-composed m
 ```
 src/
   server.ts                # MCP server bootstrap (stdio + HTTP, per-session auth)
+  instrument-server.ts     # Tool-call logging + audit wrapper (wraps registerTool)
   logger.ts                # Pino logger factory (stderr + rotating file in logs/mcp.log)
   auth/
     effective-user-context.ts  # User identity type
@@ -196,6 +197,10 @@ Uses [Pino](https://getpino.io/) (same as DataMart and MSTeamsBot). Logs go to t
 Set `LOG_LEVEL` in `.env` to control verbosity (`debug`, `info`, `warn`, `error`; default: `info`). All log entries include `{ service: 'mcp', app: 'ITM.MCP' }` base fields and ISO timestamps.
 
 HTTP clients (DataMart, REST) log at `debug` level on success (with duration in ms) and `error` on failure.
+
+**Tool-call logging:** Every MCP tool invocation is logged at `info` level with tool name, userId, and aiClientId. Completion is logged at `debug` with duration in ms. Failures are logged at `error`.
+
+**Audit:** When `ITM_AUDIT_ENABLED=true`, every tool call (read and write) sends an audit entry to the ITM backend (`/v2/{company}/mcp/audit`). Audit is fire-and-forget -- failures do not affect tool execution. Each entry includes: timestamp, userId, accountId, toolName, parametersHash (SHA-256), success, error (if any), aiClientId, durationMs.
 
 ## Specification
 
