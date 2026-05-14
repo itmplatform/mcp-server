@@ -4,7 +4,7 @@
 
 MCP (Model Context Protocol) server for ITM Platform. Exposes project management data to AI assistants -- Claude, ChatGPT, VS Code Copilot, Cursor, JetBrains -- through a universal open protocol.
 
-**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scaffolding and audit logging infrastructure in place. 124 unit tests, 23 E2E tests.
+**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scope enforcement, audit logging, and token exchange in place. 134 unit tests, 23 E2E tests.
 
 See [House Rules](../House-rules.md) for coding conventions.
 
@@ -183,6 +183,8 @@ src/
 | FullUser | Full |
 | ProjectManager | Blocked in Phase 1 (requires gateway PM-scope injection -- Phase 2) |
 | TeamMember | Blocked |
+
+**OAuth scope enforcement:** OAuth sessions respect granted scopes. Sessions with `mcp:read` only see 15 read tools; `mcp:write` is required to see and use write tools. API-key/stdio sessions get all tools unconditionally (backward compatible).
 
 ## Logging
 

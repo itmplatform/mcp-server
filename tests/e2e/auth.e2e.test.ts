@@ -11,7 +11,7 @@ describe('auth and session', () => {
     expect(result.result.tools.length).toBeGreaterThan(0);
   });
 
-  it('lists all Phase 1 tools', async () => {
+  it('api-key session lists all 20 tools (read + write)', async () => {
     const result = await listTools(3);
     const toolNames = result.result.tools.map((t: { name: string }) => t.name);
 
@@ -31,5 +31,10 @@ describe('auth and session', () => {
     for (const name of expectedTools) {
       expect(toolNames).toContain(name);
     }
+    expect(toolNames).toHaveLength(20);
   });
+
+  // OAuth scope enforcement E2E: verifies that OAuth sessions with mcp:read only
+  // see 15 read tools (no write tools). Requires browser automation for the OAuth
+  // login flow -- tested in UI-E2E-Testing/playwright/tests/oauth/mcp-scope-enforcement.spec.ts
 });

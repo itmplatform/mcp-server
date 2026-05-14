@@ -4,11 +4,19 @@ import type { Logger } from 'pino';
 import type { Clients } from '../clients/index.js';
 import { hashParameters } from '../clients/audit-client.js';
 import { createLogger } from '../logger.js';
+import { hasScope, type EffectiveUserContext } from '../auth/effective-user-context.js';
 
 export const STALE_AFTER_WRITE_NOTICE =
   'Note: DataMart reads (search_projects, get_project, list_project_tasks, etc.) ' +
   'may return stale data for 5-60 seconds after a write due to eventual consistency. ' +
   'The confirmed state above is from the v2 REST API (source of truth).';
+
+export function buildInsufficientScopeResponse(): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+  return {
+    content: [{ type: 'text' as const, text: 'Error: insufficient_scope -- the mcp:write scope is required for write operations' }],
+    isError: true,
+  };
+}
 
 export function buildWriteResponse(data: unknown): { content: Array<{ type: 'text'; text: string }> } {
   return {
@@ -94,6 +102,7 @@ export function registerWriteTools(
   clients: Clients,
   userContext: { userId: number; accountId: number; aiClientId: string },
   log?: Logger,
+  effectiveUserContext?: EffectiveUserContext,
 ): void {
   const l = log ?? createLogger('write-tools');
 
@@ -114,6 +123,7 @@ export function registerWriteTools(
       },
     },
     async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateTaskArgs(args);
       l.info({ tool: 'create_task', projectId: args.projectId }, 'Write tool invoked');
       const data = await auditWrap(clients, 'create_task', args, userContext, () =>
@@ -143,6 +153,7 @@ export function registerWriteTools(
       },
     },
     async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateTaskArgs(args);
       l.info({ tool: 'update_task', projectId: args.projectId, taskId: args.taskId }, 'Write tool invoked');
       const data = await auditWrap(clients, 'update_task', args, userContext, () =>
@@ -169,6 +180,7 @@ export function registerWriteTools(
       },
     },
     async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateRiskArgs(args);
       l.info({ tool: 'create_risk', projectId: args.projectId }, 'Write tool invoked');
       const data = await auditWrap(clients, 'create_risk', args, userContext, () =>
@@ -194,6 +206,7 @@ export function registerWriteTools(
       },
     },
     async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateIssueArgs(args);
       l.info({ tool: 'create_issue', projectId: args.projectId }, 'Write tool invoked');
       const data = await auditWrap(clients, 'create_issue', args, userContext, () =>
@@ -219,6 +232,7 @@ export function registerWriteTools(
       },
     },
     async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateProjectArgs(args);
       l.info({ tool: 'update_project', projectId: args.projectId }, 'Write tool invoked');
       const data = await auditWrap(clients, 'update_project', args, userContext, () =>

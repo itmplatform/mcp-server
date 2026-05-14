@@ -12,6 +12,7 @@ function sampleExchangeResult(): TokenExchangeResult {
     licenseTypeIds: [1],
     dataMartAccess: 'full',
     expiresAt: '2026-05-12T12:00:00.000Z',
+    scope: 'mcp:read mcp:write',
   };
 }
 
@@ -89,9 +90,33 @@ describe('buildEffectiveUserContextFromExchange', () => {
     expect(ctx.source).toBe('token');
   });
 
-  it('sets authHeaders with Bearer sessionToken', () => {
+  it('sets authHeaders with Token header for downstream gateway calls', () => {
     const ctx = buildEffectiveUserContextFromExchange(sampleExchangeResult());
-    expect(ctx.authHeaders).toEqual({ 'Authorization': 'Bearer session-abc-123' });
+    expect(ctx.authHeaders).toEqual({ 'Token': 'session-abc-123' });
+  });
+
+  it('parses space-separated scope into grantedScopes', () => {
+    const result = { ...sampleExchangeResult(), scope: 'mcp:read mcp:write' };
+    const ctx = buildEffectiveUserContextFromExchange(result);
+    expect(ctx.grantedScopes).toEqual(['mcp:read', 'mcp:write']);
+  });
+
+  it('handles read-only scope', () => {
+    const result = { ...sampleExchangeResult(), scope: 'mcp:read' };
+    const ctx = buildEffectiveUserContextFromExchange(result);
+    expect(ctx.grantedScopes).toEqual(['mcp:read']);
+  });
+
+  it('handles empty scope string', () => {
+    const result = { ...sampleExchangeResult(), scope: '' };
+    const ctx = buildEffectiveUserContextFromExchange(result);
+    expect(ctx.grantedScopes).toEqual([]);
+  });
+
+  it('trims extra whitespace in scope string', () => {
+    const result = { ...sampleExchangeResult(), scope: ' mcp:read  mcp:write ' };
+    const ctx = buildEffectiveUserContextFromExchange(result);
+    expect(ctx.grantedScopes).toEqual(['mcp:read', 'mcp:write']);
   });
 
   it('includes pmScopeUserId when present', () => {

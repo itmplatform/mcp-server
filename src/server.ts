@@ -26,7 +26,7 @@ import { buildProtectedResourceMetadata } from './auth/oauth-metadata.js';
 import { extractBearerToken } from './auth/token-extraction.js';
 import { exchangeToken, buildEffectiveUserContextFromExchange, type OAuthConfig } from './auth/oauth-auth.js';
 import { createAuditClient } from './clients/audit-client.js';
-import type { EffectiveUserContext } from './auth/effective-user-context.js';
+import { hasScope, type EffectiveUserContext } from './auth/effective-user-context.js';
 
 const log = createLogger('mcp');
 
@@ -36,7 +36,7 @@ interface WriteUserContext {
   aiClientId: string;
 }
 
-function createMcpServer(clients: Clients, writeCtx: WriteUserContext): McpServer {
+function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userContext: EffectiveUserContext): McpServer {
   const server = new McpServer(
     { name: 'itm-platform', version: '1.0.0' },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -51,7 +51,9 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext): McpServe
   registerDataMartTool(server, clients);
   registerUserTools(server, clients);
   registerReferenceDataTools(server, clients);
-  registerWriteTools(server, clients, writeCtx);
+  if (hasScope(userContext, 'mcp:write')) {
+    registerWriteTools(server, clients, writeCtx, undefined, userContext);
+  }
 
   registerSchemaResources(server, clients);
   registerCalendarResources(server, clients);
@@ -173,7 +175,7 @@ async function main() {
             aiClientId,
           };
 
-          const server = createMcpServer(sessionClients, writeCtx);
+          const server = createMcpServer(sessionClients, writeCtx, sessionUserContext);
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             enableJsonResponse: true,
@@ -220,7 +222,7 @@ async function main() {
       accountId: userContext.accountId,
       aiClientId: 'stdio',
     };
-    const server = createMcpServer(clients, writeCtx);
+    const server = createMcpServer(clients, writeCtx, userContext);
     const transport = new StdioServerTransport();
     await server.connect(transport);
     log.info({ transport: 'stdio' }, 'MCP server connected via stdio');

@@ -1,8 +1,9 @@
 # ITM Platform MCP Server
 
-> **Status:** Phase 2 in progress -- 124 unit tests, 23 E2E tests passing  
-> **Date:** 2026-05-12  
-> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⚠️ (ITM.MCP done, awaits ITM.Account OAuth + audit endpoints) | 3 Advanced ⬜
+> **Status:** Phase 2 in progress -- 134 unit tests, 23 E2E tests passing  
+> **Date:** 2026-05-14  
+> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⚠️ (ITM.MCP done incl. scope enforcement; ITM.Account OAuth done 2026-05-13, DI issue fixed; ITM.Web Login & Consent UI done 2026-05-13; browser E2E tests written) | 3 Advanced ⬜
+> **OAuth remaining work:** [SPEC_OAUTH_REMAINING.md](SPEC_OAUTH_REMAINING.md) -- tracks all open items across repos
 
 ---
 
@@ -77,6 +78,7 @@ interface EffectiveUserContext {
   dataMartAccess: "full" | "pm-scoped" | "none";
   pmScopeUserId?: number;           // set only when dataMartAccess is "pm-scoped"
   authHeaders: Record<string, string>; // auth headers injected into all gateway requests
+  grantedScopes?: string[];          // OAuth scopes (undefined for api-key = full access)
 }
 ```
 
@@ -251,7 +253,7 @@ This keeps the gateway's existing trust model intact. The exchange endpoint live
 
 | Component | Repo | What |
 |-----------|------|------|
-| **Authorization server** | ITM.Account | OAuth 2.1 endpoints: `/oauth/authorize`, `/oauth/token`. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. Built in ITM.Account to keep user identity, SSO mapping, and license interpretation in one place. Exposed publicly via a thin proxy controller in ITM.API (see [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_OAUTH_AUTHORIZATION_SERVER.md), Section 3.1). |
+| **Authorization server** | ITM.Account | OAuth 2.1 endpoints: `/oauth/authorize`, `/oauth/token`. Authorization code + PKCE only (no implicit, no password grant). Refresh token rotation. Built in ITM.Account to keep user identity, SSO mapping, and license interpretation in one place. Exposed publicly via a thin proxy controller in ITM.API (see [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_OAUTH_AUTHORIZATION_SERVER.md), Section 3.1). |
 | **OAuth login + consent page** | ITM.Web | Login + consent page for the OAuth flow. The existing login page redirects to home -- this variant authenticates the user and then returns an authorization code to the AI client's redirect URI instead. ITM.Web owns all user-facing UI; ITM.Account provides the backend endpoints it calls. |
 | **Authorization server metadata** | ITM.Account | `GET /.well-known/oauth-authorization-server` -- discovery document with endpoints, supported scopes, grant types. Served at the issuer URL (e.g., `https://api.itmplatform.com/.well-known/oauth-authorization-server`) via ITM.API proxy. |
 | **Token exchange endpoint** | ITM.Account | `POST /auth/exchange-token` -- global endpoint (no company prefix; company is extracted from the JWT claims). Validates OAuth token, creates internal session token (TTL capped at OAuth token expiry), returns full user context. Same pattern as `PerformLoginForAPIKey` but for OAuth tokens. Proxied through ITM.API. |
@@ -956,25 +958,25 @@ These must be resolved before the MCP server can go to production:
 
 ### Phase 2 -- Writes + Streamable HTTP
 
-Steps 15--16 and 19 follow a four-phase cross-repo implementation sequence defined in [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_OAUTH_AUTHORIZATION_SERVER.md). The phases and their dependencies are:
+Steps 15--16 and 19 follow a four-phase cross-repo implementation sequence defined in [SPEC_OAUTH_AUTHORIZATION_SERVER.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_OAUTH_AUTHORIZATION_SERVER.md). Phases 1 and 2 are done; all remaining OAuth work (cross-repo) is tracked in [SPEC_OAUTH_REMAINING.md](SPEC_OAUTH_REMAINING.md). The phases and their dependencies are:
 
 | OAuth Phase | Maps to step(s) below | Depends on |
 |-------------|----------------------|------------|
-| 1. Gateway Prerequisites (ITM.Web: proxy controller, token DA fix, audit route) | Part of step 15 | None |
-| 2. OAuth Authorization Server (ITM.Account: endpoints, DB, JWT, session tokens) | Step 15, step 19 | OAuth Phase 1 |
-| 3. Login & Consent UI (ITM.Web: OAuthLogin/Consent/Error pages) | Step 16 | OAuth Phase 2 |
+| 1. Gateway Prerequisites ([spec](../../ITM.Web/zz_Specifications/done/SPEC_OAUTH_GATEWAY_PREREQUISITES.md)) | Part of step 15 | ✅ Done |
+| 2. OAuth Authorization Server (ITM.Account: endpoints, DB, JWT, session tokens) | Step 15, step 19 | ✅ Done (2026-05-13) |
+| 3. Login & Consent UI (ITM.Web: OAuthLogin/Consent/Error pages) | Step 16 | ✅ Done (2026-05-13) |
 | 4. Full Browser E2E (Playwright: complete OAuth flow) | Step 20 (OAuth portion) | OAuth Phases 1+2+3 |
 
 | # | Step | Repo | Status |
 |---|------|------|--------|
 | 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
-| 15 | OAuth authorization server (authorize, token, exchange endpoints) -- includes gateway prerequisites (OAuth Phase 1) and server implementation (OAuth Phase 2) | ITM.Web + ITM.Account | ⬜ To do |
-| 16 | OAuth login/consent page (OAuth Phase 3) | ITM.Web | ⬜ To do |
-| 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ✅ Done (ITM.MCP side: OAuth scaffolding, per-session auth, metadata endpoint. Awaits ITM.Account OAuth server.) |
+| 15 | OAuth authorization server (authorize, token, exchange endpoints) -- gateway prerequisites (OAuth Phase 1) done; server implementation (OAuth Phase 2) done 2026-05-13; Login & Consent UI (Phase 3) done 2026-05-13 | ITM.Web + ITM.Account | ✅ Done |
+| 16 | OAuth login/consent page (OAuth Phase 3): OAuthLogin.aspx, OAuthConsent.aspx, OAuthError.aspx, App_Code service layer, 16 unit tests, proxy redirect fix | ITM.Web | ✅ Done (2026-05-13) |
+| 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ✅ Done (ITM.MCP side: OAuth scaffolding, per-session auth, metadata endpoint. ITM.Account OAuth server done 2026-05-13.) |
 | 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ✅ Done |
-| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) -- included in OAuth Phase 2 | ITM.Account + ITM.MCP | ✅ Done (ITM.MCP side: audit client with no-op fallback. Awaits ITM.Account audit endpoint.) |
+| 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) -- included in OAuth Phase 2 | ITM.Account + ITM.MCP | ✅ Done (both sides: ITM.MCP audit client + ITM.Account audit endpoint done 2026-05-13.) |
 | 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15). OAuth browser E2E is OAuth Phase 4. | ITM.MCP | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth E2E awaits OAuth Phase 4.) |
-| 21 | OAuth scope enforcement: `scope` in TokenExchangeResult, `grantedScopes` in EffectiveUserContext, `token` header fix, conditional write-tool registration, dispatch guard (Section 3.6.1) | ITM.MCP | ⬜ To do (blocked by OAuth Phase 2; deploy with `mcp:read` only until merged) |
+| 21 | OAuth scope enforcement: `scope` in TokenExchangeResult, `grantedScopes` in EffectiveUserContext, `token` header fix, conditional write-tool registration, dispatch guard (Section 3.6.1) | ITM.MCP | ✅ Done |
 
 ### Phase 3 -- Advanced
 
@@ -1367,7 +1369,7 @@ Phase 2 adds write tool tests. These are self-contained: `beforeAll` creates a t
 | `update_project` | PATCH project description. Returns confirmed state + stale notice. |
 | All write responses | Two content items: `content[0]` is JSON data from v2 REST, `content[1]` is the stale-after-write notice. |
 
-**OAuth flow** (not yet testable): Initialize session with OAuth Bearer token instead of API key. Awaits ITM.Account OAuth server deployment.
+**OAuth flow** (E2E tests written, not yet runnable): Initialize session with OAuth Bearer token instead of API key. ITM.Account OAuth server done (2026-05-13); ITM.Web Login & Consent UI done (2026-05-13); 14 Playwright E2E scenarios written in `UI-E2E-Testing/playwright/tests/oauth/oauth-flow.spec.ts`. Browser E2E blocked by ITM.Account local DI issue (OAuthManager constructor injection).
 
 Write tests clean up after themselves -- `afterAll` deletes created entities leaf-to-top to avoid polluting the local database. Each delete is wrapped in try/catch so partial cleanup failure does not mask test results.
 
