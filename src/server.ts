@@ -27,6 +27,7 @@ import { extractBearerToken } from './auth/token-extraction.js';
 import { exchangeToken, buildEffectiveUserContextFromExchange, type OAuthConfig } from './auth/oauth-auth.js';
 import { createAuditClient } from './clients/audit-client.js';
 import { hasScope, type EffectiveUserContext } from './auth/effective-user-context.js';
+import { instrumentServer } from './instrument-server.js';
 
 const log = createLogger('mcp');
 
@@ -42,6 +43,8 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userConte
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
+  instrumentServer(server, log, writeCtx, clients.audit);
+
   registerProjectTools(server, clients);
   registerServiceTools(server, clients);
   registerTaskTools(server, clients);
@@ -52,7 +55,7 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userConte
   registerUserTools(server, clients);
   registerReferenceDataTools(server, clients);
   if (hasScope(userContext, 'mcp:write')) {
-    registerWriteTools(server, clients, writeCtx, undefined, userContext);
+    registerWriteTools(server, clients, userContext);
   }
 
   registerSchemaResources(server, clients);

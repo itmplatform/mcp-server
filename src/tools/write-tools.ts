@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Logger } from 'pino';
 import type { Clients } from '../clients/index.js';
-import { hashParameters } from '../clients/audit-client.js';
-import { createLogger } from '../logger.js';
 import { hasScope, type EffectiveUserContext } from '../auth/effective-user-context.js';
 
 export const STALE_AFTER_WRITE_NOTICE =
@@ -25,51 +22,6 @@ export function buildWriteResponse(data: unknown): { content: Array<{ type: 'tex
       { type: 'text' as const, text: STALE_AFTER_WRITE_NOTICE },
     ],
   };
-}
-
-export async function auditWrap(
-  clients: Clients,
-  toolName: string,
-  args: Record<string, unknown>,
-  userContext: { userId: number; accountId: number; aiClientId: string },
-  operation: () => Promise<unknown>,
-): Promise<unknown> {
-  const start = Date.now();
-  try {
-    const result = await operation();
-    try {
-      await clients.audit.log({
-        timestamp: new Date().toISOString(),
-        userId: userContext.userId,
-        accountId: userContext.accountId,
-        toolName,
-        parametersHash: hashParameters(args),
-        success: true,
-        aiClientId: userContext.aiClientId,
-        durationMs: Date.now() - start,
-      });
-    } catch {
-      // fire-and-forget: audit failure must not break writes
-    }
-    return result;
-  } catch (err) {
-    try {
-      await clients.audit.log({
-        timestamp: new Date().toISOString(),
-        userId: userContext.userId,
-        accountId: userContext.accountId,
-        toolName,
-        parametersHash: hashParameters(args),
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-        aiClientId: userContext.aiClientId,
-        durationMs: Date.now() - start,
-      });
-    } catch {
-      // fire-and-forget
-    }
-    throw err;
-  }
 }
 
 export function splitCreateTaskArgs(args: { projectId: number; [key: string]: unknown }) {
@@ -100,11 +52,8 @@ export function splitUpdateProjectArgs(args: { projectId: number; [key: string]:
 export function registerWriteTools(
   server: McpServer,
   clients: Clients,
-  userContext: { userId: number; accountId: number; aiClientId: string },
-  log?: Logger,
   effectiveUserContext?: EffectiveUserContext,
 ): void {
-  const l = log ?? createLogger('write-tools');
 
   server.registerTool(
     'create_task',
@@ -125,11 +74,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateTaskArgs(args);
-      l.info({ tool: 'create_task', projectId: args.projectId }, 'Write tool invoked');
-      const data = await auditWrap(clients, 'create_task', args, userContext, () =>
-        clients.rest.post(path, body),
-      );
-      l.debug({ tool: 'create_task', projectId: args.projectId }, 'Write tool completed');
+      const data = await clients.rest.post(path, body);
       return buildWriteResponse(data);
     },
   );
@@ -155,11 +100,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateTaskArgs(args);
-      l.info({ tool: 'update_task', projectId: args.projectId, taskId: args.taskId }, 'Write tool invoked');
-      const data = await auditWrap(clients, 'update_task', args, userContext, () =>
-        clients.rest.patch(path, body),
-      );
-      l.debug({ tool: 'update_task', projectId: args.projectId, taskId: args.taskId }, 'Write tool completed');
+      const data = await clients.rest.patch(path, body);
       return buildWriteResponse(data);
     },
   );
@@ -182,11 +123,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateRiskArgs(args);
-      l.info({ tool: 'create_risk', projectId: args.projectId }, 'Write tool invoked');
-      const data = await auditWrap(clients, 'create_risk', args, userContext, () =>
-        clients.rest.post(path, body),
-      );
-      l.debug({ tool: 'create_risk', projectId: args.projectId }, 'Write tool completed');
+      const data = await clients.rest.post(path, body);
       return buildWriteResponse(data);
     },
   );
@@ -208,11 +145,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateIssueArgs(args);
-      l.info({ tool: 'create_issue', projectId: args.projectId }, 'Write tool invoked');
-      const data = await auditWrap(clients, 'create_issue', args, userContext, () =>
-        clients.rest.post(path, body),
-      );
-      l.debug({ tool: 'create_issue', projectId: args.projectId }, 'Write tool completed');
+      const data = await clients.rest.post(path, body);
       return buildWriteResponse(data);
     },
   );
@@ -234,11 +167,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateProjectArgs(args);
-      l.info({ tool: 'update_project', projectId: args.projectId }, 'Write tool invoked');
-      const data = await auditWrap(clients, 'update_project', args, userContext, () =>
-        clients.rest.patch(path, body),
-      );
-      l.debug({ tool: 'update_project', projectId: args.projectId }, 'Write tool completed');
+      const data = await clients.rest.patch(path, body);
       return buildWriteResponse(data);
     },
   );
