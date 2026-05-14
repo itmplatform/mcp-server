@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  buildWriteResponse, auditWrap, STALE_AFTER_WRITE_NOTICE,
+  buildWriteResponse, buildInsufficientScopeResponse, auditWrap, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
   splitCreateIssueArgs, splitUpdateProjectArgs,
 } from '../../../src/tools/write-tools.js';
@@ -19,6 +19,16 @@ function createMockClients(overrides?: Partial<{ postResult: unknown; patchResul
 }
 
 const userContext = { userId: 456, accountId: 123, aiClientId: 'test-client' };
+
+describe('buildInsufficientScopeResponse', () => {
+  it('returns isError true with insufficient_scope message', () => {
+    const response = buildInsufficientScopeResponse();
+    expect(response.isError).toBe(true);
+    expect(response.content).toHaveLength(1);
+    expect(response.content[0].text).toContain('insufficient_scope');
+    expect(response.content[0].text).toContain('mcp:write');
+  });
+});
 
 describe('buildWriteResponse', () => {
   it('returns two content items (JSON data + stale notice)', () => {

@@ -12,6 +12,7 @@ export interface TokenExchangeResult {
   dataMartAccess: 'full' | 'pm-scoped' | 'none';
   pmScopeUserId?: number;
   expiresAt: string;
+  scope: string;
 }
 
 export interface OAuthConfig {
@@ -56,6 +57,7 @@ export function buildEffectiveUserContextFromExchange(result: TokenExchangeResul
     licenseTypeIds: result.licenseTypeIds,
     dataMartAccess: result.dataMartAccess,
     pmScopeUserId: result.pmScopeUserId,
-    authHeaders: { 'Authorization': `Bearer ${result.sessionToken}` },
+    grantedScopes: result.scope.split(' ').filter(Boolean),
+    authHeaders: { 'Token': result.sessionToken },
   };
 }

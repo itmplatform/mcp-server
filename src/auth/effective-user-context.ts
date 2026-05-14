@@ -9,4 +9,14 @@ export interface EffectiveUserContext {
   dataMartAccess: 'full' | 'pm-scoped' | 'none';
   pmScopeUserId?: number;
   authHeaders: Record<string, string>;
+  grantedScopes?: string[];
+}
+
+export const WRITE_TOOL_NAMES = new Set([
+  'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
+]);
+
+export function hasScope(ctx: EffectiveUserContext, scope: string): boolean {
+  if (!ctx.grantedScopes) return true;
+  return ctx.grantedScopes.includes(scope);
 }
