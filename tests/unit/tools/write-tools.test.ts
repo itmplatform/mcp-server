@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   buildWriteResponse, buildInsufficientScopeResponse, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
-  splitCreateIssueArgs, splitUpdateProjectArgs,
+  splitCreateIssueArgs, splitUpdateProjectArgs, mapReferenceIdToBaseId,
+  verifyRequestedFields,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -38,44 +39,154 @@ describe('buildWriteResponse', () => {
 });
 
 describe('splitCreateTaskArgs', () => {
-  it('builds path and separates projectId from body', () => {
+  it('builds path and maps Description to Details', () => {
     const { path, body } = splitCreateTaskArgs({ projectId: 100, Name: 'New Task', Description: 'Desc' });
     expect(path).toBe('projects/100/tasks');
-    expect(body).toEqual({ Name: 'New Task', Description: 'Desc' });
+    expect(body).toEqual({ Name: 'New Task', Details: 'Desc' });
     expect(body).not.toHaveProperty('projectId');
+  });
+
+  it('rejects conflicting Description and Details values', () => {
+    expect(() => splitCreateTaskArgs({
+      projectId: 100,
+      Name: 'New Task',
+      Description: 'Desc A',
+      Details: 'Desc B',
+    })).toThrow('Description and Details cannot both be supplied');
+  });
+
+  it('rejects fields known to be ignored by task create', () => {
+    expect(() => splitCreateTaskArgs({
+      projectId: 100,
+      Name: 'New Task',
+      AssignedToUserId: 123,
+    })).toThrow('AssignedToUserId is not supported');
   });
 });
 
 describe('splitUpdateTaskArgs', () => {
-  it('builds path with taskId and separates both IDs from body', () => {
-    const { path, body } = splitUpdateTaskArgs({ projectId: 100, taskId: 42, Name: 'Updated' });
+  it('builds path with taskId, separates IDs, and maps Description to Details', () => {
+    const { path, body } = splitUpdateTaskArgs({ projectId: 100, taskId: 42, Name: 'Updated', Description: 'New details' });
     expect(path).toBe('projects/100/tasks/42');
-    expect(body).toEqual({ Name: 'Updated' });
+    expect(body).toEqual({ Name: 'Updated', Details: 'New details' });
     expect(body).not.toHaveProperty('projectId');
     expect(body).not.toHaveProperty('taskId');
+  });
+
+  it('rejects PercentComplete because PATCH ignores it', () => {
+    expect(() => splitUpdateTaskArgs({
+      projectId: 100,
+      taskId: 42,
+      PercentComplete: 37,
+    })).toThrow('PercentComplete is not supported');
   });
 });
 
 describe('splitCreateRiskArgs', () => {
-  it('builds path and separates projectId from body', () => {
-    const { path, body } = splitCreateRiskArgs({ projectId: 100, Name: 'Risk A' });
+  it('builds path, maps Impact/Probability aliases, and requires LevelId', () => {
+    const { path, body } = splitCreateRiskArgs({
+      projectId: 100,
+      Name: 'Risk A',
+      Impact: 10,
+      Probability: 20,
+      LevelId: 30,
+    });
     expect(path).toBe('projects/100/risks');
-    expect(body).toEqual({ Name: 'Risk A' });
+    expect(body).toEqual({ Name: 'Risk A', ImpactId: 10, ProbabilityId: 20, LevelId: 30 });
+  });
+
+  it('rejects missing LevelId', () => {
+    expect(() => splitCreateRiskArgs({ projectId: 100, Name: 'Risk A' })).toThrow('LevelId is required');
   });
 });
 
 describe('splitCreateIssueArgs', () => {
-  it('builds path and separates projectId from body', () => {
-    const { path, body } = splitCreateIssueArgs({ projectId: 100, Name: 'Issue B' });
+  it('builds path and maps issue aliases to v2 REST field names', () => {
+    const { path, body } = splitCreateIssueArgs({
+      projectId: 100,
+      Name: 'Issue B',
+      TypeId: 820,
+      StatusId: 547,
+      Resolution: 'Resolved',
+    });
     expect(path).toBe('projects/100/issues');
-    expect(body).toEqual({ Name: 'Issue B' });
+    expect(body).toEqual({ Name: 'Issue B', Type: 820, Status: 547, FinalResolution: 'Resolved' });
+  });
+
+  it('rejects Severity because v2 issue create does not support it', () => {
+    expect(() => splitCreateIssueArgs({
+      projectId: 100,
+      Name: 'Issue B',
+      Severity: 2,
+    })).toThrow('Severity is not supported');
   });
 });
 
 describe('splitUpdateProjectArgs', () => {
-  it('builds path and separates projectId from body', () => {
-    const { path, body } = splitUpdateProjectArgs({ projectId: 100, Name: 'Renamed' });
+  it('builds path and maps StatusId to ProjectStatusId', () => {
+    const { path, body } = splitUpdateProjectArgs({ projectId: 100, Name: 'Renamed', StatusId: 662751 });
     expect(path).toBe('projects/100');
-    expect(body).toEqual({ Name: 'Renamed' });
+    expect(body).toEqual({ Name: 'Renamed', ProjectStatusId: 662751 });
+  });
+
+  it('rejects conflicting StatusId and ProjectStatusId values', () => {
+    expect(() => splitUpdateProjectArgs({
+      projectId: 100,
+      StatusId: 662751,
+      ProjectStatusId: 662752,
+    })).toThrow('StatusId and ProjectStatusId cannot both be supplied');
+  });
+});
+
+describe('mapReferenceIdToBaseId', () => {
+  const referenceData = [
+    { Id: 814, BaseId: 820, Name: 'Change request' },
+    { Id: 815, BaseId: 821, Name: 'Problem' },
+  ];
+
+  it('maps localized Id to BaseId when reference data provides one', () => {
+    expect(mapReferenceIdToBaseId(814, referenceData)).toBe(820);
+  });
+
+  it('keeps a supplied BaseId unchanged', () => {
+    expect(mapReferenceIdToBaseId(821, referenceData)).toBe(821);
+  });
+
+  it('keeps unknown values for REST validation/readback to catch', () => {
+    expect(mapReferenceIdToBaseId(999, referenceData)).toBe(999);
+  });
+});
+
+describe('verifyRequestedFields', () => {
+  const fields = [
+    { requestField: 'ProjectStatusId', readPaths: ['Status.Id'], label: 'StatusId' },
+    { requestField: 'StartDate', readPaths: ['StartDate'] },
+  ];
+
+  it('accepts numeric and ISO date readback matches', () => {
+    expect(() => verifyRequestedFields(
+      { ProjectStatusId: 662751, StartDate: '2026-08-01' },
+      { Status: { Id: 662751 }, StartDate: '2026-08-01T00:00:00Z' },
+      fields,
+      'update_project',
+    )).not.toThrow();
+  });
+
+  it('fails when readback omits a requested field', () => {
+    expect(() => verifyRequestedFields(
+      { ProjectStatusId: 662751 },
+      { Name: 'No status here' },
+      fields,
+      'update_project',
+    )).toThrow('readback did not include Status.Id');
+  });
+
+  it('fails when readback shows the requested field was ignored', () => {
+    expect(() => verifyRequestedFields(
+      { ProjectStatusId: 662751 },
+      { Status: { Id: 662750 } },
+      fields,
+      'update_project',
+    )).toThrow('expected 662751 but read back 662750');
   });
 });

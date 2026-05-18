@@ -1,6 +1,6 @@
 # OAuth 2.1 -- Remaining Work
 
-> **Status:** Open -- tracks all remaining OAuth work across repos
+> **Status:** Open -- tracks all remaining OAuth work across repos (E2E tests done 2026-05-14)
 > **Date:** 2026-05-13
 > **Master spec:** [SPEC_MCP_SERVER.md](SPEC_MCP_SERVER.md) (Sections 3.5, 3.6.1, Phase 2 tracker)
 
@@ -38,11 +38,11 @@ All five changes implemented:
 
 ---
 
-### 1.2 ITM.Account -- Integration Tests
+### ~~1.2 ITM.Account -- Integration Tests~~ DONE ✅ (2026-05-14)
 
 **Spec reference:** [SPEC_OAUTH_AUTHORIZATION_SERVER.md, Section 9.2](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_OAUTH_AUTHORIZATION_SERVER.md#92-integration-tests)
 
-The 59 unit tests mock the DA layer. Integration tests verify the full path through the real database -- catching wrong column names, mapper mismatches, and parameter type errors that mocks cannot surface.
+8 integration tests implemented in `TestOAuthIntegration.cs`. All 8 green. Tests read the connection string from `Web.config` at runtime (portable across machines), look up real accountId/userId for FK constraints, and clean up all created rows in teardown.
 
 | Test | What it verifies |
 |------|-----------------|
@@ -55,10 +55,6 @@ The 59 unit tests mock the DA layer. Integration tests verify the full path thro
 | Insert MCP session token, verify in `tblUserToken` | SessionTokenDA round-trip |
 | Two MCP tokens for same user coexist | Both rows exist with different token strings |
 
-Run against local SQL Server. Each test creates its own data and cleans up in teardown.
-
-**When to do:** Before first deployment to stage. These catch the class of bugs that only appear against a real database.
-
 ---
 
 ### ~~1.3 ITM.Web -- Login & Consent UI (Phase 3)~~ DONE ✅ (2026-05-13)
@@ -69,19 +65,23 @@ Three ASPX pages + App_Code service layer implemented: `OAuthLogin.aspx`, `OAuth
 
 ---
 
-## 2. Blocked
+## 2. ~~Blocked~~ (All items resolved)
 
-### 2.1 Full Browser E2E Tests (Phase 4) -- Tests Written, Blocked by Local DI Issue
+### ~~2.1 Full Browser E2E Tests (Phase 4)~~ DONE ✅ (2026-05-14)
 
-**Spec references:**
-- [SPEC_OAUTH_AUTHORIZATION_SERVER.md, Section 9.3.3](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_OAUTH_AUTHORIZATION_SERVER.md#933-playwright-e2e-tests-full-browser-flow)
-- [SPEC_OAUTH_LOGIN_CONSENT.md, Section 8.3](../../ITM.Web/zz_Specifications/done/SPEC_OAUTH_LOGIN_CONSENT.md)
+**Spec reference:** [SPEC_OAUTH_E2E_TESTS.md](../../ITM.UI-E2E-Testing/zz_Specifications/done/SPEC_OAUTH_E2E_TESTS.md)
 
-14 Playwright test scenarios consolidated into `UI-E2E-Testing/playwright/tests/oauth/oauth-flow.spec.ts`. Tests cover: login page rendering, company pre-fill, editable company, invalid credentials, empty fields, login-to-consent redirect, consent page content, approve/deny flows, cancel flow, invalid client_id, expired request, and full PKCE token exchange.
+All 16 Playwright tests passing locally (3.1 min, `--workers=2`). Tests span two files:
 
-**No longer blocked by:** Phase 3 (Login & Consent UI) -- done 2026-05-13.
+- `oauth-flow.spec.ts` (14 tests): login page rendering, company pre-fill, editable company, invalid credentials, empty fields, login-to-consent redirect, consent page content, approve/deny flows, cancel flow, invalid client_id, expired request, full PKCE token exchange with session token + refresh token rotation.
+- `mcp-scope-enforcement.spec.ts` (2 tests): read-only OAuth session sees 15 tools (no write tools), read-write session sees all 20 tools.
 
-**Previously blocked by:** ~~ITM.Account local DI issue~~ -- resolved 2026-05-14 (commits `0d19e17`, `ad52feb` simplified `OAuthManager` and `OAuthTokenService` constructors). Also needs `e2e-test-client` OAuth client seeded in local database (done via `deployment.sql` Build 3).
+**Server-side fixes applied during E2E execution (2026-05-14):**
+- `OAuthController.cs`: read `company` query param, include in consent redirect URL
+- `deployment.sql`: updated seed `e2e-test-client` with callback URI + `mcp:write` scope
+- `SessionTokenManager.cs`: removed dual-constructor DI violation; fixed UTC/local time mismatch in session token expiry (GETDATE() uses local time)
+
+**CI integration:** Tests skip gracefully when OAuth/MCP prerequisites are unavailable. Environment-specific `.env` files added for stage, demo, and prod.
 
 ---
 
@@ -121,13 +121,14 @@ A `POST /oauth/revoke` endpoint for explicitly revoking access or refresh tokens
 ## Cross-Repo Dependency Map
 
 ```
-Phase 1 (Done)          Phase 2 (Done)           Phase 3 (Done)             Remaining
+Phase 1 (Done)          Phase 2 (Done)           Phase 3 (Done)             Phase 4 (Done)
 -----------------       -----------------        ---------------------      ------------------
-Gateway proxy     --->  OAuth server       --->  Login & Consent UI   --->  2.1 Browser E2E
-Token validation        JWT service              16 unit tests                (blocked: local DI)
-Audit route             Session tokens           Proxy redirect fix         1.1 Scope enforcement
-                        DB migration             E2E tests written          1.2 Integration tests
-                        Pipeline secrets
+Gateway proxy     --->  OAuth server       --->  Login & Consent UI   --->  Browser E2E ✅
+Token validation        JWT service              16 unit tests              16 Playwright tests
+Audit route             Session tokens           Proxy redirect fix         CI-compatible
+                        DB migration                                        1.1 Scope enforcement ✅
+                        Pipeline secrets                                    1.2 Integration tests ✅
+                        8 integration tests ✅
 ```
 
 ---

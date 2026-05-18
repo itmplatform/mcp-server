@@ -2,7 +2,7 @@
 
 > **Status:** Phase 2 in progress -- 134 unit tests, 23 E2E tests passing  
 > **Date:** 2026-05-14  
-> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ⚠️ (ITM.MCP done incl. scope enforcement; ITM.Account OAuth done 2026-05-13, DI issue fixed; ITM.Web Login & Consent UI done 2026-05-13; browser E2E tests written) | 3 Advanced ⬜
+> **Phases:** 1 Read-Only (stdio) ✅ | 2 Writes + HTTP ✅ (ITM.MCP done incl. scope enforcement; ITM.Account OAuth done; ITM.Web Login & Consent UI done; 16 browser E2E tests passing 2026-05-14) | 3 Advanced ⬜
 > **OAuth remaining work:** [SPEC_OAUTH_REMAINING.md](SPEC_OAUTH_REMAINING.md) -- tracks all open items across repos
 
 ---
@@ -903,7 +903,7 @@ These must be resolved before the MCP server can go to production:
 |---------|--------|------|--------|
 | Identity resolution endpoint | `POST /v2/{co}/resolve/identity` must be built. Returns userId, accountId, email, languageId, licenseTypeIds, computed dataMartAccess, pmScopeUserId. Both phases depend on it. See Section 3.7. | ITM.Account | ✅ Done |
 | DataMart query validator | `query_datamart` must not ship without validation guards. Copy PMPilot's `inference/datamart/validators.js` (~150 lines, zero deps) into `src/validation/query-validator.ts` (ported to TypeScript). Both files carry sync comments pointing to each other. Allowed operators: `$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, `$regex`, `$options`, `$exists`, `$not`, `$and`, `$or`, `$nor`. Note: `$not` is allowed by DataMart's `validate.ts` but not in PMPilot's current allow-list -- the MCP copy must add it. Allowed aggregation stages: `$match`, `$project`, `$group`, `$sort`, `$limit`, `$skip`, `$unwind`, `$addFields`, `$set`, `$unset`. Banned: `$lookup`, `$merge`, `$out`, `$function`, `$accumulator`, `$where` (JS execution), `$facet` (DoS surface). Enforce `$limit` on every aggregation (max 1000). | ITM.MCP (+ sync comment in ITM.PMPilot) | ⬜ To do |
-| Gateway PM-scope injection | The gateway must compute `X-PM-Scope-User-Id` from the authenticated user's license type and inject it, so DataMart does not rely on client-supplied headers. Requires adding license type to the gateway's `UserAccount` object (currently only has UserId, AccountId, LanguageId, IsCompanyAdmin). Until this ships, PM-only users are blocked from stdio. Phase 2 HTTP is unaffected (server-side, trusted zone). | ITM.API | ⬜ Prerequisite for PM stdio |
+| Gateway PM-scope injection | The gateway computes `X-PM-Scope-User-Id` from the authenticated user's license type and injects it, so DataMart does not rely on client-supplied headers. `UserAccount` now has `LicenseTypeIds` and `IsPmOnly`. `BuildForwardedHeaders` injects the header for PM-only users and implicitly strips client-supplied values for all users. 14 unit tests. | ITM.API | ✅ Done (2026-05-14) |
 | License policy verification | DataMart's `accessService.ts` already defines allowed license types as `[0, 1, 2]` (CompanyAdmin, FullUser, ProjectManager). PM-scoped access works in production via PMPilot. Verified: matches spec. | ITM.DataMart | ✅ Verified |
 
 ---
@@ -965,17 +965,17 @@ Steps 15--16 and 19 follow a four-phase cross-repo implementation sequence defin
 | 1. Gateway Prerequisites ([spec](../../ITM.Web/zz_Specifications/done/SPEC_OAUTH_GATEWAY_PREREQUISITES.md)) | Part of step 15 | ✅ Done |
 | 2. OAuth Authorization Server (ITM.Account: endpoints, DB, JWT, session tokens) | Step 15, step 19 | ✅ Done (2026-05-13) |
 | 3. Login & Consent UI (ITM.Web: OAuthLogin/Consent/Error pages) | Step 16 | ✅ Done (2026-05-13) |
-| 4. Full Browser E2E (Playwright: complete OAuth flow) | Step 20 (OAuth portion) | OAuth Phases 1+2+3 |
+| 4. Full Browser E2E (Playwright: complete OAuth flow) | Step 20 (OAuth portion) | ✅ Done (2026-05-14) |
 
 | # | Step | Repo | Status |
 |---|------|------|--------|
-| 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ⬜ To do |
+| 14 | Gateway PM-scope injection (unblocks PM users for stdio; Section 12) | ITM.API | ✅ Done (2026-05-14) |
 | 15 | OAuth authorization server (authorize, token, exchange endpoints) -- gateway prerequisites (OAuth Phase 1) done; server implementation (OAuth Phase 2) done 2026-05-13; Login & Consent UI (Phase 3) done 2026-05-13 | ITM.Web + ITM.Account | ✅ Done |
 | 16 | OAuth login/consent page (OAuth Phase 3): OAuthLogin.aspx, OAuthConsent.aspx, OAuthError.aspx, App_Code service layer, 16 unit tests, proxy redirect fix | ITM.Web | ✅ Done (2026-05-13) |
 | 17 | Streamable HTTP transport (metadata, token validation, token exchange) | ITM.MCP | ✅ Done (ITM.MCP side: OAuth scaffolding, per-session auth, metadata endpoint. ITM.Account OAuth server done 2026-05-13.) |
 | 18 | Write tools (`create_task`, `update_task`, `create_risk`, `create_issue`, `update_project`) | ITM.MCP | ✅ Done |
 | 19 | Audit log (`tblMcpAuditLog` inserts via ITM.Account) -- included in OAuth Phase 2 | ITM.Account + ITM.MCP | ✅ Done (both sides: ITM.MCP audit client + ITM.Account audit endpoint done 2026-05-13.) |
-| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15). OAuth browser E2E is OAuth Phase 4. | ITM.MCP | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth E2E awaits OAuth Phase 4.) |
+| 20 | E2E tests -- verify write tools, stale-after-write behavior, OAuth flow (Section 15). OAuth browser E2E is OAuth Phase 4. | ITM.MCP + UI-E2E-Testing | ✅ Done (write tool E2E tests with self-contained lifecycle. OAuth browser E2E done 2026-05-14: 14 tests in `oauth-flow.spec.ts` + 2 in `mcp-scope-enforcement.spec.ts`.) |
 | 21 | OAuth scope enforcement: `scope` in TokenExchangeResult, `grantedScopes` in EffectiveUserContext, `token` header fix, conditional write-tool registration, dispatch guard (Section 3.6.1) | ITM.MCP | ✅ Done |
 
 ### Phase 3 -- Advanced
@@ -1369,7 +1369,7 @@ Phase 2 adds write tool tests. These are self-contained: `beforeAll` creates a t
 | `update_project` | PATCH project description. Returns confirmed state + stale notice. |
 | All write responses | Two content items: `content[0]` is JSON data from v2 REST, `content[1]` is the stale-after-write notice. |
 
-**OAuth flow** (E2E tests written, not yet runnable): Initialize session with OAuth Bearer token instead of API key. ITM.Account OAuth server done (2026-05-13); ITM.Web Login & Consent UI done (2026-05-13); 14 Playwright E2E scenarios written in `UI-E2E-Testing/playwright/tests/oauth/oauth-flow.spec.ts`. Browser E2E blocked by ITM.Account local DI issue (OAuthManager constructor injection).
+**OAuth flow** (16 E2E tests passing): Initialize session with OAuth Bearer token instead of API key. Full browser E2E tests passing 2026-05-14: 14 in `oauth-flow.spec.ts` (login, consent, cancel, error, full PKCE token exchange) + 2 in `mcp-scope-enforcement.spec.ts` (read-only sees 15 tools, read-write sees 20 tools). Tests skip gracefully on CI when OAuth/MCP prerequisites are unavailable.
 
 Write tests clean up after themselves -- `afterAll` deletes created entities leaf-to-top to avoid polluting the local database. Each delete is wrapped in try/catch so partial cleanup failure does not mask test results.
 

@@ -27,6 +27,7 @@ import { extractBearerToken } from './auth/token-extraction.js';
 import { exchangeToken, buildEffectiveUserContextFromExchange, type OAuthConfig } from './auth/oauth-auth.js';
 import { createAuditClient } from './clients/audit-client.js';
 import { hasScope, type EffectiveUserContext } from './auth/effective-user-context.js';
+import { isAuditEnabled } from './audit-config.js';
 import { instrumentServer } from './instrument-server.js';
 
 const log = createLogger('mcp');
@@ -70,7 +71,7 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userConte
 }
 
 function buildClientsForUser(userContext: EffectiveUserContext): Clients {
-  const auditEnabled = process.env.ITM_AUDIT_ENABLED === 'true';
+  const auditEnabled = isAuditEnabled();
   const audit = auditEnabled
     ? createAuditClient({
         apiUrl: process.env.ITM_API_URL!,
