@@ -7,3 +7,4 @@ dist/
 nul
 NUL
 package-lock.json
+.playwright-mcp

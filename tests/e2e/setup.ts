@@ -1,25 +1,20 @@
 import { ChildProcess, spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { beforeAll, afterAll } from 'vitest';
+import {
+  createProjectViaRest,
+  deleteIssueViaRest,
+  deleteProjectViaRest,
+  deleteRiskViaRest,
+  deleteTasksViaRest,
+  fetchJson,
+  getReferenceBaseIds,
+  getReferenceIds,
+  getReferenceItems,
+  querySqlNumber,
+} from '../helpers/local-api.js';
 
-// Load .env so E2E tests have API credentials even when run without --env-file
-try {
-  const content = readFileSync(resolve(process.cwd(), '.env'), 'utf-8');
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx);
-    const value = trimmed.slice(eqIdx + 1);
-    if (key && !process.env[key]) process.env[key] = value;
-  }
-} catch { /* .env not found -- rely on existing env vars */ }
-
-const MCP_URL = 'http://localhost:6160/mcp';
-const API_URL = process.env.ITM_API_URL ?? 'http://localhost/ITM.API';
-const COMPANY = process.env.ITM_COMPANY ?? 'testsmarter';
+const MCP_PORT = process.env.MCP_E2E_PORT ?? '6160';
+const MCP_URL = `http://localhost:${MCP_PORT}/mcp`;
 let sessionId: string | undefined;
 let serverProcess: ChildProcess | undefined;
 
@@ -106,74 +101,23 @@ export async function listTools(id = 2) {
   return response.json();
 }
 
-function getRestHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (process.env.ITM_API_KEY) {
-    headers['Authorization'] = `Bearer ${process.env.ITM_API_KEY}`;
-  } else if (process.env.ITM_TOKEN) {
-    headers['Token'] = process.env.ITM_TOKEN;
-  }
-  return headers;
-}
-
-async function getFirstProjectTypeId(): Promise<number> {
-  const response = await fetch(`${API_URL}/v2/${COMPANY}/getprojecttypes`, {
-    method: 'GET',
-    headers: getRestHeaders(),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to get project types: ${response.status} ${response.statusText}`);
-  }
-  const types = await response.json() as { Id: number }[];
-  if (!types.length) throw new Error('No project types available');
-  return types[0].Id;
-}
-
-export async function createProjectViaRest(name: string): Promise<number> {
-  const typeId = await getFirstProjectTypeId();
-  const response = await fetch(`${API_URL}/v2/${COMPANY}/projects`, {
-    method: 'POST',
-    headers: getRestHeaders(),
-    body: JSON.stringify({ Name: name, TypeId: typeId }),
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to create project: ${response.status} ${response.statusText} -- ${body}`);
-  }
-  const data = await response.json() as Record<string, unknown>;
-  return (data.Id ?? data.id ?? data.ProjectId) as number;
-}
-
-export async function getReferenceIds(entity: string): Promise<number[]> {
-  const response = await fetch(`${API_URL}/v2/${COMPANY}/${entity}`, {
-    method: 'GET',
-    headers: getRestHeaders(),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to get ${entity}: ${response.status} ${response.statusText}`);
-  }
-  const items = await response.json() as { Id: number }[];
-  return items.map(i => i.Id);
-}
-
-export async function deleteViaRest(path: string): Promise<void> {
-  try {
-    const response = await fetch(`${API_URL}/v2/${COMPANY}/${path}`, {
-      method: 'DELETE',
-      headers: getRestHeaders(),
-    });
-    if (!response.ok && response.status !== 404) {
-      console.warn(`Cleanup DELETE ${path} returned ${response.status}`);
-    }
-  } catch (err) {
-    console.warn(`Cleanup DELETE ${path} failed:`, err);
-  }
-}
+export {
+  createProjectViaRest,
+  deleteIssueViaRest,
+  deleteProjectViaRest,
+  deleteRiskViaRest,
+  deleteTasksViaRest,
+  fetchJson,
+  getReferenceBaseIds,
+  getReferenceIds,
+  getReferenceItems,
+  querySqlNumber,
+};
 
 export function setupE2E() {
   beforeAll(async () => {
     try {
-      const healthRes = await fetch('http://localhost:6160/health');
+      const healthRes = await fetch(`http://localhost:${MCP_PORT}/health`);
       if (healthRes.ok) {
         await startSession();
         return;
@@ -183,12 +127,12 @@ export function setupE2E() {
     }
 
     serverProcess = spawn('npx', ['tsx', 'src/server.ts'], {
-      env: { ...process.env, PORT: '6160' },
+      env: { ...process.env, PORT: MCP_PORT },
       stdio: 'pipe',
       shell: true,
     });
 
-    await waitForServer('http://localhost:6160/mcp');
+    await waitForServer(MCP_URL);
     await startSession();
   }, 30000);
 

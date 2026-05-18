@@ -4,6 +4,7 @@ import { z } from 'zod';
 const ALLOWED_ENTITIES = [
   'projectstatuses', 'gettaskstatuses', 'gettasktypes', 'gettaskpriorities',
   'getprojecttypes', 'projectpriorities', 'riskstatuses', 'risktypes',
+  'riskimpacts', 'riskprobabilities',
   'issuestatuses', 'issuetypes', 'purchasestatuses', 'purchasetypes',
   'revenuestatuses',
 ] as const;
@@ -25,7 +26,7 @@ describe('reference-data entity validation', () => {
     expect(() => entitySchema.parse('')).toThrow();
   });
 
-  it('covers all 13 reference data endpoints from the spec', () => {
-    expect(ALLOWED_ENTITIES).toHaveLength(13);
+  it('covers all reference data endpoints exposed by the tool', () => {
+    expect(ALLOWED_ENTITIES).toHaveLength(15);
   });
 });

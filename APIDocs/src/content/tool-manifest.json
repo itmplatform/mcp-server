@@ -1,0 +1,677 @@
+{
+  "serverVersion": "1.0.0",
+  "tools": [
+    {
+      "name": "search_projects",
+      "description": "Find projects by name, status, type, or date range. Returns id, name, status, progress, dates, managers. Filterable fields: name, statusLabel, customTypeLabel, startDate, endDate.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search projects by name (case-insensitive regex)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by status label (e.g. \"In Progress\", \"Closed\")"
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by project type label"
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter projects starting on or after this date (ISO 8601)"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter projects ending on or before this date (ISO 8601)"
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort field (default: \"name\"). Use DataMart field names."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max results (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Offset for pagination"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Get full project details by ID, optionally including subcomponents (tasks, risks, issues, budget, purchases, revenues). One query returns everything requested.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tasks",
+                "risks",
+                "issues",
+                "budget",
+                "purchases",
+                "revenues"
+              ]
+            },
+            "description": "Subcomponents to include (default: none)"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search_services",
+      "description": "Find services by name, status, type, or date range. Same query shape as search_projects but for services.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search services by name (case-insensitive regex)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by status label"
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by service type label"
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter services starting on or after this date (ISO 8601)"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter services ending on or before this date (ISO 8601)"
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort field (default: \"name\")"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max results (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Offset for pagination"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_service",
+      "description": "Get full service details by ID, optionally including subcomponents (activities, purchases, revenues). Note: services have activities instead of tasks, and do not have risks or issues.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "activities",
+                "purchases",
+                "revenues",
+                "budget"
+              ]
+            },
+            "description": "Subcomponents to include (default: none)"
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_project_tasks",
+      "description": "List all tasks for a project. Returns task details: taskId, name, statusLabel, priorityLabel, assignedTo, startDate, endDate, percentComplete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_budget",
+      "description": "Get budget summary for a project. Returns four budget objects: budgetTopDown (planned), budgetBottomUp (estimated), budgetPeriodEndClose (forecast), budgetActual (spent).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_purchases",
+      "description": "Get purchase orders for a project. Returns an array of purchase items with amount, status, dates, and provider.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_revenues",
+      "description": "Get revenue items for a project. Returns an array of revenue entries with amount, status, and dates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_risks",
+      "description": "Get risks for a project. Returns an array of risk items with name, description, status, probability, impact, and mitigation plan.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_issues",
+      "description": "Get issues for a project. Returns an array of issue items with name, description, status, severity, and resolution.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "aggregate_portfolio",
+      "description": "Portfolio-level analytics: group projects by any field and compute metrics (count, avgProgress, totalBudget, totalActual). Uses DataMart aggregation -- no REST equivalent. Available groupBy fields: statusLabel, priorityLabel, methodology, customTypeLabel, isClosed, managers.name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupBy": {
+            "type": "string",
+            "description": "Field to group by (e.g. \"statusLabel\", \"methodology\", \"customTypeLabel\")"
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "count",
+                "avgProgress",
+                "totalBudget",
+                "totalActual"
+              ]
+            },
+            "description": "Metrics to compute per group"
+          },
+          "filter": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Additional MongoDB filter to narrow the portfolio (merged with componentType: project)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max groups to return (default 50, max 1000)"
+          }
+        },
+        "required": [
+          "groupBy",
+          "metrics"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "query_datamart",
+      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, tasks, risks, issues, purchases, revenues, budgetTopDown, budgetActual.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "component",
+              "components",
+              "aggregateComponents"
+            ],
+            "description": "The DataMart operation"
+          },
+          "id": {
+            "type": "number",
+            "description": "Component ID (for \"component\" operation)"
+          },
+          "where": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "MongoDB filter (for \"components\")"
+          },
+          "project": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Field projection (1 = include)"
+          },
+          "sort": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Sort spec (1 = ascending, -1 = descending)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max results (default 50, max 200 for list, 1000 for agg)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Offset for pagination"
+          },
+          "pipeline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Aggregation pipeline stages (must end with $limit)"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search_users",
+      "description": "Find team members by name or email. Returns userId, name, email, role. Uses v2 REST API (not DataMart).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search by name or email (case-insensitive)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max results (default 50)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_user",
+      "description": "Get details for a single user by ID. Returns full user profile including roles, categories, and contact info.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "description": "The user ID"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_reference_data",
+      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "projectstatuses",
+              "gettaskstatuses",
+              "gettasktypes",
+              "gettaskpriorities",
+              "getprojecttypes",
+              "projectpriorities",
+              "riskstatuses",
+              "risktypes",
+              "riskimpacts",
+              "riskprobabilities",
+              "issuestatuses",
+              "issuetypes",
+              "purchasestatuses",
+              "purchasetypes",
+              "revenuestatuses"
+            ],
+            "description": "The reference data entity to retrieve"
+          }
+        },
+        "required": [
+          "entity"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_task",
+      "description": "Create a new task in a project. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to create the task in"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Task name (required)"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Task description. Compatibility alias for the v2 REST Details field."
+          },
+          "Details": {
+            "type": "string",
+            "description": "Task details/description field used by v2 REST"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "Task status ID"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Task type ID"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "Task priority ID"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "Start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "End date (ISO 8601)"
+          }
+        },
+        "required": [
+          "projectId",
+          "Name"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_task",
+      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New task name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New description. Compatibility alias for the v2 REST Details field."
+          },
+          "Details": {
+            "type": "string",
+            "description": "New task details/description field used by v2 REST"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New status ID"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "New type ID"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "New priority ID"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "New start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "New end date (ISO 8601)"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_risk",
+      "description": "Log a new risk in a project. Returns the created risk read back from v2 REST. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", or \"riskprobabilities\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to create the risk in"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Risk name (required)"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Risk description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "Risk status ID"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Risk type ID"
+          },
+          "ProbabilityId": {
+            "type": "number",
+            "description": "Risk probability ID"
+          },
+          "ImpactId": {
+            "type": "number",
+            "description": "Risk impact ID"
+          },
+          "LevelId": {
+            "type": "number",
+            "description": "Risk level base ID required by v2 REST. No v2 risklevels reference endpoint currently exists."
+          },
+          "MitigationPlan": {
+            "type": "string",
+            "description": "Mitigation plan description"
+          }
+        },
+        "required": [
+          "projectId",
+          "Name",
+          "LevelId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Log a new issue in a project. Returns the created issue read back from v2 REST. Use get_reference_data with entity \"issuestatuses\" or \"issuetypes\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to create the issue in"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Issue name (required)"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Issue description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "Issue status ID. Mapped to the v2 REST Status field."
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Issue type ID. Mapped to the v2 REST Type field."
+          },
+          "Resolution": {
+            "type": "string",
+            "description": "Resolution description. Mapped to the v2 REST FinalResolution field."
+          }
+        },
+        "required": [
+          "projectId",
+          "Name"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_project",
+      "description": "Update project fields via PATCH. Only send the fields you want to change. Returns the updated project read back from v2 REST.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New project name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New project description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New project status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST."
+          },
+          "ProjectStatusId": {
+            "type": "number",
+            "description": "New project status ID field used by v2 REST"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "New priority ID"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "New start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "New end date (ISO 8601)"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
+}
