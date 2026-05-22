@@ -11,7 +11,7 @@ Before any work, also read:
 ```bash
 npm test              # unit tests (vitest)
 npm run build         # compile TypeScript (tsc)
-npm run dev           # HTTP dev server on port 6160 (requires .env)
+npm run dev           # HTTP dev server on port 6170 (requires .env)
 npm run test:e2e      # E2E tests (requires local ITM.API + DataMart running)
 ```
 

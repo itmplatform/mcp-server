@@ -117,7 +117,11 @@ async function main() {
   const useHttp = process.env.PORT || process.argv.includes('--http');
 
   if (useHttp) {
-    const port = parseInt(process.env.PORT ?? '6160', 10);
+    if (!process.env.PORT) {
+      log.fatal('Missing required environment variable: PORT (required for HTTP mode)');
+      process.exit(1);
+    }
+    const port = parseInt(process.env.PORT, 10);
     const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
 
     if (oauthConfig) {
@@ -129,16 +133,21 @@ async function main() {
     const httpServer = createServer(async (req, res) => {
       try {
       if (req.method === 'GET' && req.url === '/.well-known/oauth-protected-resource') {
+        if (!oauthConfig) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'OAuth not configured' }));
+          return;
+        }
         const metadata = buildProtectedResourceMetadata({
-          mcpServerUrl: process.env.MCP_SERVER_URL ?? `http://localhost:${port}`,
-          authorizationServerUrl: process.env.ITM_AUTH_URL ?? '',
+          mcpServerUrl: process.env.MCP_SERVER_URL!,
+          authorizationServerUrl: process.env.ITM_AUTH_URL!,
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(metadata));
         return;
       }
 
-      if (req.method === 'POST' && req.url === '/mcp') {
+      if (req.method === 'POST' && req.url === '/') {
         const body = await new Promise<string>((resolve) => {
           let data = '';
           req.on('data', (chunk: Buffer) => { data += chunk.toString(); });
@@ -218,7 +227,7 @@ async function main() {
     });
 
     httpServer.listen(port, () => {
-      log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/mcp`);
+      log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/`);
     });
   } else {
     const writeCtx: WriteUserContext = {

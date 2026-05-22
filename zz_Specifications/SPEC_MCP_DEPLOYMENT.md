@@ -23,65 +23,83 @@ These are ordered by priority. The hosted server is the primary distribution pat
 
 ### 2.1 Architecture
 
-The MCP server already supports Streamable HTTP transport (implemented in Phase 2). In hosted mode, it runs as a long-lived Node.js process behind a reverse proxy, handling multiple concurrent sessions via the session map in `server.ts`.
+The MCP server already supports Streamable HTTP transport (implemented in Phase 2). In hosted mode, it runs as a PM2-managed Node.js process on the same Windows Server VMs that host DataMart, PMPilot, and MSTeamBot. Requests reach it via the IIS API Gateway -- the same reverse-proxy mechanism used by all ITM Node.js microservices.
 
 ```
 AI Client (Claude, Codex, VS Code...)
   |
-  | HTTPS POST to https://mcp.itmplatform.com/mcp
+  | HTTPS POST to https://api.itmplatform.com/v2/_/mcp/
   | Bearer token (OAuth)
   |
   v
-Reverse Proxy (nginx)
+IIS (ITM.API site, TLS termination)
   |
   v
-Node.js MCP Server (port 6160)
+API Gateway (ApiGateway.cs)
+  |  - Matches URL regexp from APIGateway.json
+  |  - No auth field = unauthenticated pass-through (MCP handles its own OAuth)
+  |
+  v
+Node.js MCP Server (localhost:6170, PM2)
   |  - OAuth token exchange per session
-  |  - Routes tool calls to ITM.API gateway
+  |  - Routes tool calls to ITM.API on localhost
   |
   v
-ITM.API Gateway (api.itmplatform.com)
+ITM.API (http://localhost/ITM.API)
 ```
 
 ### 2.2 Environment URLs
 
-| Environment | MCP Server URL | ITM.API Target | OAuth Auth URL | Purpose |
-|-------------|---------------|----------------|----------------|---------|
-| Local | `http://localhost:6160/mcp` | `http://localhost/ITM.API` | `http://localhost/ITM.API` | Development |
-| Demo | `https://mcp-demo.itmplatform.com/mcp` | `https://demo-api.itmplatform.com` | `https://demo-api.itmplatform.com` | Sales demos |
-| Stage | `https://mcp-stage.itmplatform.com/mcp` | `https://new-api.itmplatform.com` | `https://new-api.itmplatform.com` | Pre-production testing |
-| Production | `https://mcp.itmplatform.com/mcp` | `https://api.itmplatform.com` | `https://api.itmplatform.com` | Live users |
+| Environment | MCP Server URL | ITM.API Target | OAuth Auth URL | VM | Purpose |
+|-------------|---------------|----------------|----------------|----|---------|
+| Local | `http://localhost:6170/` | `http://localhost/ITM.API` | `http://localhost/ITM.API` | TROJANHORSE | Development |
+| Demo | `https://new-api.itmplatform.com/v2/_/mcp/` | `https://new-api.itmplatform.com` | `https://new-api.itmplatform.com` | DemoAz2 | Sales demos |
+| Stage | `https://new-api.itmplatform.com/revamping/v2/_/mcp/` | `https://new-api.itmplatform.com/revamping` | `https://new-api.itmplatform.com/revamping` | DemoAz2 | Pre-production testing |
+| Production | `https://api.itmplatform.com/v2/_/mcp/` | `https://api.itmplatform.com` | `https://api.itmplatform.com` | ITMApp (Prod) | Live users |
+
+Port convention follows the org standard (6xxx prod, 3xxx stage, 2xxx demo):
+
+| Environment | Port |
+|-------------|------|
+| Local / Prod | 6170 |
+| Stage | 3170 |
+| Demo | 2170 |
+
+> **Port note:** Port 6160 is already used by MSTeamBot. The next available slot in the 6xxx range is 6170.
 
 ### 2.3 Infrastructure
 
-Follow the existing DataMart deployment pattern:
+Follow the existing DataMart / PMPilot / MSTeamBot deployment pattern:
 
 | Concern | Approach | Notes |
 |---------|----------|-------|
-| Hosting | AWS EC2 (same instance as DataMart) or dedicated | Node.js 22 LTS |
-| Process manager | PM2 or systemd | Auto-restart on crash, log rotation |
-| Reverse proxy | nginx | TLS termination, `/mcp` path routing |
-| TLS | Let's Encrypt or AWS ACM | Required for production |
-| DNS | `mcp.itmplatform.com` CNAME | Route 53 or existing DNS |
+| VMs | Azure VMs -- DemoAz2 (stage + demo), ITMApp (prod) | Same instances as DataMart, PMPilot, MSTeamBot |
+| Process manager | PM2 | Auto-restart on crash, log rotation. Global ecosystem at `C:\inetpub\wwwroot\ecosystem.config.js` |
+| Reverse proxy | IIS API Gateway (`ApiGateway.cs`) | TLS termination, URL routing via `APIGateway.json` |
+| TLS | IIS-managed certificates | Existing certs on the IIS sites |
+| DNS | No new DNS records needed | Routes through existing `api.itmplatform.com` / `new-api.itmplatform.com` |
 | Monitoring | Health endpoint: `GET /health` | Returns `{ status: "ok", user: "..." }` |
+| Deployment path | `C:\inetpub\wwwroot\ITM.MCP\` | Same pattern as other Node.js services |
 
 ### 2.4 Environment Variables (Production)
 
 ```bash
 # Required
-ITM_API_URL=https://api.itmplatform.com
+ITM_API_URL=http://localhost/ITM.API
 ITM_COMPANY=default          # not used in multi-tenant HTTP mode, but required for startup identity
 ITM_API_KEY=<service-key>    # for startup identity resolution only
-PORT=6160
+PORT=6170
 
 # OAuth (required for hosted mode)
-ITM_AUTH_URL=https://api.itmplatform.com
-MCP_SERVER_URL=https://mcp.itmplatform.com/mcp
+ITM_AUTH_URL=http://localhost/ITM.API
+MCP_SERVER_URL=https://api.itmplatform.com/v2/_/mcp/
 
 # Optional
 LOG_LEVEL=info
 ITM_AUDIT_ENABLED=true
 ```
+
+> Note: In production, `ITM_API_URL` points to `http://localhost/ITM.API` (local IIS), not the external URL. All ITM microservices call the API via localhost.
 
 ### 2.5 Startup Identity vs Per-Session Identity
 
@@ -89,103 +107,173 @@ The hosted server resolves a startup identity (from `ITM_API_KEY`) to verify con
 
 This means the `ITM_API_KEY` in production config is a service-level key used once at boot, not a user key. It needs minimal permissions (just enough for `POST /resolve/identity` to succeed).
 
-### 2.6 Deployment Pipeline
+### 2.6 API Gateway Integration (ITM.Web changes)
 
-Azure Pipelines YAML (`ITM-MCP-Server.yml`):
+Same pattern as MSTeamBot. No separate IIS sites, DNS records, or SSL certs needed.
+
+| File | Change |
+|------|--------|
+| `ITM.API/APIGateway/Enums.cs` | Add `MCP` to `Microservices` enum |
+| `ITM.API/APIGateway/APIGatewayManager.cs` | Add `MCPMS` case in `GetMicroserviceName()` |
+| `ITM.API/Web.config` (all variants) | Add `<add key="MCPMS" value="http://localhost:6170/" />` (port per env) |
+| `ITM.API/APIGateway.json` | Add route (see below) |
+
+Route entry in `APIGateway.json` (no `auth` -- MCP handles its own OAuth):
+
+```json
+{
+  "url": "v2/{AccountId}/mcp/{*pathInfo}",
+  "regexp": "v2/[\\w-_0-9]+/mcp/",
+  "micro": "MCP"
+}
+```
+
+Web.config appSetting per environment:
+
+| Environment | Value |
+|-------------|-------|
+| Dev / Prod | `<add key="MCPMS" value="http://localhost:6170/" />` |
+| Stage | `<add key="MCPMS" value="http://localhost:3170/" />` |
+| Demo | `<add key="MCPMS" value="http://localhost:2170/" />` |
+
+### 2.7 Gateway-Aware Routes (Code Change)
+
+The API Gateway forwards the **full URL path** to the microservice. For example, a request to `https://api.itmplatform.com/v2/_/mcp/` arrives at the Node.js server as `GET /v2/_/mcp/`. This is the same pattern MSTeamBot uses -- it registers both direct and gateway-prefixed routes:
+
+```typescript
+// MSTeamBot pattern (for reference):
+app.post('/api/messages', messagesHandler);                              // Direct
+app.post('/v2/:accountId/msteamsbot/api/messages', messagesHandler);     // Via gateway
+```
+
+The MCP server currently handles `req.url === '/.well-known/oauth-protected-resource'`, `req.url === '/'`, and `req.url === '/health'`. It needs to also handle the gateway-prefixed versions:
+
+| Direct path (local dev) | Gateway path (hosted) |
+|---|---|
+| `GET /.well-known/oauth-protected-resource` | `GET /v2/_/mcp/.well-known/oauth-protected-resource` |
+| `POST /` | `POST /v2/_/mcp/` |
+| `GET /health` | `GET /v2/_/mcp/health` |
+
+This is a code change in `server.ts`, not an infrastructure change. The OAuth metadata endpoint works through the API Gateway -- clients discover its URL from the `resource_metadata` field in the server's 401 `WWW-Authenticate` header, so the path does not need to be at the domain root.
+
+### 2.8 Deployment Pipeline
+
+Azure Pipelines YAML (`Pipelines/ITM-MCP-Stage.yml` and `Pipelines/ITM-MCP-Prod.yml`), following the DataMart/PMPilot/MSTeamBot pattern.
+
+#### Stage Pipeline (`ITM-MCP-Stage.yml`)
+
+**Trigger:** `stage` branch (exclude `Pipelines/**`)
+
+Deploys both `MCPStage` and `MCPDemo` on DemoAz2 (same pattern as PMPilot's stage pipeline).
 
 ```yaml
-# Trigger: merge to main (prod) or stage
 trigger:
   branches:
     include:
-      - main
       - stage
+    exclude:
+      - Pipelines/**
 
 stages:
   - stage: Build
+    pool:
+      vmImage: 'windows-latest'
     jobs:
       - job: BuildMCP
         steps:
           - task: NodeTool@0
-            inputs: { versionSpec: '22.x' }
+            inputs:
+              versionSpec: '22.x'
           - script: npm ci
           - script: npm test
           - script: npm run build
-          - publish: $(System.DefaultWorkingDirectory)/dist
-            artifact: mcp-server
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/drop.zip'
+          - publish: $(Build.ArtifactStagingDirectory)/drop.zip
+            artifact: drop
 
-  - stage: DeployStage
-    condition: eq(variables['Build.SourceBranch'], 'refs/heads/stage')
+  - stage: Deploy
+    dependsOn: Build
     jobs:
       - deployment: DeployToStage
-        environment: mcp-stage
+        environment:
+          name: ITM-Stage
+          resourceType: VirtualMachine
         strategy:
           runOnce:
             deploy:
               steps:
                 - script: |
-                    scp -r $(Pipeline.Workspace)/mcp-server/* user@stage-host:/app/mcp/
-                    ssh user@stage-host 'cd /app/mcp && npm ci --production && pm2 restart mcp'
-
-  - stage: DeployProd
-    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
-    jobs:
-      - deployment: DeployToProd
-        environment: mcp-prod
-        strategy:
-          runOnce:
-            deploy:
-              steps:
+                    if exist "C:\inetpub\wwwroot\0Backups\ITM.MCP_Backup" rd /s /q "C:\inetpub\wwwroot\0Backups\ITM.MCP_Backup"
+                    if exist "C:\inetpub\wwwroot\ITM.MCP" xcopy "C:\inetpub\wwwroot\ITM.MCP" "C:\inetpub\wwwroot\0Backups\ITM.MCP_Backup\" /E /I /Y
+                  displayName: 'Backup existing'
+                - task: ExtractFiles@1
+                  inputs:
+                    archiveFilePatterns: '$(Pipeline.Workspace)/drop/drop.zip'
+                    destinationFolder: 'C:\inetpub\wwwroot\ITM.MCP'
+                    cleanDestinationFolder: true
                 - script: |
-                    scp -r $(Pipeline.Workspace)/mcp-server/* user@prod-host:/app/mcp/
-                    ssh user@prod-host 'cd /app/mcp && npm ci --production && pm2 restart mcp'
+                    copy /Y "C:\inetpub\wwwroot\ITM.MCP\.env.stage" "C:\inetpub\wwwroot\ITM.MCP\.env"
+                  displayName: 'Copy .env.stage to .env'
+                - script: |
+                    node "C:\inetpub\wwwroot\ITM.MCP\scripts\ensure-ecosystem-app.cjs" "C:\inetpub\wwwroot\ecosystem.config.js" MCPStage MCPDemo
+                  displayName: 'Update PM2 ecosystem'
+                - script: |
+                    pm2 stop MCPStage & pm2 delete MCPStage & pm2 stop MCPDemo & pm2 delete MCPDemo
+                    pm2 start "C:\inetpub\wwwroot\ecosystem.config.js" --only MCPStage --update-env
+                    pm2 start "C:\inetpub\wwwroot\ecosystem.config.js" --only MCPDemo --update-env
+                    pm2 save
+                  displayName: 'Restart PM2 processes'
 ```
 
-### 2.7 nginx Configuration
+#### Prod Pipeline (`ITM-MCP-Prod.yml`)
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name mcp.itmplatform.com;
+Same structure, triggered on `main`, deploys to `ITM-Prod` environment, PM2 app name `MCPProd`.
 
-    ssl_certificate     /etc/letsencrypt/live/mcp.itmplatform.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mcp.itmplatform.com/privkey.pem;
+### 2.9 PM2 Configuration
 
-    location /mcp {
-        proxy_pass http://127.0.0.1:6160;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;    # MCP sessions can be long-lived
-        proxy_send_timeout 300s;
-    }
+Via `scripts/ensure-ecosystem-app.cjs` (to be created, same pattern as DataMart/MSTeamBot):
 
-    location /.well-known/oauth-protected-resource {
-        proxy_pass http://127.0.0.1:6160;
-        proxy_set_header Host $host;
-    }
-
-    location /health {
-        proxy_pass http://127.0.0.1:6160;
-    }
+```javascript
+// Prod entry
+{
+  name: 'MCPProd',
+  cwd: 'C:/inetpub/wwwroot/ITM.MCP',
+  script: 'dist/server.js',
+  interpreter: 'node',
+  node_args: ['--env-file=.env'],
+  instances: 1,
+  exec_mode: 'fork',
+  autorestart: true,
+  restart_delay: 3000,
+  min_uptime: '10m',
+  max_restarts: 5,
+  exp_backoff_restart_delay: 100
 }
+
+// Stage and Demo entries follow the same structure with:
+// MCPStage: node_args: ['--env-file=.env.stage']
+// MCPDemo:  node_args: ['--env-file=.env.demo']
 ```
 
-### 2.8 Pre-Deployment Checklist
+### 2.10 Pre-Deployment Checklist
 
 | Item | Detail | Status |
 |------|--------|--------|
-| OAuth flow works end-to-end against target environment | Token exchange, scope enforcement, session lifecycle | ⬜ |
-| Health endpoint accessible | `GET /health` returns 200 | ⬜ |
-| OAuth metadata endpoint accessible | `GET /.well-known/oauth-protected-resource` returns valid JSON | ⬜ |
-| TLS configured | HTTPS only, no HTTP fallback in production | ⬜ |
-| PM2 / systemd process manager configured | Auto-restart, log capture | ⬜ |
-| DNS configured | `mcp.itmplatform.com` resolves | ⬜ |
-| Seed OAuth clients for known AI clients | Claude Desktop, Codex, VS Code client_id + redirect URIs in `tblOAuthClient` | ⬜ |
-| Rate limiting | Per-session token bucket (MCP-side). Gateway throttling re-enabled. | ⬜ |
-| Monitoring / alerting | Health check ping, error rate alerting | ⬜ |
+| OAuth flow works end-to-end against target environment | Token exchange, scope enforcement, session lifecycle | &#11036; |
+| Health endpoint accessible | `GET /health` returns 200 | &#11036; |
+| OAuth metadata endpoint accessible | `GET /.well-known/oauth-protected-resource` returns valid JSON | &#11036; |
+| TLS configured | HTTPS via IIS (existing certs) | &#11036; |
+| API Gateway route added | `APIGateway.json` + `Web.config` + `Enums.cs` + `APIGatewayManager.cs` | &#11036; |
+| PM2 process manager configured | `ensure-ecosystem-app.cjs` created, ecosystem entries tested | &#11036; |
+| ITM.Web deployed with MCP route | Gateway changes deployed to target VMs | &#11036; |
+| Seed OAuth clients for known AI clients | Claude Desktop, Codex, VS Code client_id + redirect URIs in `tblOAuthClient` | &#11036; |
+| Rate limiting | Per-session token bucket (MCP-side). Gateway throttling re-enabled. | &#11036; |
+| Monitoring / alerting | Health check ping, error rate alerting | &#11036; |
 
 ---
 
@@ -309,12 +397,12 @@ Marketplace listings are discovery points. Users browsing their AI client's tool
 
 | Marketplace | Owner | Listing format | Status |
 |------------|-------|----------------|--------|
-| Claude MCP Directory | Anthropic | Submit via form/PR to MCP server registry | ⬜ Research submission process |
-| OpenAI Codex / ChatGPT Plugins | OpenAI | Tool registry / plugin manifest | ⬜ Research submission process |
-| VS Code Marketplace | Microsoft | Extension or MCP server listing | ⬜ Research MCP listing support |
-| Cursor Directory | Cursor | Community-maintained list | ⬜ Research submission process |
-| MCP Server Registry (modelcontextprotocol.io) | MCP project | GitHub PR to official server list | ⬜ Research submission process |
-| JetBrains Marketplace | JetBrains | Plugin/tool listing | ⬜ Research submission process |
+| Claude MCP Directory | Anthropic | Submit via form/PR to MCP server registry | &#11036; Research submission process |
+| OpenAI Codex / ChatGPT Plugins | OpenAI | Tool registry / plugin manifest | &#11036; Research submission process |
+| VS Code Marketplace | Microsoft | Extension or MCP server listing | &#11036; Research MCP listing support |
+| Cursor Directory | Cursor | Community-maintained list | &#11036; Research submission process |
+| MCP Server Registry (modelcontextprotocol.io) | MCP project | GitHub PR to official server list | &#11036; Research submission process |
+| JetBrains Marketplace | JetBrains | Plugin/tool listing | &#11036; Research submission process |
 
 ### 4.3 Listing Content Template
 
@@ -335,7 +423,7 @@ Each marketplace has its own format, but all need the same core content:
 - Works with Claude Desktop, Claude Code, OpenAI Codex, VS Code Copilot, Cursor, JetBrains
 
 **Quick start:**
-- Hosted: Add `https://mcp.itmplatform.com/mcp` to your AI client's MCP config
+- Hosted: Add the hosted MCP URL to your AI client's MCP config (see Environment URLs table)
 - Local: `npx itm-mcp` with your API key
 
 **Links:**
@@ -365,18 +453,22 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 
 | # | Step | Description | Depends on | Status |
 |---|------|-------------|-----------|--------|
-| 1 | Provision infrastructure | DNS, TLS, nginx, PM2 for `mcp.itmplatform.com` | -- | ⬜ |
-| 2 | Deploy to stage | Deploy MCP server to stage environment. Verify OAuth flow, health endpoint, tool execution. | 1 | ⬜ |
-| 3 | Seed OAuth clients | Register known AI client client_ids in stage database. Test OAuth flow per client. | 2 | ⬜ |
-| 4 | Deploy to production | Deploy MCP server to production. Smoke test. | 2, 3 | ⬜ |
-| 5 | Prepare npm package | Add `bin`, `files`, shebang. Verify with `npm pack --dry-run`. | -- | ⬜ |
-| 6 | Publish to npm | `npm publish`. Verify `npx itm-mcp` works. | 5 | ⬜ |
-| 7 | Research marketplace submission | For each target marketplace, document the submission process, required metadata, and any approval timeline. | -- | ⬜ |
-| 8 | Submit to MCP Server Registry | PR to modelcontextprotocol.io official list. | 4, 6, docs SPA live | ⬜ |
-| 9 | Submit to Claude MCP Directory | Follow Anthropic's submission process. | 4, 6, docs SPA live | ⬜ |
-| 10 | Submit to OpenAI / VS Code / Cursor | Follow each vendor's submission process. | 4, 6, docs SPA live | ⬜ |
-| 11 | Monitoring & alerting | Set up health check pings, error rate alerts, usage dashboards. | 4 | ⬜ |
-| 12 | Rate limiting | Implement per-session token bucket. Re-enable gateway throttling. | 4 | ⬜ |
+| 1 | API Gateway integration | Add MCP route to `APIGateway.json`, enum, `GetMicroserviceName()`, `Web.config` (all variants) | -- | &#11036; |
+| 2 | Create `scripts/ensure-ecosystem-app.cjs` | PM2 ecosystem config for `MCPProd`, `MCPStage`, `MCPDemo` | -- | &#11036; |
+| 3 | Create pipeline YAMLs | `Pipelines/ITM-MCP-Stage.yml` and `Pipelines/ITM-MCP-Prod.yml` | -- | &#11036; |
+| 4 | Create `.env.stage` and `.env.demo` | Environment-specific config files | -- | &#11036; |
+| 5 | Deploy ITM.Web with MCP gateway route | Deploy the gateway changes to DemoAz2 and Prod VMs | 1 | &#11036; |
+| 6 | Deploy to stage | Deploy MCP server to DemoAz2. Verify OAuth flow, health endpoint, tool execution. | 2, 3, 4, 5 | &#11036; |
+| 7 | Seed OAuth clients | Register known AI client client_ids in stage database. Test OAuth flow per client. | 6 | &#11036; |
+| 8 | Deploy to production | Deploy MCP server to Prod VM. Smoke test. | 6, 7 | &#11036; |
+| 9 | Prepare npm package | Add `bin`, `files`, shebang. Verify with `npm pack --dry-run`. | -- | &#11036; |
+| 10 | Publish to npm | `npm publish`. Verify `npx itm-mcp` works. | 9 | &#11036; |
+| 11 | Research marketplace submission | For each target marketplace, document the submission process, required metadata, and any approval timeline. | -- | &#11036; |
+| 12 | Submit to MCP Server Registry | PR to modelcontextprotocol.io official list. | 8, 10, docs SPA live | &#11036; |
+| 13 | Submit to Claude MCP Directory | Follow Anthropic's submission process. | 8, 10, docs SPA live | &#11036; |
+| 14 | Submit to OpenAI / VS Code / Cursor | Follow each vendor's submission process. | 8, 10, docs SPA live | &#11036; |
+| 15 | Monitoring & alerting | Set up health check pings, error rate alerts, usage dashboards. | 8 | &#11036; |
+| 16 | Rate limiting | Implement per-session token bucket. Re-enable gateway throttling. | 8 | &#11036; |
 
 ---
 
@@ -384,7 +476,7 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 
 | Concern | Mitigation |
 |---------|-----------|
-| DDoS on hosted endpoint | nginx rate limiting + MCP-side per-session token bucket. Gateway throttling as defense in depth. |
+| DDoS on hosted endpoint | API Gateway-level throttling + MCP-side per-session token bucket. IIS request filtering as defense in depth. |
 | OAuth token theft | Short-lived access tokens (15 min). Refresh token rotation. HTTPS only. Audience binding (RFC 8707). |
 | Session exhaustion | Session map cleanup on disconnect. Max concurrent sessions limit. Session TTL with eviction. |
 | npm supply chain | Publish from CI only (tagged commits). Enable npm 2FA. Use `npm provenance` if available. |
@@ -396,9 +488,9 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 
 | Question | Context |
 |----------|---------|
-| Shared EC2 or dedicated? | DataMart runs on a dedicated EC2. Does MCP go on the same instance or get its own? Cost vs isolation tradeoff. |
-| Rate limits | What are the right per-session limits? Need to balance AI agent chattiness against backend capacity. |
-| Dynamic Client Registration | Some AI clients may use dynamic callback ports. If so, DCR (currently deferred in SPEC_OAUTH_REMAINING.md) will need to be built. Research per client. |
-| npm scope | Publish as `itm-mcp` (unscoped) or `@itm-platform/mcp` (scoped)? Scoped requires an npm org. |
-| Public GitHub repo | Marketplace listings typically link to a public repo. Is the ITM.MCP repo public or does it need to be? Alternative: publish a subset (README + examples) to a public repo. |
-| Demo environment | Should `mcp-demo.itmplatform.com` be deployed for sales demos? |
+| **Port assignment** | Proposed 6170/3170/2170. Confirm no conflicts with other services on the VMs. |
+| **Rate limits** | What are the right per-session limits? Need to balance AI agent chattiness against backend capacity. |
+| **Dynamic Client Registration** | Some AI clients may use dynamic callback ports. If so, DCR (currently deferred in SPEC_OAUTH_REMAINING.md) will need to be built. Research per client. |
+| **npm scope** | Publish as `itm-mcp` (unscoped) or `@itm-platform/mcp` (scoped)? Scoped requires an npm org. |
+| **Public GitHub repo** | Marketplace listings typically link to a public repo. Is the ITM.MCP repo public or does it need to be? Alternative: publish a subset (README + examples) to a public repo. |
+| **Demo environment** | Should the MCP server be deployed to the demo environment for sales demos? |

@@ -750,7 +750,7 @@ ITM.MCP/
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `npm run dev` | `cross-env PORT=6160 node --env-file=.env --import tsx src/server.ts` | Start MCP server in dev mode (HTTP on port 6160, loads `.env`) |
+| `npm run dev` | `cross-env PORT=6170 node --env-file=.env --import tsx src/server.ts` | Start MCP server in dev mode (HTTP on port 6170, loads `.env`) |
 | `npm run build` | `tsc` | Compile TypeScript to `dist/` |
 | `npm start` | `node dist/server.js` | Start compiled server (stdio mode, used by AI clients) |
 | `npm test` | `vitest` | Run unit tests |
@@ -758,7 +758,7 @@ ITM.MCP/
 
 **Development mode (`npm run dev`):**
 
-Starts the MCP server with Streamable HTTP transport on **port 6160**. This allows testing with curl, the MCP Inspector, or any HTTP client. The server reads configuration from `.env` (or environment variables):
+Starts the MCP server with Streamable HTTP transport on **port 6170**. This allows testing with curl, the MCP Inspector, or any HTTP client. The server reads configuration from `.env` (or environment variables):
 
 ```env
 ITM_API_URL=http://localhost/ITM.API
@@ -770,7 +770,7 @@ ITM_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 The dev server is the primary way to verify tools during development. Start it, test with curl (Section 15), and stop it with Ctrl+C. It can be restarted freely between test runs.
 
-**Port assignment -- 6160:** Follows the existing local port sequence (see [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md)):
+**Port assignment -- 6170:** Follows the existing local port sequence (see [ENVIRONMENTS-AND-ACCESS.md](../../ENVIRONMENTS-AND-ACCESS.md)):
 
 | Service | Port |
 |---------|------|
@@ -778,7 +778,8 @@ The dev server is the primary way to verify tools during development. Start it, 
 | DataServiceModel | 6139 |
 | DataMart | 6142 |
 | PM Pilot | 6150 |
-| **MCP Server** | **6160** |
+| MSTeamBot | 6160 |
+| **MCP Server** | **6170** |
 
 **stdio mode (AI client usage):**
 
@@ -818,7 +819,7 @@ Hosted as an HTTP service alongside the existing API:
 
 | Environment | URL | API target |
 |-------------|-----|------------|
-| Local | `http://localhost:6160/mcp` | `http://localhost/ITM.API` |
+| Local | `http://localhost:6170/mcp` | `http://localhost/ITM.API` |
 | Demo | `https://mcp-demo.itmplatform.com/mcp` | `https://demo-api.itmplatform.com` |
 | Stage | `https://mcp-stage.itmplatform.com/mcp` | `https://new-api.itmplatform.com` |
 | Production | `https://mcp.itmplatform.com/mcp` | `https://api.itmplatform.com` |
@@ -1010,27 +1011,27 @@ Credentials, URLs, and connection details: [ENVIRONMENTS-AND-ACCESS.md](../../EN
 ### 15.2 Server Lifecycle
 
 ```bash
-# Start the MCP server in HTTP dev mode (port 6160)
+# Start the MCP server in HTTP dev mode (port 6170)
 npm run dev
 
-# The server logs "MCP server listening on http://localhost:6160/mcp" when ready.
+# The server logs "MCP server listening on http://localhost:6170/mcp" when ready.
 # Stop with Ctrl+C. Restart freely between test runs.
 ```
 
 For a clean-build test:
 
 ```bash
-npm run build && npm start -- --http --port 6160
+npm run build && npm start -- --http --port 6170
 ```
 
 ### 15.3 MCP Session Setup (curl)
 
-All E2E tests follow the Streamable HTTP protocol: POST JSON-RPC 2.0 messages to `http://localhost:6160/mcp`.
+All E2E tests follow the Streamable HTTP protocol: POST JSON-RPC 2.0 messages to `http://localhost:6170/mcp`.
 
 **Step 1 -- Initialize the session:**
 
 ```bash
-curl -s -D - -X POST http://localhost:6160/mcp \
+curl -s -D - -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{
@@ -1064,7 +1065,7 @@ Expected response body:
 **Step 2 -- Send the initialized notification:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1074,7 +1075,7 @@ curl -s -X POST http://localhost:6160/mcp \
 **Step 3 -- List available tools (sanity check):**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1092,7 +1093,7 @@ After session setup, test each tool. All curl commands use the same endpoint and
 **search_projects -- find projects by name:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1111,7 +1112,7 @@ Expected: `result.content` contains an array of projects with `id`, `name`, `sta
 **get_project -- single project with subcomponents:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1130,7 +1131,7 @@ Expected: project fields (`id`, `name`, `statusLabel`, `percentComplete`) plus r
 **list_project_tasks:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1149,7 +1150,7 @@ Expected: array of tasks with `taskId`, `name`, `statusLabel`, `assignedTo`.
 **get_project_risks:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1168,7 +1169,7 @@ Expected: array of risks (may be empty if project has none -- that is a valid re
 **get_project_issues:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1185,7 +1186,7 @@ curl -s -X POST http://localhost:6160/mcp \
 **get_project_budget:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1204,7 +1205,7 @@ Expected: budget objects (`budgetTopDown`, `budgetBottomUp`, `budgetActual`, `bu
 **get_project_purchases / get_project_revenues:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1219,7 +1220,7 @@ curl -s -X POST http://localhost:6160/mcp \
 ```
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1236,7 +1237,7 @@ curl -s -X POST http://localhost:6160/mcp \
 **aggregate_portfolio -- portfolio-level analytics:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1258,7 +1259,7 @@ Expected: grouped aggregation results (e.g., `{"_id": "In Progress", "count": 12
 **search_users -- find users (v2 REST):**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1277,7 +1278,7 @@ Expected: array of users with `userId`, `name`, `email`.
 **get_user -- single user (v2 REST):**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1294,7 +1295,7 @@ curl -s -X POST http://localhost:6160/mcp \
 **get_reference_data -- status/type lists (v2 REST):**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1313,7 +1314,7 @@ Expected: array of status objects with `id`, `name`.
 **query_datamart -- raw GraphQL (advanced):**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1337,7 +1338,7 @@ Expected: array of projects with >= 50% completion. Verify the query validator r
 **Negative test -- blocked operator:**
 
 ```bash
-curl -s -X POST http://localhost:6160/mcp \
+curl -s -X POST http://localhost:6170/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session-id>" \
@@ -1398,6 +1399,6 @@ Run with:
 npm run test:e2e
 ```
 
-The test runner starts the MCP server on port 6160 (if not already running), runs all test files, and reports results. Tests use the same HTTP calls as the curl examples above, wrapped in Vitest assertions.
+The test runner starts the MCP server on port 6170 (if not already running), runs all test files, and reports results. Tests use the same HTTP calls as the curl examples above, wrapped in Vitest assertions.
 
 **Test configuration:** `vitest.e2e.config.ts` sets a longer timeout (30 seconds per test), points at the E2E test directory, and reads `.env.test` for test-specific credentials if needed.

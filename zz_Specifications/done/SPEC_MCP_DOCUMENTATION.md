@@ -287,7 +287,7 @@ ITM.MCP/APIDocs/
 
 | Mode | `VITE_MCP_URL` | Deploy target |
 |------|----------------|---------------|
-| local | `http://localhost:6160/mcp` | Dev only |
+| local | `http://localhost:6170/` | Dev only |
 | stage | `https://mcp-stage.itmplatform.com/mcp` | Stage |
 | prod | `https://mcp.itmplatform.com/mcp` | `developers.itmplatform.com/mcp` |
 

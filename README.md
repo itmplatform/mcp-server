@@ -49,7 +49,7 @@ npm install
 cp .env.sample .env   # edit with your credentials
 npm test              # unit tests (124 tests)
 npm run build         # compile TypeScript to dist/
-npm run dev           # HTTP dev server on port 6160 (for testing with curl)
+npm run dev           # HTTP dev server on port 6170 (for testing with curl)
 npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
 ```
 
