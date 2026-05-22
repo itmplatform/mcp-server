@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "cross-env PORT=6160 node --env-file=.env --import tsx src/server.ts",
+    "dev": "cross-env PORT=6170 node --env-file=.env --import tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest run",

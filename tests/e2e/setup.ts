@@ -13,8 +13,8 @@ import {
   querySqlNumber,
 } from '../helpers/local-api.js';
 
-const MCP_PORT = process.env.MCP_E2E_PORT ?? '6160';
-const MCP_URL = `http://localhost:${MCP_PORT}/mcp`;
+const MCP_PORT = process.env.MCP_E2E_PORT ?? '6170';
+const MCP_URL = `http://localhost:${MCP_PORT}/`;
 let sessionId: string | undefined;
 let serverProcess: ChildProcess | undefined;
 
@@ -22,7 +22,7 @@ async function waitForServer(url: string, timeoutMs = 15000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(url.replace('/mcp', '/health'));
+      const res = await fetch(new URL('/health', url).href);
       if (res.ok) return;
     } catch {
       // not ready yet

@@ -34,7 +34,7 @@ ITM_API_URL=https://api.itmplatform.com
 ITM_COMPANY={your-account}
 ITM_API_KEY=your-api-key
 LOG_LEVEL=info
-PORT=6160
+PORT=6170
 ```
 
 ### Environment variables reference
@@ -46,7 +46,7 @@ PORT=6160
 | `ITM_API_KEY` | Yes* | -- | Your personal API key (*or use `ITM_TOKEN`) |
 | `ITM_TOKEN` | Yes* | -- | Session token (*alternative to API key) |
 | `LOG_LEVEL` | No | `info` | Pino log level: `debug`, `info`, `warn`, `error` |
-| `PORT` | No | `6160` | HTTP server port (for dev/hosted mode) |
+| `PORT` | No | `6170` | HTTP server port (for dev/hosted mode) |
 | `ITM_AUTH_URL` | No | -- | OAuth authorization server URL |
 | `MCP_SERVER_URL` | No | -- | MCP server URL for OAuth resource metadata |
 | `ITM_AUDIT_ENABLED` | No | `false` | Enable audit logging to ITM backend |
@@ -63,7 +63,7 @@ node dist/server.js
 npm run dev
 ```
 
-This starts the server on the configured port (default 6160) with hot-reload.
+This starts the server on the configured port (default 6170) with hot-reload.
 
 ### Production deployment
 
