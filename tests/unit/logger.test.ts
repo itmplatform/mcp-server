@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import pino from 'pino';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 describe('createLogger', () => {
   afterEach(() => {
@@ -48,5 +52,25 @@ describe('createLogger', () => {
     const log = createLogger('test-svc');
     const bindings = log.bindings();
     expect(bindings.service).toBe('test-svc');
+  });
+
+  it('resolves file logs from the application directory, not the launch directory', async () => {
+    const previousCwd = process.cwd();
+    const foreignCwd = mkdtempSync(join(tmpdir(), 'itm-mcp-logger-'));
+
+    try {
+      process.chdir(foreignCwd);
+      vi.resetModules();
+
+      const { LOG_FILE } = await import('../../src/logger.js');
+      const expectedLogFile = fileURLToPath(new URL('../../logs/mcp.log', import.meta.url));
+
+      expect(LOG_FILE).toBe(expectedLogFile);
+      expect(LOG_FILE).not.toBe(join(foreignCwd, 'logs', 'mcp.log'));
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(foreignCwd, { recursive: true, force: true });
+      vi.resetModules();
+    }
   });
 });
