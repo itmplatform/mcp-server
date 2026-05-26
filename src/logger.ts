@@ -1,9 +1,11 @@
 import pino, { type Logger } from 'pino';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const LOG_DIR = join(process.cwd(), 'logs');
-const LOG_FILE = join(LOG_DIR, 'mcp.log');
+const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const LOG_DIR = join(APP_DIR, 'logs');
+export const LOG_FILE = join(LOG_DIR, 'mcp.log');
 
 export function createLogger(service: string): Logger {
   const level = process.env.LOG_LEVEL || 'info';

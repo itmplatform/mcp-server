@@ -198,7 +198,7 @@ src/
 Uses [Pino](https://getpino.io/) (same as DataMart and MSTeamsBot). Logs go to two destinations:
 
 - **stderr** -- pretty-printed, colorized (stdout is reserved for the MCP JSON-RPC protocol)
-- **`logs/mcp.log`** -- rotating file, 10 MB max, keeps 5 old files (skipped in test)
+- **`logs/mcp.log`** -- rotating file relative to the MCP application root, 10 MB max, keeps 5 old files (skipped in test)
 
 Set `LOG_LEVEL` in `.env` to control verbosity (`debug`, `info`, `warn`, `error`; default: `info`). All log entries include `{ service: 'mcp', app: 'ITM.MCP' }` base fields and ISO timestamps.
 
