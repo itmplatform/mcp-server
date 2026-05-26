@@ -1,6 +1,6 @@
-### API key authentication
+### API key authentication (stdio mode only)
 
-The simplest authentication method. Generate an API key in your ITM Platform user settings and pass it as an environment variable when starting the MCP server.
+For local use via stdio transport (AI clients that spawn the server as a child process). Generate an API key in your ITM Platform user settings and pass it as an environment variable:
 
 ```
 ITM_API_URL=https://api.itmplatform.com
@@ -11,6 +11,8 @@ ITM_API_KEY=your-api-key
 At startup, the server calls the identity resolution endpoint (`/resolve/identity`) to verify the key and determine the user's license type. If the key is invalid or the user account is disabled, the server fails to start.
 
 API keys provide full access (read + write) based on the user's license type. There is no scope restriction -- the key represents the user's full permissions.
+
+API key authentication is not available in HTTP+OAuth mode. When deployed with OAuth, `ITM_COMPANY` and `ITM_API_KEY` are not required -- each session authenticates via OAuth token exchange.
 
 ### OAuth 2.1 authentication
 

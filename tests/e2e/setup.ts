@@ -127,7 +127,7 @@ export function setupE2E() {
     }
 
     serverProcess = spawn('npx', ['tsx', 'src/server.ts'], {
-      env: { ...process.env, PORT: MCP_PORT },
+      env: { ...process.env, PORT: MCP_PORT, ITM_AUTH_URL: '', MCP_SERVER_URL: '' },
       stdio: 'pipe',
       shell: true,
     });

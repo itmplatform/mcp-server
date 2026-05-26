@@ -268,8 +268,8 @@ Via `scripts/ensure-ecosystem-app.cjs` (to be created, same pattern as DataMart/
 | Health endpoint accessible | `GET /health` returns 200 | &#11036; |
 | OAuth metadata endpoint accessible | `GET /.well-known/oauth-protected-resource` returns valid JSON | &#11036; |
 | TLS configured | HTTPS via IIS (existing certs) | &#11036; |
-| API Gateway route added | `APIGateway.json` + `Web.config` + `Enums.cs` + `APIGatewayManager.cs` | &#11036; |
-| PM2 process manager configured | `ensure-ecosystem-app.cjs` created, ecosystem entries tested | &#11036; |
+| API Gateway route added | `APIGateway.json` + `Web.config` + `Enums.cs` + `APIGatewayManager.cs` | &#9989; |
+| PM2 process manager configured | `ensure-ecosystem-app.cjs` created, ecosystem entries tested | &#9989; |
 | ITM.Web deployed with MCP route | Gateway changes deployed to target VMs | &#11036; |
 | Seed OAuth clients for known AI clients | Claude Desktop, Codex, VS Code client_id + redirect URIs in `tblOAuthClient` | &#11036; |
 | Rate limiting | Per-session token bucket (MCP-side). Gateway throttling re-enabled. | &#11036; |
@@ -453,10 +453,10 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 
 | # | Step | Description | Depends on | Status |
 |---|------|-------------|-----------|--------|
-| 1 | API Gateway integration | Add MCP route to `APIGateway.json`, enum, `GetMicroserviceName()`, `Web.config` (all variants) | -- | &#11036; |
-| 2 | Create `scripts/ensure-ecosystem-app.cjs` | PM2 ecosystem config for `MCPProd`, `MCPStage`, `MCPDemo` | -- | &#11036; |
-| 3 | Create pipeline YAMLs | `Pipelines/ITM-MCP-Stage.yml` and `Pipelines/ITM-MCP-Prod.yml` | -- | &#11036; |
-| 4 | Create `.env.stage` and `.env.demo` | Environment-specific config files | -- | &#11036; |
+| 1 | API Gateway integration | Add MCP route to `APIGateway.json`, enum, `GetMicroserviceName()`, `Web.config` (all variants). Gateway-aware routes in `server.ts` via `resolveRoute()`. | -- | &#9989; |
+| 2 | Create `scripts/ensure-ecosystem-app.cjs` | PM2 ecosystem config for `MCPProd`, `MCPStage`, `MCPDemo` | -- | &#9989; |
+| 3 | Create pipeline YAMLs | `Pipelines/ITM-MCP-Stage.yml` and `Pipelines/ITM-MCP-Prod.yml` | -- | &#9989; |
+| 4 | Create `.env.stage` and `.env.demo` | Environment-specific config files (+ `.env.prod`) | -- | &#9989; |
 | 5 | Deploy ITM.Web with MCP gateway route | Deploy the gateway changes to DemoAz2 and Prod VMs | 1 | &#11036; |
 | 6 | Deploy to stage | Deploy MCP server to DemoAz2. Verify OAuth flow, health endpoint, tool execution. | 2, 3, 4, 5 | &#11036; |
 | 7 | Seed OAuth clients | Register known AI client client_ids in stage database. Test OAuth flow per client. | 6 | &#11036; |

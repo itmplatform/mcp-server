@@ -55,17 +55,23 @@ npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
 
 ## AI client configuration
 
-The config tells the AI client how to spawn the MCP server. All clients use the same pattern: a command, args, and three environment variables.
+The config tells the AI client how to spawn the MCP server. The server runs in two modes with different requirements:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ITM_API_URL` | Yes | ITM.API gateway URL |
-| `ITM_COMPANY` | Yes | Company/tenant slug |
-| `ITM_API_KEY` | Yes* | Per-user API key (generate from My Profile in ITM Platform) |
-| `ITM_TOKEN` | Yes* | Session token (alternative to API key, useful for dev) |
-| `LOG_LEVEL` | No | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| Variable | Stdio | HTTP+OAuth | Description |
+|----------|-------|------------|-------------|
+| `ITM_API_URL` | Required | Required | ITM.API base URL |
+| `ITM_COMPANY` | Required | -- | Company/tenant slug |
+| `ITM_API_KEY` | Required* | -- | Per-user API key (generate from My Profile) |
+| `ITM_TOKEN` | Required* | -- | Session token (alternative to API key) |
+| `PORT` | -- | Required | HTTP listen port |
+| `ITM_AUTH_URL` | -- | Required | OAuth authorization server URL |
+| `MCP_SERVER_URL` | -- | Required | MCP server public URL (OAuth audience) |
+| `LOG_LEVEL` | Optional | Optional | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| `ITM_AUDIT_ENABLED` | Optional | Optional | Enable audit logging to ITM backend |
 
-\* One of `ITM_API_KEY` or `ITM_TOKEN` is required.
+\* One of `ITM_API_KEY` or `ITM_TOKEN` is required for stdio mode.
+
+In HTTP mode, if both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. If either is missing, the server runs in dev mode using the startup identity.
 
 ### Claude Desktop
 

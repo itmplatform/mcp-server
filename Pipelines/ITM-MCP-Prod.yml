@@ -1,0 +1,185 @@
+variables:
+  - name: projectName
+    value: 'ITM.MCP'
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - Pipelines/**
+
+name: $(date:yyyyMMdd)$(rev:.r)
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: main
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    displayName: BuildJob
+    pool:
+      vmImage: windows-latest
+    steps:
+    - checkout: self
+
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '22.x'
+      displayName: 'Install Node.js'
+
+    - script: |
+        npm install
+      displayName: 'NPM Install'
+
+    - script: |
+        npm test
+      displayName: 'NPM Test'
+
+    - script: |
+        npm run build
+      displayName: 'TypeScript Compile'
+
+    - task: PowerShell@2
+      displayName: Config
+      inputs:
+        targetType: 'inline'
+        script: |
+          Copy-Item -Path "$(Build.SourcesDirectory)\.env.prod" -Destination "$(Build.SourcesDirectory)\.env" -Force
+        failOnStderr: true
+        showWarnings: true
+
+    - task: PowerShell@2
+      displayName: ArchiveArtifact
+      inputs:
+        targetType: 'inline'
+        script: |
+          Compress-Archive -Path "$(Build.SourcesDirectory)\*" -DestinationPath $(Build.ArtifactStagingDirectory)/$(projectName).zip
+        failOnStderr: true
+        showWarnings: true
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifact
+      condition: succeededOrFailed()
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        TargetPath: '\\my\share\$(Build.DefinitionName)\$(Build.BuildNumber)'
+
+- stage: 'Deploy_MCP'
+  displayName: 'Deploy_MCP'
+  dependsOn: 'Build'
+  jobs:
+  - deployment: Deploy_MCP
+    displayName: 'Deploy_MCP'
+    environment:
+      name: 'ITM-Prod'
+      resourceType: VirtualMachine
+      tags: 'web, prod'
+    variables:
+      websiteName: 'MCP'
+      websitePath: 'C:\inetpub\wwwroot\ITM.MCP'
+      ecosystemPath: 'C:\inetpub\wwwroot\ecosystem.config.js'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: PowerShell@2
+            displayName: 'BackupSite'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $websitePath = "$(websitePath)"
+                $backupFolderName = "$(websiteName)" + "_Backup"
+                $backupPath = Join-Path (Split-Path $websitePath -Parent) "0Backups\$backupFolderName"
+                if (-not (Test-Path -Path $backupPath -PathType Container)) {
+                    New-Item -ItemType Directory -Path $backupPath
+                }
+                if (Test-Path -Path $websitePath) {
+                    Copy-Item -Path $websitePath\* -Destination $backupPath -Recurse -Force
+                    Write-Host "Backup completed successfully. Backup location: $backupPath"
+                } else {
+                    Write-Host "No existing site to backup (first deployment). Skipping."
+                }
+              failOnStderr: true
+              showWarnings: true
+
+          - task: PowerShell@2
+            displayName: 'Extract'
+            inputs:
+              targetType: 'inline'
+              script: |
+                if (-not (Test-Path -Path "$(websitePath)")) {
+                    New-Item -ItemType Directory -Path "$(websitePath)"
+                }
+                Expand-Archive -Path $(Pipeline.Workspace)\drop\$(projectName).zip -DestinationPath '$(websitePath)' -Force
+              failOnStderr: true
+              showWarnings: true
+
+          - task: PowerShell@2
+            displayName: 'Copy env file'
+            inputs:
+              targetType: 'inline'
+              pwsh: true
+              script: |
+                $ErrorActionPreference = 'Stop'
+                Copy-Item -Path "$(websitePath)\.env.prod" -Destination "$(websitePath)\.env" -Force
+                Write-Host "Environment file configured: .env (from .env.prod)"
+              failOnStderr: true
+              showWarnings: true
+
+          - task: PowerShell@2
+            name: EnsureApp
+            displayName: 'Ensure MCP in global ecosystem (fail-fast)'
+            inputs:
+              targetType: 'inline'
+              pwsh: true
+              script: |
+                $ErrorActionPreference = 'Stop'
+                Set-Location "$(websitePath)"
+                node scripts\ensure-ecosystem-app.cjs "$(ecosystemPath)" MCPProd
+                if ($LASTEXITCODE -ne 0) {
+                  throw "ensure-ecosystem-app.cjs failed with exit code $LASTEXITCODE"
+                }
+              failOnStderr: true
+              showWarnings: true
+
+          - task: PowerShell@2
+            name: Pm2Stop
+            displayName: 'PM2 stop MCP'
+            inputs:
+              targetType: 'inline'
+              pwsh: true
+              script: |
+                pm2 stop MCPProd 2>$null
+                if ($LASTEXITCODE -ne 0) { Write-Host "MCPProd not running or already stopped" }
+
+                pm2 delete MCPProd 2>$null
+                if ($LASTEXITCODE -ne 0) { Write-Host "MCPProd not found in PM2" }
+
+                $LASTEXITCODE = 0
+                Write-Host "PM2 cleanup completed successfully"
+                exit 0
+              failOnStderr: false
+              showWarnings: true
+
+          - task: PowerShell@2
+            name: Pm2Start
+            displayName: 'PM2 start MCP + save'
+            inputs:
+              targetType: 'inline'
+              pwsh: true
+              script: |
+                $ErrorActionPreference = 'Stop'
+
+                pm2 start "$(ecosystemPath)" --only MCPProd --update-env
+                if ($LASTEXITCODE -ne 0) {
+                  throw "pm2 start MCPProd failed with exit code $LASTEXITCODE"
+                }
+
+                pm2 save
+              failOnStderr: true
+              showWarnings: true
