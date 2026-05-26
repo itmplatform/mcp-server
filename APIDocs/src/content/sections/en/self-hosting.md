@@ -27,29 +27,41 @@ npm run build
 
 ### Configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root. The variables required depend on the transport mode:
 
+**Stdio mode** (local, single user):
 ```
 ITM_API_URL=https://api.itmplatform.com
 ITM_COMPANY={your-account}
 ITM_API_KEY=your-api-key
 LOG_LEVEL=info
+```
+
+**HTTP+OAuth mode** (deployed, multi-tenant):
+```
+ITM_API_URL=http://localhost/ITM.API
 PORT=6170
+ITM_AUTH_URL=http://localhost/ITM.API
+MCP_SERVER_URL=https://api.itmplatform.com/v2/_/mcp/
+LOG_LEVEL=info
+ITM_AUDIT_ENABLED=true
 ```
 
 ### Environment variables reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ITM_API_URL` | Yes | -- | ITM Platform API gateway URL |
-| `ITM_COMPANY` | Yes | -- | Your company/tenant slug |
-| `ITM_API_KEY` | Yes* | -- | Your personal API key (*or use `ITM_TOKEN`) |
-| `ITM_TOKEN` | Yes* | -- | Session token (*alternative to API key) |
-| `LOG_LEVEL` | No | `info` | Pino log level: `debug`, `info`, `warn`, `error` |
-| `PORT` | No | `6170` | HTTP server port (for dev/hosted mode) |
-| `ITM_AUTH_URL` | No | -- | OAuth authorization server URL |
-| `MCP_SERVER_URL` | No | -- | MCP server URL for OAuth resource metadata |
-| `ITM_AUDIT_ENABLED` | No | `false` | Enable audit logging to ITM backend |
+| Variable | Stdio | HTTP+OAuth | Description |
+|----------|-------|------------|-------------|
+| `ITM_API_URL` | Required | Required | ITM Platform API gateway URL |
+| `ITM_COMPANY` | Required | -- | Your company/tenant slug |
+| `ITM_API_KEY` | Required* | -- | Your personal API key (*or use `ITM_TOKEN`) |
+| `ITM_TOKEN` | Required* | -- | Session token (*alternative to API key) |
+| `PORT` | -- | Required | HTTP server port |
+| `ITM_AUTH_URL` | -- | Required | OAuth authorization server URL |
+| `MCP_SERVER_URL` | -- | Required | MCP server public URL (OAuth audience) |
+| `LOG_LEVEL` | Optional | Optional | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| `ITM_AUDIT_ENABLED` | Optional | Optional | Enable audit logging to ITM backend |
+
+In HTTP mode, when both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. `ITM_COMPANY` and `ITM_API_KEY` are not required in this mode.
 
 ### Running the server
 

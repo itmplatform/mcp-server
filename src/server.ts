@@ -23,12 +23,14 @@ import { registerPortfolioOverviewPrompt } from './prompts/portfolio-overview.js
 import { registerTeamWorkloadPrompt } from './prompts/team-workload.js';
 import { registerRiskAnalysisPrompt } from './prompts/risk-analysis.js';
 import { buildProtectedResourceMetadata } from './auth/oauth-metadata.js';
+import { resolveRoute } from './gateway.js';
 import { extractBearerToken } from './auth/token-extraction.js';
-import { exchangeToken, buildEffectiveUserContextFromExchange, type OAuthConfig } from './auth/oauth-auth.js';
+import { exchangeToken, buildEffectiveUserContextFromExchange } from './auth/oauth-auth.js';
 import { createAuditClient } from './clients/audit-client.js';
 import { hasScope, type EffectiveUserContext } from './auth/effective-user-context.js';
 import { isAuditEnabled } from './audit-config.js';
 import { instrumentServer } from './instrument-server.js';
+import { resolveStartupMode } from './startup-mode.js';
 
 const log = createLogger('mcp');
 
@@ -89,50 +91,63 @@ function buildClientsForUser(userContext: EffectiveUserContext): Clients {
   }, audit);
 }
 
-function getOAuthConfig(): OAuthConfig | undefined {
-  const authUrl = process.env.ITM_AUTH_URL;
-  const audience = process.env.MCP_SERVER_URL;
-  if (!authUrl || !audience) return undefined;
-  return {
-    tokenExchangeUrl: `${authUrl}/auth/exchange-token`,
-    audience,
-  };
-}
-
 async function main() {
   log.info('ITM Platform MCP server starting...');
 
-  let userContext: EffectiveUserContext;
-  try {
-    userContext = await resolveIdentity();
-    log.info({ userId: userContext.userId, email: userContext.email, access: userContext.dataMartAccess }, 'Identity resolved');
-  } catch (err) {
-    log.fatal({ err }, 'Failed to resolve identity');
-    process.exit(1);
-  }
+  const startupMode = resolveStartupMode(process.env, process.argv);
 
-  const clients = buildClientsForUser(userContext);
-  const oauthConfig = getOAuthConfig();
-
-  const useHttp = process.env.PORT || process.argv.includes('--http');
-
-  if (useHttp) {
-    if (!process.env.PORT) {
-      log.fatal('Missing required environment variable: PORT (required for HTTP mode)');
+  if (startupMode.mode === 'stdio') {
+    let userContext: EffectiveUserContext;
+    try {
+      userContext = await resolveIdentity();
+      log.info({ userId: userContext.userId, email: userContext.email, access: userContext.dataMartAccess }, 'Identity resolved');
+    } catch (err) {
+      log.fatal({ err }, 'Failed to resolve identity');
       process.exit(1);
     }
-    const port = parseInt(process.env.PORT, 10);
-    const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
 
-    if (oauthConfig) {
-      log.info('OAuth configured -- per-session auth enabled');
-    } else {
-      log.info('OAuth not configured -- using startup identity for all sessions');
+    const clients = buildClientsForUser(userContext);
+    const writeCtx: WriteUserContext = {
+      userId: userContext.userId,
+      accountId: userContext.accountId,
+      aiClientId: 'stdio',
+    };
+    const server = createMcpServer(clients, writeCtx, userContext);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    log.info({ transport: 'stdio' }, 'MCP server connected via stdio');
+    return;
+  }
+
+  // HTTP modes: http-dev or http-oauth
+  const { port } = startupMode;
+  let fallbackContext: EffectiveUserContext | undefined;
+  let fallbackClients: Clients | undefined;
+
+  if (startupMode.mode === 'http-dev') {
+    log.warn('HTTP mode without OAuth -- all sessions use startup identity (dev only)');
+    try {
+      fallbackContext = await resolveIdentity();
+      fallbackClients = buildClientsForUser(fallbackContext);
+      log.info({ userId: fallbackContext.userId, email: fallbackContext.email, access: fallbackContext.dataMartAccess }, 'Identity resolved');
+    } catch (err) {
+      log.fatal({ err }, 'Failed to resolve identity');
+      process.exit(1);
     }
+  }
 
-    const httpServer = createServer(async (req, res) => {
-      try {
-      if (req.method === 'GET' && req.url === '/.well-known/oauth-protected-resource') {
+  const oauthConfig = startupMode.mode === 'http-oauth' ? startupMode.oauthConfig : undefined;
+  const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+
+  if (oauthConfig) {
+    log.info('OAuth configured -- per-session auth enabled');
+  }
+
+  const httpServer = createServer(async (req, res) => {
+    try {
+      const route = resolveRoute(req.url ?? '/');
+
+      if (req.method === 'GET' && route === '/.well-known/oauth-protected-resource') {
         if (!oauthConfig) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'OAuth not configured' }));
@@ -147,7 +162,7 @@ async function main() {
         return;
       }
 
-      if (req.method === 'POST' && req.url === '/') {
+      if (req.method === 'POST' && route === '/') {
         const body = await new Promise<string>((resolve) => {
           let data = '';
           req.on('data', (chunk: Buffer) => { data += chunk.toString(); });
@@ -161,25 +176,31 @@ async function main() {
         if (sessionId && sessions.has(sessionId)) {
           transport = sessions.get(sessionId)!.transport;
         } else if (!sessionId && parsed.method === 'initialize') {
-          let sessionClients = clients;
-          let sessionUserContext = userContext;
+          let sessionUserContext: EffectiveUserContext;
+          let sessionClients: Clients;
           const aiClientId = parsed.params?.clientInfo?.name ?? 'unknown';
 
           if (oauthConfig) {
             const oauthToken = extractBearerToken(req.headers as Record<string, string | undefined>);
-            if (oauthToken) {
-              try {
-                const exchangeResult = await exchangeToken(oauthToken, oauthConfig, log);
-                sessionUserContext = buildEffectiveUserContextFromExchange(exchangeResult);
-                sessionClients = buildClientsForUser(sessionUserContext);
-                log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
-              } catch (err) {
-                log.error({ err }, 'OAuth token exchange failed');
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Authentication failed' }));
-                return;
-              }
+            if (!oauthToken) {
+              res.writeHead(401, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Authentication required' }));
+              return;
             }
+            try {
+              const exchangeResult = await exchangeToken(oauthToken, oauthConfig, log);
+              sessionUserContext = buildEffectiveUserContextFromExchange(exchangeResult);
+              sessionClients = buildClientsForUser(sessionUserContext);
+              log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
+            } catch (err) {
+              log.error({ err }, 'OAuth token exchange failed');
+              res.writeHead(401, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Authentication failed' }));
+              return;
+            }
+          } else {
+            sessionUserContext = fallbackContext!;
+            sessionClients = fallbackClients!;
           }
 
           const writeCtx: WriteUserContext = {
@@ -210,36 +231,27 @@ async function main() {
         }
 
         await transport.handleRequest(req, res, parsed);
-      } else if (req.method === 'GET' && req.url === '/health') {
+      } else if (req.method === 'GET' && route === '/health') {
+        const health: Record<string, string> = { status: 'ok' };
+        if (fallbackContext) health.user = fallbackContext.email;
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', user: userContext.email }));
+        res.end(JSON.stringify(health));
       } else {
         res.writeHead(404);
         res.end();
       }
-      } catch (err) {
-        log.error({ err }, 'HTTP request error');
-        if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Internal server error' }));
-        }
+    } catch (err) {
+      log.error({ err }, 'HTTP request error');
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
       }
-    });
+    }
+  });
 
-    httpServer.listen(port, () => {
-      log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/`);
-    });
-  } else {
-    const writeCtx: WriteUserContext = {
-      userId: userContext.userId,
-      accountId: userContext.accountId,
-      aiClientId: 'stdio',
-    };
-    const server = createMcpServer(clients, writeCtx, userContext);
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    log.info({ transport: 'stdio' }, 'MCP server connected via stdio');
-  }
+  httpServer.listen(port, () => {
+    log.info({ port, transport: 'http' }, `MCP server listening on http://localhost:${port}/`);
+  });
 }
 
 main().catch((err) => {
