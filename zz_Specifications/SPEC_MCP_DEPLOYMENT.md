@@ -78,34 +78,35 @@ Follow the existing DataMart / PMPilot / MSTeamBot deployment pattern:
 | Reverse proxy | IIS API Gateway (`ApiGateway.cs`) | TLS termination, URL routing via `APIGateway.json` |
 | TLS | IIS-managed certificates | Existing certs on the IIS sites |
 | DNS | No new DNS records needed | Routes through existing `api.itmplatform.com` / `new-api.itmplatform.com` |
-| Monitoring | Health endpoint: `GET /health` | Returns `{ status: "ok", user: "..." }` |
+| Monitoring | Health endpoint: `GET /health` | Returns `{ status: "ok" }` (http-oauth) or `{ status: "ok", user: "..." }` (http-dev) |
 | Deployment path | `C:\inetpub\wwwroot\ITM.MCP\` | Same pattern as other Node.js services |
 
 ### 2.4 Environment Variables (Production)
 
 ```bash
-# Required
 ITM_API_URL=http://localhost/ITM.API
-ITM_COMPANY=default          # not used in multi-tenant HTTP mode, but required for startup identity
-ITM_API_KEY=<service-key>    # for startup identity resolution only
 PORT=6170
-
-# OAuth (required for hosted mode)
 ITM_AUTH_URL=http://localhost/ITM.API
 MCP_SERVER_URL=https://api.itmplatform.com/v2/_/mcp/
-
-# Optional
 LOG_LEVEL=info
 ITM_AUDIT_ENABLED=true
 ```
 
+`ITM_COMPANY` and `ITM_API_KEY` are **not required** in HTTP+OAuth mode. When both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory per session and no startup identity is resolved. These variables are only needed for stdio mode (local dev).
+
 > Note: In production, `ITM_API_URL` points to `http://localhost/ITM.API` (local IIS), not the external URL. All ITM microservices call the API via localhost.
 
-### 2.5 Startup Identity vs Per-Session Identity
+### 2.5 Startup Modes
 
-The hosted server resolves a startup identity (from `ITM_API_KEY`) to verify connectivity and populate the health endpoint. But in OAuth mode, each session gets its own identity via token exchange. The startup identity is NOT used for tool calls -- it is only a connectivity check.
+The server selects one of three modes at startup (via `resolveStartupMode()` in `src/startup-mode.ts`):
 
-This means the `ITM_API_KEY` in production config is a service-level key used once at boot, not a user key. It needs minimal permissions (just enough for `POST /resolve/identity` to succeed).
+| Mode | When | Identity | Auth |
+|------|------|----------|------|
+| **stdio** | No `PORT`, no `--http` | `resolveIdentity()` at boot from `ITM_COMPANY` + `ITM_API_KEY` | Single user for process lifetime |
+| **http-oauth** | `PORT` + `ITM_AUTH_URL` + `MCP_SERVER_URL` all set | No startup identity. Each session resolves via OAuth token exchange. | Bearer token required on `initialize`. 401 if missing. |
+| **http-dev** | `PORT` set but OAuth vars missing | `resolveIdentity()` at boot (warning logged) | Fallback identity for all sessions. Dev/test only. |
+
+In production, the deployed `.env` files set `ITM_AUTH_URL` and `MCP_SERVER_URL`, so the server always starts in **http-oauth** mode. Unauthenticated clients receive a 401 response.
 
 ### 2.6 API Gateway Integration (ITM.Web changes)
 
@@ -271,7 +272,7 @@ Via `scripts/ensure-ecosystem-app.cjs` (to be created, same pattern as DataMart/
 | API Gateway route added | `APIGateway.json` + `Web.config` + `Enums.cs` + `APIGatewayManager.cs` | &#9989; |
 | PM2 process manager configured | `ensure-ecosystem-app.cjs` created, ecosystem entries tested | &#9989; |
 | ITM.Web deployed with MCP route | Gateway changes deployed to target VMs | &#11036; |
-| Seed OAuth clients for known AI clients | Claude Desktop, Codex, VS Code client_id + redirect URIs in `tblOAuthClient` | &#11036; |
+| ~~Seed OAuth clients~~ ~~Implement DCR (RFC 7591)~~ | DCR implemented in ITM.Account (2026-05-26). See [SPEC_DYNAMIC_CLIENT_REGISTRATION.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_DYNAMIC_CLIENT_REGISTRATION.md). Deferred items in [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md). | &#9989; |
 | Rate limiting | Per-session token bucket (MCP-side). Gateway throttling re-enabled. | &#11036; |
 | Monitoring / alerting | Health check ping, error rate alerting | &#11036; |
 
@@ -433,19 +434,31 @@ Each marketplace has its own format, but all need the same core content:
 
 ### 4.4 OAuth Client Registration for Marketplaces
 
-Each AI client that connects via OAuth needs a registered `client_id` in `tblOAuthClient`. For marketplace listings:
+> **Research completed 2026-05-26.** Full findings in [OAUTH-CLIENT-REGISTRATION.md](../../OAUTH-CLIENT-REGISTRATION.md).
 
-| AI Client | client_id | redirect_uri | Scope | Notes |
-|-----------|-----------|-------------|-------|-------|
-| Claude Desktop | `claude-desktop` | TBD (Anthropic provides) | `mcp:read mcp:write` | Check Anthropic docs for callback URL |
-| Codex CLI | `codex-cli` | TBD (OpenAI provides) | `mcp:read mcp:write` | Check OpenAI docs for callback URL |
-| VS Code Copilot | `vscode-copilot` | TBD (Microsoft provides) | `mcp:read mcp:write` | Check VS Code MCP docs |
-| Cursor | `cursor` | TBD (Cursor provides) | `mcp:read mcp:write` | Check Cursor docs |
-| E2E Test | `e2e-test-client` | `http://localhost:9876/callback` | `mcp:read mcp:write` | Already seeded |
+**Key finding:** Every major AI client uses Dynamic Client Registration (DCR, RFC 7591) as its primary (or only) registration mechanism. Pre-seeding static `client_id`s will not work for any real client. DCR must move from "deferred" to "blocking for deployment."
 
-These need to be seeded in each environment's database before the marketplace listing goes live. The redirect URIs are provided by each AI client vendor -- research these during the submission process.
+| AI Client | Registration | `redirect_uri` pattern | PKCE | Static `client_id` |
+|-----------|-------------|----------------------|------|-------------------|
+| Claude Code | DCR only | `http://localhost:<port>/callback` (random port) | S256 | Not supported |
+| Codex CLI | DCR only | `http://localhost:<port>/callback` (configurable port) | S256 | Not supported |
+| VS Code | DCR (fallback: hardcoded MS Graph ID) | `https://vscode.dev/redirect` + `http://127.0.0.1:33418/` | S256 | Feature requested, not shipped |
+| Cursor | DCR only | `cursor://anysphere.cursor-mcp/oauth/callback` + `http://127.0.0.1:<port>/callback` | S256 | Not supported |
+| JetBrains (native) | N/A | N/A | N/A | N/A (no OAuth for MCP) |
+| JetBrains (Copilot) | DCR (fallback: static) | Not published | S256 | Yes (fallback) |
+| E2E Test | Pre-registered | `http://localhost:9876/callback` | S256 | `e2e-test-client` (seeded) |
 
-If the AI client does not provide a fixed redirect URI (some use dynamic ports), Dynamic Client Registration (RFC 7591, currently deferred) may be needed. Evaluate per client.
+**ITM.Account DCR implementation (done 2026-05-26):**
+
+1. ~~`POST /oauth/register`~~ Done -- DCR endpoint with metadata validation
+2. ~~`registration_endpoint` in metadata~~ Done -- advertised in `/.well-known/oauth-authorization-server`
+3. ~~RFC 8252 loopback port matching~~ Done -- accepts any port for `localhost` / `127.0.0.1` / `[::1]`
+4. Custom URI scheme support (`cursor://...`) -- deferred to v2 (see [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md))
+5. ~~HTTPS redirect URI support~~ Done -- accepts `https://` redirect URIs with host validation
+
+**Security mitigations implemented:** Request body size cap (8192 bytes at proxy and controller), PKCE S256 enforcement, registered-scope enforcement, refresh-client binding, periodic cleanup of stale dynamic clients (30 days). DCR-specific per-IP rate limiter deferred (existing general throttler covers baseline).
+
+**CIMD (future):** The MCP spec prefers Client ID Metadata Documents over DCR, but no AI client has shipped CIMD support as of May 2026. When clients adopt it, set `client_id_metadata_document_supported: true` in AS metadata (currently `false`).
 
 ---
 
@@ -457,9 +470,10 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 | 2 | Create `scripts/ensure-ecosystem-app.cjs` | PM2 ecosystem config for `MCPProd`, `MCPStage`, `MCPDemo` | -- | &#9989; |
 | 3 | Create pipeline YAMLs | `Pipelines/ITM-MCP-Stage.yml` and `Pipelines/ITM-MCP-Prod.yml` | -- | &#9989; |
 | 4 | Create `.env.stage` and `.env.demo` | Environment-specific config files (+ `.env.prod`) | -- | &#9989; |
+| 4b | Auth hardening | Remove fallback identity in HTTP+OAuth mode. Tokenless sessions return 401. Remove `ITM_COMPANY`/`ITM_API_KEY` from deployed env files. | 4 | &#9989; |
 | 5 | Deploy ITM.Web with MCP gateway route | Deploy the gateway changes to DemoAz2 and Prod VMs | 1 | &#11036; |
 | 6 | Deploy to stage | Deploy MCP server to DemoAz2. Verify OAuth flow, health endpoint, tool execution. | 2, 3, 4, 5 | &#11036; |
-| 7 | Seed OAuth clients | Register known AI client client_ids in stage database. Test OAuth flow per client. | 6 | &#11036; |
+| 7 | ~~Seed OAuth clients~~ ~~Implement DCR~~ | DCR implemented in ITM.Account (2026-05-26). `POST /oauth/register`, redirect validation, PKCE S256, scope enforcement, client binding, cleanup, proxy, MCP discovery. See [SPEC_DYNAMIC_CLIENT_REGISTRATION.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_DYNAMIC_CLIENT_REGISTRATION.md). | 6 | &#9989; |
 | 8 | Deploy to production | Deploy MCP server to Prod VM. Smoke test. | 6, 7 | &#11036; |
 | 9 | Prepare npm package | Add `bin`, `files`, shebang. Verify with `npm pack --dry-run`. | -- | &#11036; |
 | 10 | Publish to npm | `npm publish`. Verify `npx itm-mcp` works. | 9 | &#11036; |
@@ -490,7 +504,7 @@ If the AI client does not provide a fixed redirect URI (some use dynamic ports),
 |----------|---------|
 | **Port assignment** | Proposed 6170/3170/2170. Confirm no conflicts with other services on the VMs. |
 | **Rate limits** | What are the right per-session limits? Need to balance AI agent chattiness against backend capacity. |
-| **Dynamic Client Registration** | Some AI clients may use dynamic callback ports. If so, DCR (currently deferred in SPEC_OAUTH_REMAINING.md) will need to be built. Research per client. |
+| ~~**Dynamic Client Registration**~~ | **Done (2026-05-26).** DCR implemented in ITM.Account. See [SPEC_DYNAMIC_CLIENT_REGISTRATION.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_DYNAMIC_CLIENT_REGISTRATION.md). Deferred items (rate limiter, E2E, Cursor scheme) in [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md). |
 | **npm scope** | Publish as `itm-mcp` (unscoped) or `@itm-platform/mcp` (scoped)? Scoped requires an npm org. |
 | **Public GitHub repo** | Marketplace listings typically link to a public repo. Is the ITM.MCP repo public or does it need to be? Alternative: publish a subset (README + examples) to a public repo. |
 | **Demo environment** | Should the MCP server be deployed to the demo environment for sales demos? |

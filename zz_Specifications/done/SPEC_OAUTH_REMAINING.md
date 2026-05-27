@@ -87,20 +87,15 @@ All 16 Playwright tests passing locally (3.1 min, `--workers=2`). Tests span two
 
 ## 3. Deferred by Design
 
-### 3.1 Dynamic Client Registration (RFC 7591)
+### ~~3.1 Dynamic Client Registration (RFC 7591)~~ DONE (2026-05-26)
 
-**Spec reference:** [SPEC_OAUTH_AUTHORIZATION_SERVER.md, Section 4.8](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_OAUTH_AUTHORIZATION_SERVER.md#48-dynamic-client-registration-rfc-7591--deferred)
+**Spec reference:** [SPEC_DYNAMIC_CLIENT_REGISTRATION.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_DYNAMIC_CLIENT_REGISTRATION.md)
 
-A `POST /oauth/register` endpoint that lets unknown AI clients register themselves automatically (send name + redirect URIs, get back a client_id).
+Implemented 2026-05-26. `POST /oauth/register` endpoint, `registration_endpoint` in metadata, RFC 8252 loopback port matching, PKCE S256 enforcement, registered-scope enforcement, refresh-client binding, stale client cleanup, proxy route, MCP `WWW-Authenticate` discovery challenge. 54 new tests (47 unit + 6 integration + 1 proxy).
 
-**Why deferred:**
-- MCP authorization guidance prefers Client ID Metadata Documents over DCR
-- The endpoint would be publicly accessible with no authentication, creating a spam vector on `tblOAuthClient`
-- All known onboarding scenarios are covered by pre-seeded clients or future Client ID Metadata Document support
+Full research on AI client requirements: [ITM.MCP/OAUTH-CLIENT-REGISTRATION.md](../../ITM.MCP/OAUTH-CLIENT-REGISTRATION.md)
 
-**When to build:** When a concrete need arises -- e.g., a new AI client needs to connect and manual seeding is impractical.
-
-**If building:** Add rate limiting (IP-based minimum), request-body size caps, optionally a registration token requirement (RFC 7591 Section 3). Then add `registration_endpoint` to the metadata response and the `/oauth/register` route to `OAuthProxyController`.
+Deferred items tracked in [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md): DCR-specific rate limiter, E2E Playwright tests, Cursor custom URI scheme, CIMD, manual real-client validation.
 
 ### 3.2 Client ID Metadata Documents
 
@@ -121,12 +116,12 @@ A `POST /oauth/revoke` endpoint for explicitly revoking access or refresh tokens
 ## Cross-Repo Dependency Map
 
 ```
-Phase 1 (Done)          Phase 2 (Done)           Phase 3 (Done)             Phase 4 (Done)
------------------       -----------------        ---------------------      ------------------
-Gateway proxy     --->  OAuth server       --->  Login & Consent UI   --->  Browser E2E ✅
-Token validation        JWT service              16 unit tests              16 Playwright tests
-Audit route             Session tokens           Proxy redirect fix         CI-compatible
-                        DB migration                                        1.1 Scope enforcement ✅
+Phase 1 (Done)          Phase 2 (Done)           Phase 3 (Done)             Phase 4 (Done)            Phase 5 (Done)
+-----------------       -----------------        ---------------------      ------------------         ------------------
+Gateway proxy     --->  OAuth server       --->  Login & Consent UI   --->  Browser E2E ✅       --->  DCR ✅
+Token validation        JWT service              16 unit tests              16 Playwright tests        54 new tests
+Audit route             Session tokens           Proxy redirect fix         CI-compatible              RFC 8252 matching
+                        DB migration                                        1.1 Scope enforcement ✅   Auth hardening ✅
                         Pipeline secrets                                    1.2 Integration tests ✅
                         8 integration tests ✅
 ```
@@ -138,7 +133,7 @@ Audit route             Session tokens           Proxy redirect fix         CI-c
 OAuth is fully operational end-to-end when:
 
 1. An AI client (Claude Desktop, VS Code, etc.) can complete the full OAuth flow against any environment
-2. Write tools are hidden from sessions without `mcp:write` scope
-3. Downstream gateway calls use the `token` header
-4. All integration and E2E tests pass
-5. At least one real AI client is onboarded with confirmed redirect URIs (not just `e2e-test-client`)
+2. ~~Write tools are hidden from sessions without `mcp:write` scope~~ Done (Phase 4)
+3. ~~Downstream gateway calls use the `token` header~~ Done (Phase 4)
+4. ~~All integration and E2E tests pass~~ Done (180 MCP + 54 DCR + 16 Playwright)
+5. At least one real AI client is onboarded with confirmed redirect URIs (not just `e2e-test-client`) -- **blocked by deployment** (steps 5-6 in SPEC_MCP_DEPLOYMENT.md)

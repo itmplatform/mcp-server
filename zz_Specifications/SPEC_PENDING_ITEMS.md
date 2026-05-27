@@ -55,11 +55,11 @@ The APIDocs SPA is fully built (all components, all 15 English sections, all 9 S
 
 These are intentionally deferred, not pending work. Build only when a concrete need arises.
 
-| Item | Trigger to build |
-|------|-----------------|
-| Dynamic Client Registration (RFC 7591) | When a new AI client needs to connect and manual seeding is impractical |
-| Client ID Metadata Documents | When AI clients start publishing metadata documents |
-| Token Revocation Endpoint (RFC 7009) | When a user-facing "revoke MCP access" UI is needed, or compliance requires it |
+| Item | Trigger to build | Status |
+|------|-----------------|--------|
+| ~~Dynamic Client Registration (RFC 7591)~~ | ~~When a new AI client needs to connect and manual seeding is impractical~~ | **Done** (2026-05-26). See [SPEC_DYNAMIC_CLIENT_REGISTRATION.md](../../ITM.Account/ITM.Account/zz_Specifications/done/SPEC_DYNAMIC_CLIENT_REGISTRATION.md). Remaining items in [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md). |
+| Client ID Metadata Documents | When AI clients start publishing metadata documents | Deferred |
+| Token Revocation Endpoint (RFC 7009) | When a user-facing "revoke MCP access" UI is needed, or compliance requires it | Deferred |
 
 ---
 
@@ -67,7 +67,7 @@ These are intentionally deferred, not pending work. Build only when a concrete n
 
 > At least one real AI client is onboarded with confirmed redirect URIs (not just `e2e-test-client`)
 
-This depends on the deployment work tracked in [SPEC_MCP_DEPLOYMENT.md](SPEC_MCP_DEPLOYMENT.md) (seeding OAuth clients for Claude Desktop, Codex, VS Code, etc.).
+DCR is now implemented -- AI clients can self-register via `POST /oauth/register`. This criterion now depends on the hosted deployment (tracked in [SPEC_MCP_DEPLOYMENT.md](SPEC_MCP_DEPLOYMENT.md)) and manual real-client validation (tracked in [SPEC_DCR_DEFERRED_ITEMS.md](../../ITM.Account/ITM.Account/zz_Specifications/SPEC_DCR_DEFERRED_ITEMS.md) Section 3).
 
 ---
 
