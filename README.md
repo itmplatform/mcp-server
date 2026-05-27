@@ -64,7 +64,8 @@ The config tells the AI client how to spawn the MCP server. The server runs in t
 | `ITM_API_KEY` | Required* | -- | Per-user API key (generate from My Profile) |
 | `ITM_TOKEN` | Required* | -- | Session token (alternative to API key) |
 | `PORT` | -- | Required | HTTP listen port |
-| `ITM_AUTH_URL` | -- | Required | OAuth authorization server URL |
+| `ITM_AUTH_URL` | -- | Required | Internal OAuth authorization server URL (used for token exchange) |
+| `ITM_AUTH_PUBLIC_URL` | -- | Required* | Public OAuth URL advertised to AI clients. Falls back to `ITM_AUTH_URL` |
 | `MCP_SERVER_URL` | -- | Required | MCP server public URL (OAuth audience) |
 | `LOG_LEVEL` | Optional | Optional | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 | `ITM_AUDIT_ENABLED` | Optional | Optional | Enable audit logging to ITM backend |
@@ -72,6 +73,8 @@ The config tells the AI client how to spawn the MCP server. The server runs in t
 \* One of `ITM_API_KEY` or `ITM_TOKEN` is required for stdio mode.
 
 In HTTP mode, if both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. If either is missing, the server runs in dev mode using the startup identity.
+
+On deployed environments, `ITM_AUTH_URL` points to `localhost` for internal server-to-server token exchange. `ITM_AUTH_PUBLIC_URL` must be set to the public URL so AI clients can discover the OAuth authorization server.
 
 ### Claude Desktop
 

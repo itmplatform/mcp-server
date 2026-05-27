@@ -105,7 +105,8 @@ describe('http-oauth mode (tokenless rejection)', () => {
         ...process.env,
         PORT: OAUTH_PORT,
         ITM_AUTH_URL: 'http://localhost/ITM.API',
-        MCP_SERVER_URL: `http://localhost:${OAUTH_PORT}`,
+        ITM_AUTH_PUBLIC_URL: 'https://auth.example.com',
+        MCP_SERVER_URL: `http://localhost:${OAUTH_PORT}/`,
         ITM_COMPANY: '',
         ITM_API_KEY: '',
         ITM_TOKEN: '',
@@ -135,6 +136,35 @@ describe('http-oauth mode (tokenless rejection)', () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe('Authentication required');
+  });
+
+  it('401 WWW-Authenticate header has correct resource_metadata URL without double slash', async () => {
+    const res = await fetch(OAUTH_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'e2e-slash-check', version: '1.0.0' } },
+      }),
+    });
+    const wwwAuth = res.headers.get('www-authenticate') ?? '';
+    expect(wwwAuth).not.toContain('//.well-known');
+    const match = wwwAuth.match(/resource_metadata="([^"]+)"/);
+    expect(match).toBeTruthy();
+    expect(match![1]).toBe(`http://localhost:${OAUTH_PORT}/.well-known/oauth-protected-resource`);
+  });
+
+  it('GET /.well-known/oauth-protected-resource returns ITM_AUTH_PUBLIC_URL in authorization_servers', async () => {
+    const res = await fetch(`${OAUTH_BASE}/.well-known/oauth-protected-resource`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.authorization_servers).toEqual(['https://auth.example.com']);
+  });
+
+  it('GET /.well-known/oauth-protected-resource has no trailing slash on resource', async () => {
+    const res = await fetch(`${OAUTH_BASE}/.well-known/oauth-protected-resource`);
+    const body = await res.json();
+    expect(body.resource).toBe(`http://localhost:${OAUTH_PORT}`);
   });
 
   it('GET /health returns 200 without user field', async () => {
