@@ -183,7 +183,11 @@ async function main() {
           if (oauthConfig) {
             const oauthToken = extractBearerToken(req.headers as Record<string, string | undefined>);
             if (!oauthToken) {
-              res.writeHead(401, { 'Content-Type': 'application/json' });
+              const resourceMetadataUrl = `${process.env.MCP_SERVER_URL!}/.well-known/oauth-protected-resource`;
+              res.writeHead(401, {
+                'Content-Type': 'application/json',
+                'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
+              });
               res.end(JSON.stringify({ error: 'Authentication required' }));
               return;
             }
@@ -194,7 +198,11 @@ async function main() {
               log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
             } catch (err) {
               log.error({ err }, 'OAuth token exchange failed');
-              res.writeHead(401, { 'Content-Type': 'application/json' });
+              const resourceMetadataUrl = `${process.env.MCP_SERVER_URL!}/.well-known/oauth-protected-resource`;
+              res.writeHead(401, {
+                'Content-Type': 'application/json',
+                'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
+              });
               res.end(JSON.stringify({ error: 'Authentication failed' }));
               return;
             }
