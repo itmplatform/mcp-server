@@ -22,7 +22,7 @@ import { registerProjectStatusPrompt } from './prompts/project-status.js';
 import { registerPortfolioOverviewPrompt } from './prompts/portfolio-overview.js';
 import { registerTeamWorkloadPrompt } from './prompts/team-workload.js';
 import { registerRiskAnalysisPrompt } from './prompts/risk-analysis.js';
-import { buildProtectedResourceMetadata } from './auth/oauth-metadata.js';
+import { buildProtectedResourceMetadata, buildResourceMetadataUrl } from './auth/oauth-metadata.js';
 import { resolveRoute } from './gateway.js';
 import { extractBearerToken } from './auth/token-extraction.js';
 import { exchangeToken, buildEffectiveUserContextFromExchange } from './auth/oauth-auth.js';
@@ -155,7 +155,7 @@ async function main() {
         }
         const metadata = buildProtectedResourceMetadata({
           mcpServerUrl: process.env.MCP_SERVER_URL!,
-          authorizationServerUrl: process.env.ITM_AUTH_URL!,
+          authorizationServerUrl: process.env.ITM_AUTH_PUBLIC_URL || process.env.ITM_AUTH_URL!,
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(metadata));
@@ -183,7 +183,7 @@ async function main() {
           if (oauthConfig) {
             const oauthToken = extractBearerToken(req.headers as Record<string, string | undefined>);
             if (!oauthToken) {
-              const resourceMetadataUrl = `${process.env.MCP_SERVER_URL!}/.well-known/oauth-protected-resource`;
+              const resourceMetadataUrl = buildResourceMetadataUrl(process.env.MCP_SERVER_URL!);
               res.writeHead(401, {
                 'Content-Type': 'application/json',
                 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
@@ -198,7 +198,7 @@ async function main() {
               log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
             } catch (err) {
               log.error({ err }, 'OAuth token exchange failed');
-              const resourceMetadataUrl = `${process.env.MCP_SERVER_URL!}/.well-known/oauth-protected-resource`;
+              const resourceMetadataUrl = buildResourceMetadataUrl(process.env.MCP_SERVER_URL!);
               res.writeHead(401, {
                 'Content-Type': 'application/json',
                 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,

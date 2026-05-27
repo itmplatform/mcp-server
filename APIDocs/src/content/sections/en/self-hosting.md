@@ -42,6 +42,7 @@ LOG_LEVEL=info
 ITM_API_URL=http://localhost/ITM.API
 PORT=6170
 ITM_AUTH_URL=http://localhost/ITM.API
+ITM_AUTH_PUBLIC_URL=https://api.itmplatform.com
 MCP_SERVER_URL=https://api.itmplatform.com/v2/_/mcp/
 LOG_LEVEL=info
 ITM_AUDIT_ENABLED=true
@@ -56,12 +57,15 @@ ITM_AUDIT_ENABLED=true
 | `ITM_API_KEY` | Required* | -- | Your personal API key (*or use `ITM_TOKEN`) |
 | `ITM_TOKEN` | Required* | -- | Session token (*alternative to API key) |
 | `PORT` | -- | Required | HTTP server port |
-| `ITM_AUTH_URL` | -- | Required | OAuth authorization server URL |
+| `ITM_AUTH_URL` | -- | Required | Internal OAuth authorization server URL (token exchange) |
+| `ITM_AUTH_PUBLIC_URL` | -- | Required* | Public OAuth URL for AI client discovery. Falls back to `ITM_AUTH_URL` |
 | `MCP_SERVER_URL` | -- | Required | MCP server public URL (OAuth audience) |
 | `LOG_LEVEL` | Optional | Optional | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 | `ITM_AUDIT_ENABLED` | Optional | Optional | Enable audit logging to ITM backend |
 
 In HTTP mode, when both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. `ITM_COMPANY` and `ITM_API_KEY` are not required in this mode.
+
+When deployed behind a reverse proxy, `ITM_AUTH_URL` may point to `localhost` for internal token exchange. Set `ITM_AUTH_PUBLIC_URL` to the URL that AI clients can reach from the internet.
 
 ### Running the server
 
