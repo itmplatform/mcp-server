@@ -186,6 +186,46 @@ HTTP clients (DataMart, REST) log at `debug` level on success (with duration in 
 
 **Audit:** When `ITM_AUDIT_ENABLED=true`, every tool call (read and write) sends an audit entry to the ITM backend (`/v2/{company}/mcp/audit`). Audit is fire-and-forget -- failures do not affect tool execution. Each entry includes: timestamp, userId, accountId, toolName, parametersHash (SHA-256), success, error (if any), aiClientId, durationMs.
 
+## Deployment and publishing
+
+This repo has two remotes and two CI pipelines:
+
+| Remote | Branch | What happens |
+|--------|--------|-------------|
+| Azure DevOps (`origin`) | `stage` | Build, test, deploy to stage VM via PM2 |
+| Azure DevOps (`origin`) | `main` | Build, test, deploy to prod VM via PM2 |
+| GitHub (`github`) | `main` | Build, test, publish to npm (if version changed) |
+
+### Workflow
+
+```
+develop ──push──> stage (Azure DevOps only, deploy to stage)
+develop ──push──> main  (Azure DevOps + GitHub, deploy to prod + publish to npm)
+```
+
+**Deploy to stage** (no npm publish):
+```bash
+.\merge-develop-into.bat stage
+```
+
+**Deploy to prod + publish to npm:**
+1. Bump the version in `package.json` (e.g., `1.0.0` -> `1.1.0`)
+2. Commit and push to `develop`
+3. Run:
+```bash
+.\merge-develop-into.bat main
+```
+
+This pushes to both Azure DevOps (triggers prod deployment) and GitHub (triggers npm publish). The GitHub Actions workflow checks if the version is already published and skips if so -- only version bumps result in a new npm release.
+
+### npm package
+
+Published as [`@itm-platform/mcp-server`](https://www.npmjs.com/package/@itm-platform/mcp-server) via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers/) -- no npm tokens are stored or rotated. GitHub Actions proves its identity to npm directly via OpenID Connect.
+
+- GitHub repo: https://github.com/itmplatform/mcp-server
+- npm package: https://www.npmjs.com/package/@itm-platform/mcp-server
+- Workflow: [.github/workflows/npm-publish.yml](.github/workflows/npm-publish.yml)
+
 ## Specification
 
 Full design, architecture decisions, phased rollout, and E2E test details:

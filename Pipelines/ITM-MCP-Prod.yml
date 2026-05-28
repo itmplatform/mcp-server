@@ -53,6 +53,21 @@ stages:
         failOnStderr: true
         showWarnings: true
 
+    # --- APIDocs ---
+    - script: |
+        cd APIDocs && npm install
+      displayName: 'APIDocs: NPM Install'
+
+    - script: |
+        cd APIDocs && npm run build:prod
+      displayName: 'APIDocs: Build'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish APIDocs Artifact'
+      inputs:
+        PathtoPublish: '$(Build.SourcesDirectory)/APIDocs/dist'
+        ArtifactName: 'apidocs-drop'
+
     - task: PowerShell@2
       displayName: ArchiveArtifact
       inputs:
@@ -183,3 +198,43 @@ stages:
                 pm2 save
               failOnStderr: true
               showWarnings: true
+
+- stage: 'DeployAPIDocs'
+  displayName: 'Deploy APIDocs'
+  dependsOn: 'Build'
+  jobs:
+  - job: DeployAPIDocsJob
+    displayName: 'Deploy APIDocs to developers.itmplatform.com/mcp'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - task: DownloadBuildArtifacts@0
+        displayName: 'Download APIDocs artifact'
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'apidocs-drop'
+          downloadPath: '$(Pipeline.Workspace)'
+
+      - task: SSH@0
+        displayName: 'Clean target folder'
+        inputs:
+          sshEndpoint: 'itmplatform.com-3.16.9.171'
+          runOptions: 'inline'
+          inline: |
+            set -e
+            TARGET="/var/www/developers.itmplatform.com/htdocs/mcp"
+            mkdir -p "$TARGET"
+            echo "=== Cleaning $TARGET ==="
+            rm -rf "$TARGET"/*
+            echo "=== Done ==="
+          failOnStdErr: false
+
+      - task: CopyFilesOverSSH@0
+        displayName: 'Copy APIDocs to server'
+        inputs:
+          sshEndpoint: 'itmplatform.com-3.16.9.171'
+          sourceFolder: '$(Pipeline.Workspace)/apidocs-drop'
+          contents: '**'
+          targetFolder: '/var/www/developers.itmplatform.com/htdocs/mcp'
+          overwrite: true

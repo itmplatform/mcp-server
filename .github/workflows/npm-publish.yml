@@ -1,8 +1,8 @@
 name: Publish to npm
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
 
 jobs:
   publish:
@@ -19,4 +19,19 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npm publish --provenance --access public
+      - name: Check if version is already published
+        id: check
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          if npm view @itm-platform/mcp-server@$PACKAGE_VERSION version 2>/dev/null; then
+            echo "published=true" >> $GITHUB_OUTPUT
+          else
+            echo "published=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Publish to npm
+        if: steps.check.outputs.published == 'false'
+        run: npm publish --provenance --access public
+      - name: Skip publish (version already exists)
+        if: steps.check.outputs.published == 'true'
+        run: echo "Version ${{ steps.check.outputs.version }} is already published, skipping."

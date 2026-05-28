@@ -185,31 +185,20 @@ git remote add github https://github.com/itmplatform/mcp-server.git
 git push github main
 ```
 
-## Fallback: 90-day granular token (Azure DevOps only)
+## Setup checklist (completed May 28, 2026)
 
-If GitHub is not set up yet, the temporary alternative is:
-
-1. Create a granular token at npmjs.com with write access, 90-day expiry, "Bypass 2FA" checked, scoped to `@itm-platform/mcp-server`
-2. Store it as a secret in **Azure Key Vault** (like all other secrets), and link it as a pipeline variable
-3. Add a pipeline step:
-
-```yaml
-- script: |
-    echo //registry.npmjs.org/:_authToken=$(NPM_TOKEN) > .npmrc
-    npm publish --access public
-  displayName: 'NPM Publish'
-  env:
-    NPM_TOKEN: $(NPM_TOKEN)
-```
-
-4. Set a calendar reminder to rotate the token before it expires (every 90 days)
-
-This is a stopgap. Migrate to trusted publishing as soon as the repo is on GitHub.
+- [x] GitHub repo created: https://github.com/itmplatform/mcp-server (public)
+- [x] `package.json` updated: name `@itm-platform/mcp-server`, repository, publishConfig, files, bin
+- [x] `bin/mcp-server.js` created (shebang wrapper for npx)
+- [x] `.github/workflows/npm-publish.yml` created (OIDC trusted publishing)
+- [x] `main` and `develop` branches pushed to GitHub
+- [x] First publish done: `@itm-platform/mcp-server@1.0.0` live on npmjs.com
+- [x] Trusted publisher configured on npmjs.com (itmplatform/mcp-server, npm-publish.yml)
+- [x] npm 2FA enabled on daniel-piret account
+- [ ] Delete the one-time granular access token from npmjs.com
+- [ ] Optionally switch publishing access to "disallow tokens (recommended)"
 
 ## Open questions
 
-- [ ] Repo name on GitHub: `mcp-server` or `ITM.MCP`?
-- [ ] Public or private repo? (public recommended -- free unlimited Actions minutes + provenance)
-- [ ] Decide what to include in the npm tarball (`files` field in package.json)
 - [ ] Decide whether to use GitHub Releases (manual) or automated version bumps (e.g., changesets, semantic-release)
 - [ ] Install `gh` CLI for easier GitHub management, or manage from the web UI
