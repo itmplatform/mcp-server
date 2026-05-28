@@ -1,32 +1,34 @@
-### Revoking access
+### Disconnecting your AI client
 
-You can disconnect your AI client at any time:
+To stop your AI client from accessing ITM Platform, remove the MCP server from the client's configuration:
 
-**If you used an API key (local setup):**
-1. Go to **User Settings** in ITM Platform
-2. Under **API Key**, click **Regenerate**
-3. The old key is immediately invalidated. The AI client will stop working until you configure a new key.
+**Claude Code:**
+```bash
+claude mcp remove itm-platform
+```
 
-**If you used OAuth (hosted setup):**
-1. Go to **User Settings** in ITM Platform
-2. Under **Connected Applications**, find the MCP server entry
-3. Click **Revoke**
-4. The AI client's token is immediately invalidated
+**Claude Desktop:** Go to **Settings > Connectors**, find the ITM Platform entry, and remove it.
 
-### Reviewing activity
+**VS Code:** Delete the `itm-platform` entry from `.vscode/mcp.json`.
 
-Every write operation performed by the AI is recorded in the audit log. Each entry includes:
+**Cursor:** Delete the `itm-platform` entry from `.cursor/mcp.json`.
+
+**Other clients:** Remove the ITM Platform server from your client's MCP configuration file or settings.
+
+If you used an API key and want to invalidate it, go to **My Profile** in ITM Platform and regenerate the key. The old key stops working immediately.
+
+### Audit logging
+
+When audit logging is enabled on the server, each tool call is recorded with:
 
 | Field | Description |
 |-------|-------------|
-| **Who** | The user whose credentials were used |
-| **When** | Timestamp of the operation |
+| **User** | The user whose credentials were used |
+| **Timestamp** | When the operation happened |
 | **Tool** | Which MCP tool was called (e.g., `create_task`, `update_project`) |
-| **What changed** | The fields that were modified and their new values |
+| **Success** | Whether the operation completed or failed |
 | **AI client** | Which AI client initiated the request |
-
-Company Admins can review audit log entries to see all AI-initiated changes across the organization.
 
 ### Why this matters
 
-When you give an AI assistant write access to project and financial data, you need to know exactly what it changed. The audit log provides a complete trail of every AI-initiated modification, so you can verify changes and troubleshoot issues.
+When you give an AI assistant access to project data, you want to know what it did. Audit logging provides a record of every tool call made through the MCP server, so you can track AI-initiated activity.

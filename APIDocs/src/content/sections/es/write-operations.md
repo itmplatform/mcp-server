@@ -14,9 +14,8 @@ La IA puede modificar tus datos de ITM Platform, no solo leerlos. Las operacione
 
 Cada operacion de escritura sigue el mismo patron:
 
-1. **Confirmacion**: La IA te dice lo que va a hacer antes de realizar el cambio
-2. **Verificacion en origen**: Despues de la escritura, el servidor relee el registro actualizado desde la API REST v2 para confirmar que se guardo correctamente
-3. **Registro de auditoria**: Cada escritura se registra con quien hizo el cambio, cuando, que herramienta se uso y que campos se modificaron
+1. **Verificacion en origen**: Despues de la escritura, el servidor relee el registro actualizado desde la API REST v2 para confirmar que se guardo correctamente. Si la verificacion no coincide con los cambios solicitados, el servidor reporta un error.
+2. **Registro de auditoria**: Cuando esta habilitado, cada llamada a herramienta se registra con el usuario, marca de tiempo, nombre de herramienta y resultado.
 
 ### Consistencia eventual de DataMart
 

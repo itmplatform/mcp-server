@@ -44,9 +44,13 @@ export function App() {
           {sections.map((section) => (
             <div key={section.id}>
               <GuideSection section={section} companySlug={companySlug} />
-              {section.id === 'what-can-it-do' && <ToolCatalog mode="overview" />}
-              {section.id === 'setup-stdio' && <ConfigPanel companySlug={companySlug} />}
-              {section.id === 'tools-reference' && <ToolCatalog mode="detail" />}
+              {section.id === 'ai-clients' && <ConfigPanel companySlug={companySlug} />}
+              {section.id === 'tools-reference' && (
+                <>
+                  <ToolCatalog mode="overview" />
+                  <ToolCatalog mode="detail" />
+                </>
+              )}
             </div>
           ))}
         </main>

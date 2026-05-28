@@ -1,30 +1,34 @@
-### How it works
+This is the fastest way to get started. Your AI client connects to the ITM Platform MCP server over the internet. No installation, no API keys -- just a URL and your ITM Platform login.
 
-With the hosted setup, your AI client connects to the ITM Platform MCP server over the internet. When you connect for the first time, a browser window opens asking you to log in to ITM Platform and authorize the AI client.
+If you prefer to run the server locally instead, see [Connect with an API Key](#setup-stdio).
 
 ### Step 1: Add the server URL
 
-In your AI client's MCP configuration, add the hosted server:
+In your AI client's MCP configuration, add the server URL:
 
-```json
-{
-  "mcpServers": {
-    "itm-platform": {
-      "type": "http",
-      "url": "https://mcp.itmplatform.com/mcp"
-    }
-  }
-}
 ```
+https://api.itmplatform.com/v2/_/mcp/
+```
+
+The exact format varies by client. See [Setup by AI Client](#ai-clients) below for copy-paste instructions for Claude, VS Code, Cursor, Codex, Windsurf, and more.
 
 ### Step 2: Authorize
 
-When you first use the connection, your AI client will open a browser window. Log in with your ITM Platform credentials and click **Authorize**. The AI client receives a token that lets it act on your behalf.
+The first time you use the connection, your AI client opens a browser window. Log in with your ITM Platform credentials and grant access. The AI client receives a token that lets it act on your behalf.
 
-### Step 3: Start using it
+### Step 3: Start asking questions
 
-Ask the AI a question about your projects. The authorization is remembered -- you will not need to log in again unless you revoke access.
+Ask the AI something about your projects. The authorization is remembered -- you will not need to log in again unless the token expires or you remove the server from your AI client.
 
 ### What OAuth does
 
-OAuth lets the AI client act on your behalf without ever seeing your password. You log in directly with ITM Platform, and the server issues a scoped token. You can revoke this token at any time (see the "Revoking Access" section).
+OAuth lets the AI client act on your behalf without ever seeing your password. You log in directly with ITM Platform, and the server issues a scoped token. To disconnect, remove the server from your AI client (see [Disconnecting & Audit](#revoke-and-audit)).
+
+### Scopes
+
+Your OAuth token determines what the AI can do:
+
+| Scope | What it allows |
+|-------|----------------|
+| `mcp:read` | Search projects, view budgets, list tasks, query the portfolio |
+| `mcp:write` | Everything above, plus create tasks, log risks/issues, update projects |

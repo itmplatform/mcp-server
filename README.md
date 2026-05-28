@@ -10,29 +10,23 @@ See [House Rules](../House-rules.md) for coding conventions.
 
 ## How it works
 
-MCP is a JSON-RPC 2.0 protocol that lets AI assistants discover and call tools on external servers. The AI client (Claude Desktop, VS Code, etc.) spawns the MCP server as a **child process** connected via stdin/stdout. The server stays running for the session's lifetime -- you never start it manually.
+MCP is a JSON-RPC 2.0 protocol that lets AI assistants discover and call tools on external servers. The server supports two transports:
+
+- **HTTP + OAuth (recommended)** -- AI clients connect to a hosted URL and authenticate via OAuth 2.1 (PKCE). No local install needed.
+- **stdio** -- AI clients spawn the server as a local child process. Auth via API key.
 
 ```
-You ask: "Which projects are behind schedule?"
+AI Client (Claude, Cursor, VS Code, Codex...)
   |
+  |  HTTP (remote) or stdio (local)
   v
-AI Client (Claude Desktop / VS Code / Cursor)
-  |  1. Spawns ITM.MCP as a child process at session start
-  |  2. Discovers tools via JSON-RPC handshake
-  |  3. The AI model decides which tools to call based on your question
-  |  4. Sends tool calls over stdin, reads results from stdout
-  |
-  v
-ITM.MCP Server (child process, stdin/stdout)
-  |  - Authenticates once at startup using your API key
-  |  - Receives tool calls, queries ITM APIs, returns results
-  |  - Stays alive until the AI client closes
-  |
+ITM.MCP Server
+  |  authenticates as the user, calls ITM APIs
   v
 ITM.API Gateway --> DataMart (GraphQL) + v2 REST (users, reference data)
 ```
 
-**Key point:** The AI model never sees your credentials. Auth is handled by the MCP server process. The model only sees tool names, descriptions, and results.
+**Key point:** The AI model never sees user credentials. Auth is handled by the MCP server. The model only sees tool names, descriptions, and results.
 
 ### Three MCP primitives
 
@@ -53,9 +47,23 @@ npm run dev           # HTTP dev server on port 6170 (for testing with curl)
 npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
 ```
 
-## AI client configuration
+## End-user setup
 
-The config tells the AI client how to spawn the MCP server. The server runs in two modes with different requirements:
+For end-user setup instructions (OAuth, per-client configuration, npm package), see the [APIDocs site](APIDocs/).
+
+**Quick connect (OAuth):**
+
+```bash
+claude mcp add --scope user --transport http itm-platform https://api.itmplatform.com/v2/_/mcp/
+```
+
+**Quick connect (npm, local):**
+
+```bash
+claude mcp add --scope user itm-platform -- npx @itm-platform/mcp-server
+```
+
+## Server configuration (development / deployment)
 
 | Variable | Stdio | HTTP+OAuth | Description |
 |----------|-------|------------|-------------|
@@ -75,39 +83,6 @@ The config tells the AI client how to spawn the MCP server. The server runs in t
 In HTTP mode, if both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. If either is missing, the server runs in dev mode using the startup identity.
 
 On deployed environments, `ITM_AUTH_URL` points to `localhost` for internal server-to-server token exchange. `ITM_AUTH_PUBLIC_URL` must be set to the public URL so AI clients can discover the OAuth authorization server.
-
-### Claude Desktop
-
-Edit `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "itm-platform": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["C:/path/to/ITM.MCP/dist/server.js"],
-      "env": {
-        "ITM_API_URL": "http://localhost/ITM.API",
-        "ITM_COMPANY": "testsmarter",
-        "ITM_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-### Claude Code
-
-Add to `.claude/settings.json` or `.mcp.json` -- same JSON structure as above.
-
-### VS Code (Copilot)
-
-Add to `.vscode/mcp.json` -- same JSON structure as above.
-
-### Cursor / JetBrains
-
-Add to `.cursor/mcp.json` or IDE MCP settings -- same JSON structure as above.
 
 ## Tools (Phase 1 -- read-only)
 

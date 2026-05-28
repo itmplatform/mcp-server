@@ -55,4 +55,4 @@ API key sessions do not have scope restrictions -- they use the full permissions
 
 ### Server metadata
 
-The MCP server publishes its OAuth configuration at `/.well-known/oauth-authorization-server`. AI clients use this to discover the authorization and token endpoints automatically.
+The MCP server publishes its resource metadata at `/.well-known/oauth-protected-resource`. This tells AI clients which authorization server to use and which scopes are available. The AI client then fetches the authorization server's own metadata to discover the authorization and token endpoints.

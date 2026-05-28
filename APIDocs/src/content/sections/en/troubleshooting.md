@@ -13,7 +13,7 @@
 
 - Make sure the MCP server started successfully (check stderr output for the "MCP server connected" message)
 - Verify the configuration path and format match what your AI client expects
-- For stdio mode: check that `npx -y itm-mcp` runs correctly in your terminal
+- For stdio mode: check that `npx @itm-platform/mcp-server` runs correctly in your terminal
 - For HTTP mode: check that the URL is correct and the server is listening on the expected port
 - Restart your AI client after changing the configuration
 

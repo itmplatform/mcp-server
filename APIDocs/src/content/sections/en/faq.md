@@ -4,11 +4,11 @@ The MCP server runs between your AI client and ITM Platform. Your project data f
 
 ### Can the AI modify my projects?
 
-Yes, if you have the right license (Company Admin or Full User) and have granted write permissions. The AI can create tasks, update projects, and log risks and issues. Every modification is recorded in the audit log. You can revoke write access at any time.
+Yes, if you have the right license (Company Admin or Full User) and have granted write permissions. The AI can create tasks, update projects, and log risks and issues. To stop access, remove the MCP server from your AI client (see [Disconnecting & Audit](#revoke-and-audit)).
 
 ### Which AI clients are supported?
 
-Claude Desktop, Claude Code, OpenAI Codex, VS Code (Copilot), Cursor, and JetBrains AI Assistant. Any MCP-compatible client can connect using the standard configuration.
+Claude Code, Claude Desktop, VS Code (Copilot), Cursor, OpenAI Codex, Windsurf, and JetBrains AI Assistant. Any MCP-compatible client can connect using the standard configuration.
 
 ### Do I need to install anything?
 
@@ -16,7 +16,7 @@ For local setup: you need Node.js installed (the `npx` command handles the rest)
 
 ### What happens if I change my password?
 
-API keys are not affected by password changes. OAuth tokens remain valid until they expire or you revoke them. You do not need to reconfigure your AI client after a password change.
+API keys are not affected by password changes. OAuth tokens remain valid until they expire. You do not need to reconfigure your AI client after a password change.
 
 ### Can multiple users connect at the same time?
 

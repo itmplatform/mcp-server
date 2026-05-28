@@ -1,9 +1,25 @@
 {
-  "name": "itm-mcp",
+  "name": "@itm-platform/mcp-server",
   "version": "1.0.0",
   "description": "MCP server for ITM Platform",
   "type": "module",
   "main": "dist/server.js",
+  "bin": {
+    "mcp-server": "bin/mcp-server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itmplatform/mcp-server.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "cross-env PORT=6170 node --env-file=.env --import tsx src/server.ts",
     "build": "tsc",

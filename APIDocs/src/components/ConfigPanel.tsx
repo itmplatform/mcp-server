@@ -6,7 +6,7 @@ interface ConfigPanelProps {
   companySlug: string
 }
 
-type ClientId = 'claude-desktop' | 'claude-code' | 'codex' | 'vscode' | 'cursor' | 'jetbrains'
+type ClientId = 'claude-code' | 'claude-desktop' | 'vscode' | 'cursor' | 'codex' | 'windsurf' | 'jetbrains'
 
 interface ClientConfig {
   id: ClientId
@@ -16,22 +16,14 @@ interface ClientConfig {
   filePath: { windows?: string; mac?: string; linux?: string; note?: string }
 }
 
-const HOSTED_CONFIG = JSON.stringify({
-  mcpServers: {
-    'itm-platform': {
-      type: 'http',
-      url: 'https://mcp.itmplatform.com/mcp',
-    },
-  },
-}, null, 2)
+const MCP_URL = 'https://api.itmplatform.com/v2/_/mcp/'
 
 function stdioBlock(slug: string): string {
   return JSON.stringify({
     mcpServers: {
       'itm-platform': {
-        type: 'stdio',
         command: 'npx',
-        args: ['-y', 'itm-mcp'],
+        args: ['@itm-platform/mcp-server'],
         env: {
           ITM_API_URL: 'https://api.itmplatform.com',
           ITM_COMPANY: slug || '{your-account}',
@@ -44,55 +36,33 @@ function stdioBlock(slug: string): string {
 
 const CLIENTS: ClientConfig[] = [
   {
+    id: 'claude-code',
+    label: 'Claude Code',
+    stdioConfig: () => `claude mcp add --scope user itm-platform -- npx @itm-platform/mcp-server`,
+    hostedConfig: `claude mcp add --scope user --transport http itm-platform ${MCP_URL}`,
+    filePath: {
+      note: 'Run in your terminal. The --scope user flag makes it available across all projects.',
+    },
+  },
+  {
     id: 'claude-desktop',
     label: 'Claude Desktop',
     stdioConfig: stdioBlock,
-    hostedConfig: HOSTED_CONFIG,
+    hostedConfig: `Use Settings > Connectors > Add custom connector\nand enter the URL:\n\n${MCP_URL}`,
     filePath: {
       windows: '%APPDATA%\\Claude\\claude_desktop_config.json',
       mac: '~/Library/Application Support/Claude/claude_desktop_config.json',
     },
   },
   {
-    id: 'claude-code',
-    label: 'Claude Code',
-    stdioConfig: (slug) => JSON.stringify({
-      mcpServers: {
-        'itm-platform': {
-          type: 'stdio',
-          command: 'npx',
-          args: ['-y', 'itm-mcp'],
-          env: {
-            ITM_API_URL: 'https://api.itmplatform.com',
-            ITM_COMPANY: slug || '{your-account}',
-            ITM_API_KEY: 'your-api-key',
-          },
-        },
-      },
-    }, null, 2),
-    hostedConfig: HOSTED_CONFIG,
-    filePath: {
-      note: 'Run: claude mcp add itm-platform -- npx -y itm-mcp',
-    },
-  },
-  {
-    id: 'codex',
-    label: 'OpenAI Codex',
-    stdioConfig: stdioBlock,
-    hostedConfig: HOSTED_CONFIG,
-    filePath: {
-      note: 'Add to your Codex MCP server configuration.',
-    },
-  },
-  {
     id: 'vscode',
     label: 'VS Code',
     stdioConfig: (slug) => JSON.stringify({
-      'mcp.servers': {
+      servers: {
         'itm-platform': {
           type: 'stdio',
           command: 'npx',
-          args: ['-y', 'itm-mcp'],
+          args: ['@itm-platform/mcp-server'],
           env: {
             ITM_API_URL: 'https://api.itmplatform.com',
             ITM_COMPANY: slug || '{your-account}',
@@ -102,41 +72,90 @@ const CLIENTS: ClientConfig[] = [
       },
     }, null, 2),
     hostedConfig: JSON.stringify({
-      'mcp.servers': {
+      servers: {
         'itm-platform': {
           type: 'http',
-          url: 'https://mcp.itmplatform.com/mcp',
+          url: MCP_URL,
         },
       },
     }, null, 2),
     filePath: {
-      note: 'Add to your VS Code settings.json (User or Workspace).',
+      note: 'Save as .vscode/mcp.json in your workspace.',
     },
   },
   {
     id: 'cursor',
     label: 'Cursor',
     stdioConfig: stdioBlock,
-    hostedConfig: HOSTED_CONFIG,
+    hostedConfig: JSON.stringify({
+      mcpServers: {
+        'itm-platform': {
+          url: MCP_URL,
+        },
+      },
+    }, null, 2),
     filePath: {
-      note: 'Add to .cursor/mcp.json in your project root.',
+      note: 'Save as .cursor/mcp.json in your project root, or ~/.cursor/mcp.json for global access.',
+    },
+  },
+  {
+    id: 'codex',
+    label: 'OpenAI Codex',
+    stdioConfig: () => `[mcp_servers.itm-platform]\nurl = "${MCP_URL}"\nbearer_token_env_var = "ITM_API_TOKEN"`,
+    hostedConfig: `codex mcp add itm-platform --url ${MCP_URL}`,
+    filePath: {
+      note: 'Run the command above, or add to ~/.codex/config.toml manually.',
+    },
+  },
+  {
+    id: 'windsurf',
+    label: 'Windsurf',
+    stdioConfig: (slug) => JSON.stringify({
+      mcpServers: {
+        'itm-platform': {
+          command: 'npx',
+          args: ['@itm-platform/mcp-server'],
+          env: {
+            ITM_API_URL: 'https://api.itmplatform.com',
+            ITM_COMPANY: slug || '{your-account}',
+            ITM_API_KEY: 'your-api-key',
+          },
+        },
+      },
+    }, null, 2),
+    hostedConfig: JSON.stringify({
+      mcpServers: {
+        'itm-platform': {
+          serverUrl: MCP_URL,
+        },
+      },
+    }, null, 2),
+    filePath: {
+      windows: '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json',
+      mac: '~/.codeium/windsurf/mcp_config.json',
     },
   },
   {
     id: 'jetbrains',
     label: 'JetBrains',
     stdioConfig: stdioBlock,
-    hostedConfig: HOSTED_CONFIG,
+    hostedConfig: JSON.stringify({
+      mcpServers: {
+        'itm-platform': {
+          url: MCP_URL,
+        },
+      },
+    }, null, 2),
     filePath: {
-      note: 'Settings > Tools > AI Assistant > MCP Servers. Add a new server configuration.',
+      note: 'Settings > Tools > AI Assistant > Model Context Protocol (MCP). Click Add and paste the JSON.',
     },
   },
 ]
 
 export function ConfigPanel({ companySlug }: ConfigPanelProps) {
   const { t } = useLocaleContext()
-  const [activeClient, setActiveClient] = useState<ClientId>('claude-desktop')
-  const [showHosted, setShowHosted] = useState(false)
+  const [activeClient, setActiveClient] = useState<ClientId>('claude-code')
+  const [showHosted, setShowHosted] = useState(true)
 
   const client = CLIENTS.find((c) => c.id === activeClient)!
   const snippet = showHosted
@@ -176,7 +195,7 @@ export function ConfigPanel({ companySlug }: ConfigPanelProps) {
           <CopyButton text={snippet} />
         </div>
 
-        <pre className="p-3 rounded text-xs overflow-x-auto" style={{ backgroundColor: 'var(--code-bg)', color: 'var(--text-primary)' }}>
+        <pre className="p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap" style={{ backgroundColor: 'var(--code-bg)', color: 'var(--text-primary)' }}>
           <code>{snippet}</code>
         </pre>
 
