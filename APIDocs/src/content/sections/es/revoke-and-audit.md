@@ -1,32 +1,34 @@
-### Revocar acceso
+### Desconectar tu cliente de IA
 
-Puedes desconectar tu cliente de IA en cualquier momento:
+Para que tu cliente de IA deje de acceder a ITM Platform, elimina el servidor MCP de la configuracion del cliente:
 
-**Si usaste una clave API (configuracion local):**
-1. Ve a **Configuracion de usuario** en ITM Platform
-2. En **Clave API**, haz clic en **Regenerar**
-3. La clave antigua se invalida inmediatamente. El cliente de IA dejara de funcionar hasta que configures una nueva clave.
+**Claude Code:**
+```bash
+claude mcp remove itm-platform
+```
 
-**Si usaste OAuth (configuracion alojada):**
-1. Ve a **Configuracion de usuario** en ITM Platform
-2. En **Aplicaciones conectadas**, busca la entrada del servidor MCP
-3. Haz clic en **Revocar**
-4. El token del cliente de IA se invalida inmediatamente
+**Claude Desktop:** Ve a **Settings > Connectors**, busca la entrada de ITM Platform y eliminala.
 
-### Revisar actividad
+**VS Code:** Elimina la entrada `itm-platform` de `.vscode/mcp.json`.
 
-Cada operacion de escritura realizada por la IA se registra en el log de auditoria. Cada entrada incluye:
+**Cursor:** Elimina la entrada `itm-platform` de `.cursor/mcp.json`.
+
+**Otros clientes:** Elimina el servidor de ITM Platform del archivo de configuracion MCP o los ajustes de tu cliente.
+
+Si usaste una clave API y quieres invalidarla, ve a **Mi perfil** en ITM Platform y regenera la clave. La clave anterior deja de funcionar inmediatamente.
+
+### Registro de auditoria
+
+Cuando el registro de auditoria esta habilitado en el servidor, cada llamada a herramienta se registra con:
 
 | Campo | Descripcion |
 |-------|-------------|
-| **Quien** | El usuario cuyas credenciales se usaron |
-| **Cuando** | Fecha y hora de la operacion |
+| **Usuario** | El usuario cuyas credenciales se usaron |
+| **Marca de tiempo** | Cuando ocurrio la operacion |
 | **Herramienta** | Que herramienta MCP se llamo (ej. `create_task`, `update_project`) |
-| **Que cambio** | Los campos que se modificaron y sus nuevos valores |
+| **Resultado** | Si la operacion se completo o fallo |
 | **Cliente de IA** | Que cliente de IA inicio la solicitud |
-
-Los Company Admins pueden revisar las entradas del log de auditoria para ver todos los cambios iniciados por IA en la organizacion.
 
 ### Por que esto importa
 
-Cuando le das a un asistente de IA acceso de escritura a datos de proyectos y financieros, necesitas saber exactamente que cambio. El log de auditoria proporciona un registro completo de cada modificacion iniciada por IA, para que puedas verificar cambios y solucionar problemas.
+Cuando le das a un asistente de IA acceso a datos de proyectos, quieres saber que hizo. El registro de auditoria proporciona un registro de cada llamada a herramienta realizada a traves del servidor MCP, para que puedas rastrear la actividad iniciada por IA.

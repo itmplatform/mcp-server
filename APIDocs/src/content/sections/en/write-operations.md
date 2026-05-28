@@ -14,9 +14,8 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 
 Every write operation follows the same pattern:
 
-1. **Confirmation**: The AI tells you what it is about to do before making the change
-2. **Source-of-truth verification**: After the write, the server reads the updated record back from the v2 REST API to confirm it was saved correctly
-3. **Audit logging**: Each write is logged with who made the change, when, what tool was called, and what fields were modified
+1. **Source-of-truth verification**: After the write, the server reads the updated record back from the v2 REST API to confirm it was saved correctly. If the readback does not match the requested changes, the server reports an error.
+2. **Audit logging**: When enabled, each tool call is logged with the user, timestamp, tool name, and result.
 
 ### DataMart eventual consistency
 

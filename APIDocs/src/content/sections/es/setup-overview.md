@@ -1,27 +1,37 @@
-Hay dos formas de conectar tu asistente de IA a ITM Platform:
+Hay dos formas de conectar tu asistente de IA a ITM Platform. Elige la que mejor se adapte a tu situacion -- siempre puedes cambiar despues.
 
-### Configuracion local (clave API)
+### Conectar con OAuth (recomendado)
 
-Instala el servidor MCP en tu ordenador. Tu cliente de IA inicia el servidor como un proceso local y se comunica con el directamente. Te autenticas con una clave API de tu cuenta de ITM Platform.
+Agrega una sola URL a tu cliente de IA. La primera vez que lo uses, se abre una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform. Sin instalacion, sin clave API, sin variables de entorno.
 
-**Ideal para:** usuarios que ejecutan un cliente de IA en su propio ordenador (Claude Desktop, Claude Code, Cursor, VS Code).
+**Solo necesitas una linea:**
 
-### Configuracion alojada (OAuth)
+```
+https://api.itmplatform.com/v2/_/mcp/
+```
 
-Apunta tu cliente de IA a la URL del servidor alojado. La primera vez que te conectes, autorizas el acceso con tu inicio de sesion de ITM Platform. Sin instalacion, sin clave API.
+**Ideal para:** la mayoria de los usuarios. Funciona con Claude Code, Claude Desktop, Cursor, VS Code y cualquier cliente MCP que soporte servidores remotos.
 
-**Ideal para:** usuarios que quieren configuracion cero, o cuyo cliente de IA soporta servidores MCP remotos.
+### Conectar con clave API (alternativa)
+
+Instala el servidor MCP en tu ordenador via npm. Tu cliente de IA inicia el servidor como un proceso local. Te autenticas con una clave API generada desde tu cuenta de ITM Platform.
+
+```bash
+npx @itm-platform/mcp-server
+```
+
+**Ideal para:** usuarios que prefieren acceso sin conexion, trabajan detras de un firewall o necesitan control total sobre el servidor.
 
 ### Como funciona MCP
 
-MCP (Model Context Protocol) es un estandar que permite a los asistentes de IA conectarse a fuentes de datos externas. Cuando haces una pregunta sobre tus proyectos, el cliente de IA envia la peticion al servidor MCP de ITM. El servidor se autentica como tu, llama a las APIs de ITM Platform y devuelve los datos a la IA para que pueda responder tu pregunta.
+MCP (Model Context Protocol) es un estandar abierto que permite a los asistentes de IA conectarse a fuentes de datos externas. Cuando haces una pregunta sobre tus proyectos, el cliente de IA envia la peticion al servidor MCP de ITM. El servidor se autentica como tu, llama a las APIs de ITM Platform y devuelve los datos a la IA para que pueda responder.
 
 ```
 Haces una pregunta
   |
   v
-Cliente de IA (Claude, Codex, VS Code...)
-  |  inicia el servidor MCP o se conecta via URL
+Cliente de IA (Claude, Cursor, VS Code, Codex...)
+  |  se conecta al servidor MCP (URL remota o proceso local)
   v
 Servidor MCP de ITM
   |  se autentica como tu, llama a las APIs de ITM

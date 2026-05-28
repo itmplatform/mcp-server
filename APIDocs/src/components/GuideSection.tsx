@@ -1,5 +1,6 @@
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import type { GuideSection as GuideSectionType } from '../content/guide-sections'
 
 interface GuideSectionProps {
@@ -20,12 +21,18 @@ export function GuideSection({ section, companySlug }: GuideSectionProps) {
       <div className="guide-prose text-sm" style={{ color: 'var(--text-secondary)' }}>
         <Markdown
           remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
           components={{
-            a: ({ href, children, ...props }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-                {children}
-              </a>
-            ),
+            a: ({ href, children, ...props }) =>
+              href?.startsWith('#') ? (
+                <a href={href} {...props}>
+                  {children}
+                </a>
+              ) : (
+                <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                  {children}
+                </a>
+              ),
           }}
         >
           {content}

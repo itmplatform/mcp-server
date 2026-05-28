@@ -9,9 +9,6 @@ export type Locale = 'en' | 'es'
 
 export const SECTION_ORDER = [
   'what-can-it-do',
-  'setup-overview',
-  'setup-stdio',
-  'setup-oauth',
   'ai-clients',
   'write-operations',
   'access-control',
@@ -22,16 +19,12 @@ export const SECTION_ORDER = [
   'authentication',
   'self-hosting',
   'troubleshooting',
-  'changelog',
 ] as const
 
 export type SectionId = (typeof SECTION_ORDER)[number]
 
 const END_USER_SECTIONS: ReadonlySet<string> = new Set([
   'what-can-it-do',
-  'setup-overview',
-  'setup-stdio',
-  'setup-oauth',
   'ai-clients',
   'write-operations',
   'access-control',

@@ -1,27 +1,37 @@
-There are two ways to connect your AI assistant to ITM Platform:
+There are two ways to connect your AI assistant to ITM Platform. Pick the one that fits your situation -- you can always switch later.
 
-### Local setup (API Key)
+### Connect with OAuth (recommended)
 
-Install the MCP server on your machine. Your AI client spawns the server as a local process and communicates with it directly. You authenticate with an API key from your ITM Platform account.
+Add a single URL to your AI client. The first time you use it, a browser window opens for you to log in with your ITM Platform credentials. No install, no API key, no environment variables.
 
-**Best for:** users who run an AI client on their own computer (Claude Desktop, Claude Code, Cursor, VS Code).
+**One line is all it takes:**
 
-### Hosted setup (OAuth)
+```
+https://api.itmplatform.com/v2/_/mcp/
+```
 
-Point your AI client to the hosted server URL. When you connect for the first time, you authorize via your ITM Platform login. No install, no API key.
+**Best for:** most users. Works with Claude Code, Claude Desktop, Cursor, VS Code, and any MCP-compatible client that supports remote servers.
 
-**Best for:** users who want zero setup, or whose AI client supports remote MCP servers.
+### Connect with an API key (alternative)
+
+Install the MCP server locally via npm. Your AI client spawns the server as a local process. You authenticate with an API key generated from your ITM Platform account.
+
+```bash
+npx @itm-platform/mcp-server
+```
+
+**Best for:** users who prefer offline access, work behind a firewall, or need full control over the server process.
 
 ### How MCP works
 
-MCP (Model Context Protocol) is a standard that lets AI assistants connect to external data sources. When you ask a question about your projects, the AI client sends the request to the ITM MCP server. The server authenticates as you, calls ITM Platform APIs, and returns the data to the AI so it can answer your question.
+MCP (Model Context Protocol) is an open standard that lets AI assistants connect to external data sources. When you ask a question about your projects, the AI client sends the request to the ITM MCP server. The server authenticates as you, calls ITM Platform APIs, and returns the data to the AI so it can answer.
 
 ```
 You ask a question
   |
   v
-AI Client (Claude, Codex, VS Code...)
-  |  spawns MCP server or connects via URL
+AI Client (Claude, Cursor, VS Code, Codex...)
+  |  connects to MCP server (remote URL or local process)
   v
 ITM MCP Server
   |  authenticates as you, calls ITM APIs
@@ -29,4 +39,4 @@ ITM MCP Server
 Your ITM Platform Data
 ```
 
-Your data flows through the MCP server to the AI client you are using. The AI provider's data handling policy applies to any data the AI processes.
+Your data flows through the MCP server to the AI client you are using. The AI provider's data-handling policy applies to any data the AI processes.

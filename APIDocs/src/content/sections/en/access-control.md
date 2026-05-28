@@ -6,8 +6,8 @@ Access to MCP tools depends on your ITM Platform license type. The MCP server en
 |---------|------------|--------------|-------|
 | **Company Admin** | Full | Full | Can see and modify all projects, services, and users |
 | **Full User** | Full | Full | Same data access as Company Admin |
-| **Project Manager** | Scoped | Scoped | Can only see and modify projects where they are assigned as a manager |
-| **Team Member** | Blocked | Blocked | Cannot use MCP tools (403 error) |
+| **Project Manager** | Not yet available | Not yet available | Scoped access for Project Managers is planned for a future release |
+| **Team Member** | Blocked | Blocked | Cannot use MCP tools |
 
 ### How it works
 
@@ -15,4 +15,4 @@ When you connect your AI client, the MCP server resolves your identity using you
 
 ### Project-level permissions
 
-Project Managers can only access projects where they are assigned as a manager. If you ask the AI about a project you do not manage, the server returns an empty result -- the AI will tell you it could not find that project.
+Company Admins and Full Users can access all projects. Project Manager scoped access (limited to assigned projects) is planned for a future release.

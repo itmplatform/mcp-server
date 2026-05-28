@@ -4,11 +4,11 @@ El servidor MCP funciona entre tu cliente de IA e ITM Platform. Los datos de tus
 
 ### Puede la IA modificar mis proyectos?
 
-Si, si tienes la licencia adecuada (Company Admin o Full User) y has otorgado permisos de escritura. La IA puede crear tareas, actualizar proyectos y registrar riesgos e incidencias. Cada modificacion se registra en el log de auditoria. Puedes revocar el acceso de escritura en cualquier momento.
+Si, si tienes la licencia adecuada (Company Admin o Full User) y has otorgado permisos de escritura. La IA puede crear tareas, actualizar proyectos y registrar riesgos e incidencias. Para detener el acceso, elimina el servidor MCP de tu cliente de IA (consulta [Desconectar y auditoria](#revoke-and-audit)).
 
 ### Que clientes de IA son compatibles?
 
-Claude Desktop, Claude Code, OpenAI Codex, VS Code (Copilot), Cursor y JetBrains AI Assistant. Cualquier cliente compatible con MCP puede conectarse usando la configuracion estandar.
+Claude Code, Claude Desktop, VS Code (Copilot), Cursor, OpenAI Codex, Windsurf y JetBrains AI Assistant. Cualquier cliente compatible con MCP puede conectarse usando la configuracion estandar.
 
 ### Necesito instalar algo?
 
@@ -16,7 +16,7 @@ Para configuracion local: necesitas Node.js instalado (el comando `npx` se encar
 
 ### Que pasa si cambio mi contrasena?
 
-Las claves API no se ven afectadas por cambios de contrasena. Los tokens OAuth siguen siendo validos hasta que expiren o los revoques. No necesitas reconfigurar tu cliente de IA despues de un cambio de contrasena.
+Las claves API no se ven afectadas por cambios de contrasena. Los tokens OAuth siguen siendo validos hasta que expiren. No necesitas reconfigurar tu cliente de IA despues de un cambio de contrasena.
 
 ### Pueden varios usuarios conectarse al mismo tiempo?
 

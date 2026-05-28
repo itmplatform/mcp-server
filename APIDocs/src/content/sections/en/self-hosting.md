@@ -1,25 +1,27 @@
+This section is for teams that want to run the MCP server on their own infrastructure, either as a local process for individual users or as a shared HTTP service behind OAuth.
+
 ### Prerequisites
 
 - Node.js 20 or later
 - An ITM Platform account with Company Admin or Full User license
-- An API key generated in your ITM Platform user settings
+- An API key generated from your ITM Platform user settings (for stdio mode)
 
 ### Install from npm
 
 ```bash
-npm install -g itm-mcp
+npm install -g @itm-platform/mcp-server
 ```
 
 Or run without installing:
 
 ```bash
-npx -y itm-mcp
+npx @itm-platform/mcp-server
 ```
 
-### Clone and build from source
+### Build from source
 
 ```bash
-git clone https://github.com/niceTech/ITM.MCP.git
+git clone https://github.com/niceTech/ITM.MCP.git  # placeholder -- update with actual repo URL
 cd ITM.MCP
 npm install
 npm run build
@@ -37,7 +39,7 @@ ITM_API_KEY=your-api-key
 LOG_LEVEL=info
 ```
 
-**HTTP+OAuth mode** (deployed, multi-tenant):
+**HTTP + OAuth mode** (deployed, multi-tenant):
 ```
 ITM_API_URL=http://localhost/ITM.API
 PORT=6170
