@@ -43,6 +43,8 @@ IF /I "%TARGET%"=="stage" (
 IF /I "%TARGET%"=="main" (
   echo Pushing develop ^> main ...
   git push origin develop:main
+  echo Pushing main to GitHub ...
+  git push github develop:main
   GOTO done
 )
 
