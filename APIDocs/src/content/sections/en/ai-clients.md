@@ -2,6 +2,8 @@ There are two ways to connect: **OAuth** (recommended) connects to the hosted se
 
 Pick your AI client below. Each one shows both methods.
 
+After adding the server, open MCP in your client -- type `/mcp` where slash commands are supported -- select `itm-platform`, and authenticate when prompted.
+
 ---
 
 ### Claude Code
@@ -12,7 +14,7 @@ Pick your AI client below. Each one shows both methods.
 claude mcp add --scope user --transport http itm-platform https://api.itmplatform.com/v2/_/mcp/
 ```
 
-The `--scope user` flag makes the server available across all your projects. Claude Code handles OAuth automatically -- your browser will open for login the first time a tool is called.
+The `--scope user` flag makes the server available across all your projects. Then type `/mcp`, select `itm-platform`, and complete the ITM Platform login when prompted.
 
 **API Key (local):**
 
@@ -35,6 +37,8 @@ https://api.itmplatform.com/v2/_/mcp/
 ```
 
 Claude Desktop handles the OAuth flow automatically. Available on Pro, Max, Team, and Enterprise plans.
+
+After adding the connector, type `/mcp`, select the ITM Platform connector, and authenticate when prompted.
 
 **API Key (local):**
 
@@ -75,6 +79,8 @@ Edit your config file (`%APPDATA%\Claude\claude_desktop_config.json` on Windows,
 
 You can also add servers via **Command Palette > MCP: Add Server**.
 
+After adding the server, open Copilot Chat, type `/mcp`, select `itm-platform`, and authenticate when prompted.
+
 **API Key (local):**
 
 ```json
@@ -112,6 +118,8 @@ Create or edit `.cursor/mcp.json` in your project root (or `~/.cursor/mcp.json` 
 }
 ```
 
+After adding the server, restart Cursor, type `/mcp`, select `itm-platform`, and authenticate when prompted.
+
 **API Key (local):**
 
 ```json
@@ -147,6 +155,8 @@ Or add manually to `~/.codex/config.toml`:
 url = "https://api.itmplatform.com/v2/_/mcp/"
 ```
 
+After adding the server, start Codex, type `/mcp`, select `itm-platform`, and authenticate when prompted.
+
 ---
 
 ### Windsurf
@@ -164,6 +174,8 @@ Edit `~/.codeium/windsurf/mcp_config.json` (or `%USERPROFILE%\.codeium\windsurf\
   }
 }
 ```
+
+After adding the server, restart Windsurf, type `/mcp`, select `itm-platform`, and authenticate when prompted.
 
 **API Key (local):**
 
@@ -191,6 +203,8 @@ Go to **Settings > Tools > AI Assistant > Model Context Protocol (MCP)** and cli
 
 **OAuth (recommended):** select HTTP protocol and enter `https://api.itmplatform.com/v2/_/mcp/`.
 
+After adding the server, open AI Assistant, type `/mcp` where slash commands are available, or open the MCP servers panel. Select `itm-platform` and authenticate when prompted.
+
 **API Key (local):** select stdio protocol and use the command `npx @itm-platform/mcp-server` with the required environment variables.
 
 ---
@@ -204,11 +218,13 @@ Any client that implements the [Model Context Protocol](https://modelcontextprot
 | **Remote URL (OAuth)** | `https://api.itmplatform.com/v2/_/mcp/` |
 | **Local command (API Key)** | `npx @itm-platform/mcp-server` |
 
+After adding the server, use the client's MCP command or server list. If the client supports slash commands, type `/mcp`, select `itm-platform`, and authenticate when prompted.
+
 ---
 
 ### About OAuth
 
-The first time you connect via OAuth, your AI client opens a browser window. Log in with your ITM Platform credentials and grant access. The AI client receives a scoped token:
+The first time you connect via OAuth, open MCP in your client and select `itm-platform`. In clients that support slash commands, type `/mcp`. The client opens a browser window so you can log in with your ITM Platform credentials and grant access. The AI client receives a scoped token:
 
 | Scope | What it allows |
 |-------|----------------|

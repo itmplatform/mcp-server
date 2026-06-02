@@ -27,7 +27,7 @@ See [Setup by AI Client](#ai-clients) above for the exact configuration for Clau
 
 ### Step 3: Verify the connection
 
-After adding the configuration, restart your AI client. Then ask a question like:
+After adding the configuration, restart your AI client. Type `/mcp` where slash commands are supported, or open the client's MCP server list, and confirm that `itm-platform` is connected. Then ask a question like:
 
 > "How many projects do I have in ITM Platform?"
 

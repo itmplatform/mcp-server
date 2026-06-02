@@ -8,6 +8,7 @@
   "copy.button": "Copy",
   "copy.done": "Copied!",
   "config.hostedMode": "Hosted (OAuth) -- no API key needed",
+  "config.postSetup": "After adding the server, type /mcp where supported, select itm-platform, and authenticate when prompted.",
   "tools.searchPlaceholder": "Search tools...",
   "tools.allCategories": "All categories",
   "tools.noResults": "No tools match your search.",

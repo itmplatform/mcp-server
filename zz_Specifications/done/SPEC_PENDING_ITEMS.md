@@ -43,7 +43,7 @@ The APIDocs SPA is fully built (all components, all 15 English sections, all 9 S
 
 | Question | Context |
 |----------|---------|
-| Help center integration | Should MCP docs be linked from help.itmplatform.com? If so, where? |
+| Help center integration | Should MCP docs be linked from helpcenter.itmplatform.com? If so, where? |
 | Video content | Would a short setup walkthrough video be valuable? |
 | Manifest generation in CI | Script needs ITM.API access. Options: (a) CI service API key, (b) commit generated manifest. |
 | Audit log visibility | `revoke-and-audit` section promises users can see AI changes. Is there a UI/API exposing `tblMcpAuditLog`? |

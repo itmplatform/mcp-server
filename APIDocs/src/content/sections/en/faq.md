@@ -24,6 +24,6 @@ Yes. Each user authenticates independently with their own API key or OAuth token
 
 ### Where can I find more help?
 
-- For ITM Platform questions: [help.itmplatform.com](https://help.itmplatform.com)
+- For ITM Platform questions: [helpcenter.itmplatform.com](https://helpcenter.itmplatform.com)
 - For REST API access without an AI assistant: [developers.itmplatform.com/documentation](https://developers.itmplatform.com/documentation)
 - For DataMart (GraphQL) queries: [developers.itmplatform.com/datamart](https://developers.itmplatform.com/datamart)

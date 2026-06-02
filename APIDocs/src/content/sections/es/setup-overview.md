@@ -2,13 +2,15 @@ Hay dos formas de conectar tu asistente de IA a ITM Platform. Elige la que mejor
 
 ### Conectar con OAuth (recomendado)
 
-Agrega una sola URL a tu cliente de IA. La primera vez que lo uses, se abre una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform. Sin instalacion, sin clave API, sin variables de entorno.
+Agrega una sola URL a tu cliente de IA. Luego abre MCP en el cliente -- escribe `/mcp` donde se admitan comandos con barra -- selecciona `itm-platform` y autenticate con tus credenciales de ITM Platform. Sin instalacion, sin clave API, sin variables de entorno.
 
 **Solo necesitas una linea:**
 
 ```
 https://api.itmplatform.com/v2/_/mcp/
 ```
+
+Despues de agregar la URL, usa `/mcp` o la lista de servidores MCP de tu cliente para conectarte a `itm-platform` y completar el inicio de sesion OAuth.
 
 **Ideal para:** la mayoria de los usuarios. Funciona con Claude Code, Claude Desktop, Cursor, VS Code y cualquier cliente MCP que soporte servidores remotos.
 
@@ -19,6 +21,8 @@ Instala el servidor MCP en tu ordenador via npm. Tu cliente de IA inicia el serv
 ```bash
 npx @itm-platform/mcp-server
 ```
+
+Despues de configurar el servidor local, reinicia tu cliente de IA y usa `/mcp` o la lista de servidores MCP del cliente para confirmar que `itm-platform` esta conectado.
 
 **Ideal para:** usuarios que prefieren acceso sin conexion, trabajan detras de un firewall o necesitan control total sobre el servidor.
 

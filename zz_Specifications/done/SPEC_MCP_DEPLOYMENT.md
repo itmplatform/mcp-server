@@ -430,7 +430,7 @@ Each marketplace has its own format, but all need the same core content:
 **Links:**
 - Documentation: `https://developers.itmplatform.com/mcp`
 - npm: `https://www.npmjs.com/package/itm-mcp`
-- Support: `https://help.itmplatform.com`
+- Support: `https://helpcenter.itmplatform.com`
 
 ### 4.4 OAuth Client Registration for Marketplaces
 

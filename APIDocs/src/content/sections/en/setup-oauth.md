@@ -12,9 +12,9 @@ https://api.itmplatform.com/v2/_/mcp/
 
 The exact format varies by client. See [Setup by AI Client](#ai-clients) below for copy-paste instructions for Claude, VS Code, Cursor, Codex, Windsurf, and more.
 
-### Step 2: Authorize
+### Step 2: Open MCP and authorize
 
-The first time you use the connection, your AI client opens a browser window. Log in with your ITM Platform credentials and grant access. The AI client receives a token that lets it act on your behalf.
+After adding the server, open your AI client and type `/mcp` where slash commands are supported. Select `itm-platform`; the client opens a browser window so you can log in with your ITM Platform credentials and grant access. The AI client receives a token that lets it act on your behalf.
 
 ### Step 3: Start asking questions
 

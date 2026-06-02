@@ -438,7 +438,7 @@ The MCP docs should link to the REST API and DataMart docs where relevant (e.g.,
 
 | Question | Context |
 |----------|---------|
-| Help center integration | Should the MCP docs be linked from the ITM Platform help center (help.itmplatform.com)? If so, where? |
+| Help center integration | Should the MCP docs be linked from the ITM Platform help center (helpcenter.itmplatform.com)? If so, where? |
 | Video content | Would a short setup walkthrough video be valuable? If so, embed in the `setup-overview` section. |
 | Manifest generation in CI | The manifest script needs ITM.API access. Options: (a) give CI a service API key, (b) commit the generated manifest and regenerate manually when tools change. Which approach? |
 | Audit log visibility | The `revoke-and-audit` section promises users can see what the AI changed. Is there currently a UI or API endpoint exposing `tblMcpAuditLog` entries to users, or does this need to be built? If it needs building, that is a dependency outside this spec. |
