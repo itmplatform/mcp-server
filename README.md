@@ -66,17 +66,25 @@ To create an API key, log in to ITM Platform, open **My Profile**, and generate 
 
 After configuring the local server, restart your AI client and use `/mcp` or the client's MCP server list to confirm `itm-platform` is connected.
 
-## What You Can Ask
+## What Can an Agent Do?
 
-Once connected, your AI assistant can use ITM Platform data in normal conversation:
+From simple lookups to fully automated cross-system workflows, MCP unlocks progressively more powerful use cases.
 
-> "Which projects are behind schedule?"
+**Quick lookup** -- Ask a question, get an answer:
 
-> "Give me a budget summary for the Digital Transformation program."
+> "What risks are open across my portfolio?"
 
-> "Create a high-priority task in Project Alpha due next Friday."
+**Multi-step analysis** -- The agent chains multiple tools and synthesizes results:
 
-> "What open risks exist across my portfolio?"
+> "Review every project ending this quarter. Flag any with budget overruns, open high-impact risks, or task completion below 60%."
+
+**Automated bulk actions** -- The agent reads, decides, and writes across projects:
+
+> "For every project still in Planning status with a start date in the past, update the status to Execution and create a kick-off checklist task assigned to the project manager."
+
+**Scheduled intelligence** -- An agent runs on a schedule with no human prompt, pulling overdue tasks every Monday and posting a summary to Slack grouped by project manager.
+
+**Cross-system orchestration** -- Combine ITM Platform's MCP with other MCP servers (GitHub, Slack, Google Calendar, email). When a developer merges a PR, an agent finds the matching ITM Platform task, marks it complete, and if the project hits 100%, drafts a closure summary and emails the program manager.
 
 The MCP server authenticates as you, calls ITM Platform APIs, and returns only the data your ITM Platform account is allowed to access.
 
