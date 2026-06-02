@@ -1,6 +1,6 @@
 {
   "name": "@itm-platform/mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for ITM Platform",
   "type": "module",
   "main": "dist/server.js",
@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "dev": "cross-env PORT=6170 node --env-file=.env --import tsx src/server.ts",
-    "build": "tsc",
+    "build": "node scripts/increase-package-version.mjs && tsc",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",

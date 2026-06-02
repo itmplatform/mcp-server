@@ -1,233 +1,225 @@
-# ITM.MCP
+# ITM Platform MCP Server
 
-> For cross-cutting documentation (debugging, database schema, environments, API versioning, build commands), see the [parent README](../README.md#documentation-index).
+Connect ITM Platform to AI assistants through the [Model Context Protocol](https://modelcontextprotocol.io). The ITM Platform MCP server lets MCP-compatible clients search projects, inspect budgets, summarize portfolio health, create tasks, log risks and issues, and update project details using your ITM Platform permissions.
 
-MCP (Model Context Protocol) server for ITM Platform. Exposes project management data to AI assistants -- Claude, ChatGPT, VS Code Copilot, Cursor, JetBrains -- through a universal open protocol.
+It works with Claude, VS Code, Cursor, OpenAI Codex, Windsurf, JetBrains AI Assistant, and any other client that supports MCP.
 
-**Status:** Phase 2 in progress -- 20 tools (15 read + 5 write), 6 resources, 4 prompts. OAuth scope enforcement, audit logging, and token exchange in place. 137 unit tests, 23 E2E tests.
+- Public docs: [developers.itmplatform.com/mcp](https://developers.itmplatform.com/mcp/)
+- npm package: [@itm-platform/mcp-server](https://www.npmjs.com/package/@itm-platform/mcp-server)
+- Hosted MCP URL: `https://api.itmplatform.com/v2/_/mcp/`
 
-See [House Rules](../House-rules.md) for coding conventions.
+## Quick Start
 
-## How it works
+### Hosted connection with OAuth
 
-MCP is a JSON-RPC 2.0 protocol that lets AI assistants discover and call tools on external servers. The server supports two transports:
-
-- **HTTP + OAuth (recommended)** -- AI clients connect to a hosted URL and authenticate via OAuth 2.1 (PKCE). No local install needed.
-- **stdio** -- AI clients spawn the server as a local child process. Auth via API key.
-
-```
-AI Client (Claude, Cursor, VS Code, Codex...)
-  |
-  |  HTTP (remote) or stdio (local)
-  v
-ITM.MCP Server
-  |  authenticates as the user, calls ITM APIs
-  v
-ITM.API Gateway --> DataMart (GraphQL) + v2 REST (users, reference data)
-```
-
-**Key point:** The AI model never sees user credentials. Auth is handled by the MCP server. The model only sees tool names, descriptions, and results.
-
-### Three MCP primitives
-
-| Primitive | Who controls it | What it does | Example |
-|-----------|----------------|--------------|---------|
-| **Tools** | AI model decides when to call | Executable read/write operations | `search_projects`, `get_project_budget` |
-| **Resources** | Client app loads as context | Read-only reference data (schemas, docs) | `itm://schema/component` |
-| **Prompts** | User triggers a workflow template | Pre-composed multi-tool request | `/project_status` fetches project + tasks + risks + budget in one shot |
-
-## Quick start
-
-```bash
-npm install
-cp .env.sample .env   # edit with your credentials
-npm test              # unit tests (124 tests)
-npm run build         # compile TypeScript to dist/
-npm run dev           # HTTP dev server on port 6170 (for testing with curl)
-npm run test:e2e      # E2E tests (requires local ITM.API + DataMart)
-```
-
-## End-user setup
-
-For end-user setup instructions (OAuth, per-client configuration, npm package), see the [APIDocs site](APIDocs/).
-
-**Quick connect (OAuth):**
+Use the hosted server if your AI client supports remote MCP servers. There is nothing to install: add the URL, sign in with your ITM Platform account, and approve the requested access.
 
 ```bash
 claude mcp add --scope user --transport http itm-platform https://api.itmplatform.com/v2/_/mcp/
 ```
 
-**Quick connect (npm, local):**
+For other MCP clients, use this remote URL:
+
+```text
+https://api.itmplatform.com/v2/_/mcp/
+```
+
+OAuth is the recommended setup for most users because your AI client never sees your ITM Platform password or API key.
+
+### Local connection with an API key
+
+Use the npm package if you prefer to run the server locally, work behind a firewall, or need to connect to a self-hosted ITM Platform instance.
 
 ```bash
-claude mcp add --scope user itm-platform -- npx @itm-platform/mcp-server
+npx @itm-platform/mcp-server
 ```
 
-## Server configuration (development / deployment)
+Your MCP client must pass these environment variables to the server:
 
-| Variable | Stdio | HTTP+OAuth | Description |
-|----------|-------|------------|-------------|
-| `ITM_API_URL` | Required | Required | ITM.API base URL |
-| `ITM_COMPANY` | Required | -- | Company/tenant slug |
-| `ITM_API_KEY` | Required* | -- | Per-user API key (generate from My Profile) |
-| `ITM_TOKEN` | Required* | -- | Session token (alternative to API key) |
-| `PORT` | -- | Required | HTTP listen port |
-| `ITM_AUTH_URL` | -- | Required | Internal OAuth authorization server URL (used for token exchange) |
-| `ITM_AUTH_PUBLIC_URL` | -- | Required* | Public OAuth URL advertised to AI clients. Falls back to `ITM_AUTH_URL` |
-| `MCP_SERVER_URL` | -- | Required | MCP server public URL (OAuth audience) |
-| `LOG_LEVEL` | Optional | Optional | Pino log level: `debug`, `info`, `warn`, `error` (default: `info`) |
-| `ITM_AUDIT_ENABLED` | Optional | Optional | Enable audit logging to ITM backend |
+| Variable | Value |
+|----------|-------|
+| `ITM_API_URL` | `https://api.itmplatform.com` |
+| `ITM_COMPANY` | Your company/account slug |
+| `ITM_API_KEY` | Your personal API key from ITM Platform |
 
-\* One of `ITM_API_KEY` or `ITM_TOKEN` is required for stdio mode.
+Example stdio configuration:
 
-In HTTP mode, if both `ITM_AUTH_URL` and `MCP_SERVER_URL` are set, OAuth is mandatory and every session must provide a Bearer token. If either is missing, the server runs in dev mode using the startup identity.
-
-On deployed environments, `ITM_AUTH_URL` points to `localhost` for internal server-to-server token exchange. `ITM_AUTH_PUBLIC_URL` must be set to the public URL so AI clients can discover the OAuth authorization server.
-
-## Tools (Phase 1 -- read-only)
-
-### DataMart-backed (fast, single-query reads)
-
-| Tool | Description |
-|------|-------------|
-| `search_projects` | Find projects by name, status, type, date range |
-| `search_services` | Find services by name, status, type, date range |
-| `get_project` | Full project details with optional subcomponents (tasks, risks, budget, etc.) |
-| `get_service` | Full service details with optional subcomponents |
-| `list_project_tasks` | Tasks for a project |
-| `get_project_risks` | Risks for a project |
-| `get_project_issues` | Issues for a project |
-| `get_project_budget` | Budget summary (top-down, bottom-up, actual, period-end close) |
-| `get_project_purchases` | Purchase orders for a project |
-| `get_project_revenues` | Revenue items for a project |
-| `aggregate_portfolio` | Portfolio analytics -- group, count, sum, avg across all projects |
-| `query_datamart` | Raw DataMart query for advanced analysis (validated, safe operators only) |
-
-### v2 REST-backed (users, reference data)
-
-| Tool | Description |
-|------|-------------|
-| `search_users` | Find team members |
-| `get_user` | User details |
-| `get_reference_data` | Status lists, types, priorities for any entity |
-
-### Write tools (Phase 2 -- v2 REST-backed)
-
-| Tool | Description |
-|------|-------------|
-| `create_task` | Create a new task in a project |
-| `update_task` | PATCH task fields (status, dates, assignee, progress) |
-| `create_risk` | Log a new risk in a project |
-| `create_issue` | Log a new issue in a project |
-| `update_project` | PATCH project fields (name, status, dates, priority) |
-
-Write tools return confirmed state from v2 REST (source of truth). Subsequent DataMart reads may lag 5-60 seconds due to eventual consistency -- this is noted in every write response.
-
-## Prompts
-
-Workflow templates the user can trigger. The MCP server returns a pre-composed message that instructs the AI to call the right tools.
-
-| Prompt | What it does |
-|--------|-------------|
-| `/project_status` | Fetches project + tasks + risks + budget, asks AI to summarize |
-| `/portfolio_overview` | Aggregates projects by status/methodology/budget, asks AI for health overview |
-| `/team_workload` | Fetches users + assignments, asks AI for workload analysis |
-| `/risk_analysis` | Fetches risks + issues + budget, asks AI for risk assessment |
-
-## Architecture
-
-```
-src/
-  server.ts                # MCP server bootstrap (stdio + HTTP, per-session auth)
-  instrument-server.ts     # Tool-call logging + audit wrapper (wraps registerTool)
-  logger.ts                # Pino logger factory (stderr + rotating file in logs/mcp.log)
-  auth/
-    effective-user-context.ts  # User identity type
-    api-key-auth.ts            # API key auth, calls /resolve/identity
-    license-resolver.ts        # License type -> access level
-    oauth-auth.ts              # Phase 2: OAuth token exchange
-    oauth-metadata.ts          # Phase 2: /.well-known/oauth-protected-resource
-    token-extraction.ts        # Bearer token extraction from headers
-  clients/
-    datamart-client.ts     # DataMart GraphQL through gateway
-    rest-client.ts         # v2 REST through gateway (GET, POST, PATCH)
-    audit-client.ts        # Phase 2: audit logging (fire-and-forget)
-  tools/                   # One file per tool group
-    write-tools.ts         # Phase 2: create/update tools (task, risk, issue, project)
-  resources/               # Schema + calendar resources
-  prompts/                 # Workflow templates
-  validation/
-    query-validator.ts     # Allowlist of safe MongoDB operators
+```json
+{
+  "mcpServers": {
+    "itm-platform": {
+      "command": "npx",
+      "args": ["@itm-platform/mcp-server"],
+      "env": {
+        "ITM_API_URL": "https://api.itmplatform.com",
+        "ITM_COMPANY": "{your-account}",
+        "ITM_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
 ```
 
-## Access control
+To create an API key, log in to ITM Platform, open **My Profile**, and generate a key from the **API Key** section.
 
-| License type | Access |
-|-------------|--------|
-| CompanyAdmin | Full |
-| FullUser | Full |
-| ProjectManager | Blocked in Phase 1 (requires gateway PM-scope injection -- Phase 2) |
-| TeamMember | Blocked |
+## What You Can Ask
 
-**OAuth scope enforcement:** OAuth sessions respect granted scopes. Sessions with `mcp:read` only see 15 read tools; `mcp:write` is required to see and use write tools. API-key/stdio sessions get all tools unconditionally (backward compatible).
+Once connected, your AI assistant can use ITM Platform data in normal conversation:
 
-## Logging
+> "Which projects are behind schedule?"
 
-Uses [Pino](https://getpino.io/) (same as DataMart and MSTeamsBot). Logs go to two destinations:
+> "Give me a budget summary for the Digital Transformation program."
 
-- **stderr** -- pretty-printed, colorized (stdout is reserved for the MCP JSON-RPC protocol)
-- **`logs/mcp.log`** -- rotating file relative to the MCP application root, 10 MB max, keeps 5 old files (skipped in test)
+> "Create a high-priority task in Project Alpha due next Friday."
 
-Set `LOG_LEVEL` in `.env` to control verbosity (`debug`, `info`, `warn`, `error`; default: `info`). All log entries include `{ service: 'mcp', app: 'ITM.MCP' }` base fields and ISO timestamps.
+> "What open risks exist across my portfolio?"
 
-HTTP clients (DataMart, REST) log at `debug` level on success (with duration in ms) and `error` on failure.
+The MCP server authenticates as you, calls ITM Platform APIs, and returns only the data your ITM Platform account is allowed to access.
 
-**Tool-call logging:** Every MCP tool invocation is logged at `info` level with tool name, userId, and aiClientId. Completion is logged at `debug` with duration in ms. Failures are logged at `error`.
+## Capabilities
 
-**Audit:** When `ITM_AUDIT_ENABLED=true`, every tool call (read and write) sends an audit entry to the ITM backend (`/v2/{company}/mcp/audit`). Audit is fire-and-forget -- failures do not affect tool execution. Each entry includes: timestamp, userId, accountId, toolName, parametersHash (SHA-256), success, error (if any), aiClientId, durationMs.
+The server exposes 20 MCP tools, 6 resources, and 4 prompt templates.
 
-## Deployment and publishing
+### Read Tools
 
-This repo has two remotes and two CI pipelines:
+| Tool | What it does |
+|------|--------------|
+| `search_projects` | Find projects by name, status, type, or date range |
+| `get_project` | Retrieve project details, including optional tasks, risks, issues, budget, purchases, and revenues |
+| `search_services` | Find services by name, status, type, or date range |
+| `get_service` | Retrieve service details |
+| `list_project_tasks` | List tasks for a project |
+| `get_project_budget` | Get budget, actuals, revenue, cost, and margin information |
+| `get_project_purchases` | List purchase orders for a project |
+| `get_project_revenues` | List revenue items for a project |
+| `get_project_risks` | List project risks |
+| `get_project_issues` | List project issues |
+| `aggregate_portfolio` | Group and summarize portfolio data |
+| `query_datamart` | Run validated DataMart queries for advanced analysis |
+| `search_users` | Find users and team members |
+| `get_user` | Retrieve user details |
+| `get_reference_data` | Retrieve statuses, types, priorities, and other reference lists |
 
-| Remote | Branch | What happens |
-|--------|--------|-------------|
-| Azure DevOps (`origin`) | `stage` | Build, test, deploy to stage VM via PM2 |
-| Azure DevOps (`origin`) | `main` | Build, test, deploy to prod VM via PM2 |
-| GitHub (`github`) | `main` | Build, test, publish to npm (if version changed) |
+### Write Tools
 
-### Workflow
+| Tool | What it does |
+|------|--------------|
+| `create_task` | Add a task to a project |
+| `update_task` | Update task fields such as status, dates, assignee, and progress |
+| `create_risk` | Log a project risk |
+| `create_issue` | Log a project issue |
+| `update_project` | Update project fields such as name, status, dates, and priority |
 
-```
-develop ──push──> stage (Azure DevOps only, deploy to stage)
-develop ──push──> main  (Azure DevOps + GitHub, deploy to prod + publish to npm)
-```
+Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
 
-**Deploy to stage** (no npm publish):
+### Resources and Prompts
+
+Resources give AI clients read-only context such as DataMart schemas and project calendars. Prompt templates provide guided workflows for common analysis tasks:
+
+| Prompt | What it helps with |
+|--------|--------------------|
+| `/project_status` | Summarize health, tasks, risks, issues, and budget for one project |
+| `/portfolio_overview` | Analyze portfolio status, methodology, budget, and delivery patterns |
+| `/team_workload` | Review assignments and workload patterns |
+| `/risk_analysis` | Assess risk exposure, issues, and budget impact |
+
+## Authentication and Permissions
+
+The MCP server uses the same identity and permission model as ITM Platform.
+
+| Connection method | Authentication | Best for |
+|-------------------|----------------|----------|
+| Hosted HTTP | OAuth 2.1 with PKCE | Most users and managed AI clients |
+| Local stdio | ITM Platform API key | Local execution, firewalled networks, self-hosted environments |
+
+OAuth sessions use scopes:
+
+| Scope | Allows |
+|-------|--------|
+| `mcp:read` | Read-only tools such as search, get, list, aggregate, and query |
+| `mcp:write` | Read tools plus create and update tools |
+
+API key sessions use the full permissions of the ITM Platform user who generated the key.
+
+License access:
+
+| License | MCP access |
+|---------|------------|
+| Company Admin | Full read and write access |
+| Full User | Full read and write access |
+| Project Manager | Not yet available |
+| Team Member | Blocked |
+
+Your AI assistant does not receive your ITM Platform password or API key. Project data is returned to the AI client you choose, so the AI provider's data-handling policy applies to any data it processes.
+
+## Client Setup
+
+Use the public docs for client-specific setup:
+
+- [Claude Code, Claude Desktop, VS Code, Cursor, Codex, Windsurf, and JetBrains](https://developers.itmplatform.com/mcp/#ai-clients)
+- [Connect with OAuth](https://developers.itmplatform.com/mcp/#setup-oauth)
+- [Connect with an API key](https://developers.itmplatform.com/mcp/#setup-stdio)
+- [Troubleshooting](https://developers.itmplatform.com/mcp/#troubleshooting)
+
+For any MCP-compatible client, the two connection values are:
+
+| Method | Value |
+|--------|-------|
+| Remote URL | `https://api.itmplatform.com/v2/_/mcp/` |
+| Local command | `npx @itm-platform/mcp-server` |
+
+## Self-Hosting
+
+For a local stdio server, configure `ITM_API_URL`, `ITM_COMPANY`, and either `ITM_API_KEY` or `ITM_TOKEN`.
+
+For an HTTP server with OAuth, configure:
+
+| Variable | Description |
+|----------|-------------|
+| `ITM_API_URL` | ITM Platform API gateway URL |
+| `PORT` | HTTP listen port |
+| `ITM_AUTH_URL` | OAuth authorization server URL used for token exchange |
+| `ITM_AUTH_PUBLIC_URL` | Public OAuth URL advertised to AI clients |
+| `MCP_SERVER_URL` | Public MCP server URL used as the OAuth audience |
+| `LOG_LEVEL` | Optional Pino log level: `debug`, `info`, `warn`, or `error` |
+| `ITM_AUDIT_ENABLED` | Enables server-side audit logging when set to `true` |
+
+When deployed behind a reverse proxy, `ITM_AUTH_URL` can point to a server-to-server address while `ITM_AUTH_PUBLIC_URL` must be reachable by AI clients.
+
+## Development
+
+Requirements:
+
+- Node.js 20 or later
+- npm
+
+Install dependencies, run tests, and build:
+
 ```bash
-.\merge-develop-into.bat stage
+npm install
+npm test
+npm run build
 ```
 
-**Deploy to prod + publish to npm:**
-1. Bump the version in `package.json` (e.g., `1.0.0` -> `1.1.0`)
-2. Commit and push to `develop`
-3. Run:
+Run the HTTP development server:
+
 ```bash
-.\merge-develop-into.bat main
+cp .env.sample .env
+npm run dev
 ```
 
-This pushes to both Azure DevOps (triggers prod deployment) and GitHub (triggers npm publish). The GitHub Actions workflow checks if the version is already published and skips if so -- only version bumps result in a new npm release.
+The package entry point is `dist/server.js`; the npm executable is `mcp-server`.
 
-### npm package
+## Troubleshooting
 
-Published as [`@itm-platform/mcp-server`](https://www.npmjs.com/package/@itm-platform/mcp-server) via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers/) -- no npm tokens are stored or rotated. GitHub Actions proves its identity to npm directly via OpenID Connect.
+If tools do not appear in your AI client, confirm that the server configuration is in the correct file for that client, restart the client, and check that `npx @itm-platform/mcp-server` runs successfully for local setups.
 
-- GitHub repo: https://github.com/itmplatform/mcp-server
-- npm package: https://www.npmjs.com/package/@itm-platform/mcp-server
-- Workflow: [.github/workflows/npm-publish.yml](.github/workflows/npm-publish.yml)
+If authentication fails, regenerate your API key or reconnect the OAuth server so your client receives a fresh token.
 
-## Specification
+If a write succeeds but a later search shows old data, wait up to 60 seconds. Writes are confirmed from the REST API immediately, while DataMart search indexes update asynchronously.
 
-Full design, architecture decisions, phased rollout, and E2E test details:
+## More Help
 
-- [SPEC_MCP_SERVER.md](zz_Specifications/SPEC_MCP_SERVER.md)
+- MCP docs: [modelcontextprotocol.io](https://modelcontextprotocol.io)
+- ITM Platform help: [help.itmplatform.com](https://help.itmplatform.com)
+- ITM Platform developer docs: [developers.itmplatform.com/documentation](https://developers.itmplatform.com/documentation)
