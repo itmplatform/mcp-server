@@ -212,6 +212,7 @@ export function ConfigPanel({ companySlug }: ConfigPanelProps) {
           {client.filePath.note && (
             <p>{client.filePath.note}</p>
           )}
+          <p>{t('config.postSetup')}</p>
         </div>
       </div>
     </div>

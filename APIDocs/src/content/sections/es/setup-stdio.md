@@ -27,7 +27,7 @@ Consulta [Configuracion por cliente de IA](#ai-clients) para la configuracion ex
 
 ### Paso 3: Verifica la conexion
 
-Despues de agregar la configuracion, reinicia tu cliente de IA. Luego haz una pregunta como:
+Despues de agregar la configuracion, reinicia tu cliente de IA. Escribe `/mcp` donde se admitan comandos con barra, o abre la lista de servidores MCP del cliente, y confirma que `itm-platform` esta conectado. Luego haz una pregunta como:
 
 > "Cuantos proyectos tengo en ITM Platform?"
 

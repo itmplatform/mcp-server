@@ -2,10 +2,9 @@
 
 Para que tu cliente de IA deje de acceder a ITM Platform, elimina el servidor MCP de la configuracion del cliente:
 
-**Claude Code:**
-```bash
-claude mcp remove itm-platform
-```
+**Claude Code:** Ejecuta `claude mcp remove itm-platform`.
+
+**OpenAI Codex:** Ejecuta `codex mcp remove itm-platform`.
 
 **Claude Desktop:** Ve a **Settings > Connectors**, busca la entrada de ITM Platform y eliminala.
 

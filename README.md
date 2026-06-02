@@ -26,6 +26,8 @@ https://api.itmplatform.com/v2/_/mcp/
 
 OAuth is the recommended setup for most users because your AI client never sees your ITM Platform password or API key.
 
+After adding the server, open your AI client, type `/mcp` where slash commands are supported, select `itm-platform`, and complete the ITM Platform OAuth login when prompted.
+
 ### Local connection with an API key
 
 Use the npm package if you prefer to run the server locally, work behind a firewall, or need to connect to a self-hosted ITM Platform instance.
@@ -61,6 +63,8 @@ Example stdio configuration:
 ```
 
 To create an API key, log in to ITM Platform, open **My Profile**, and generate a key from the **API Key** section.
+
+After configuring the local server, restart your AI client and use `/mcp` or the client's MCP server list to confirm `itm-platform` is connected.
 
 ## What You Can Ask
 
@@ -168,6 +172,8 @@ For any MCP-compatible client, the two connection values are:
 | Remote URL | `https://api.itmplatform.com/v2/_/mcp/` |
 | Local command | `npx @itm-platform/mcp-server` |
 
+After adding either connection, open the client's MCP command or server list. In clients that support slash commands, type `/mcp`, select `itm-platform`, and authenticate when prompted.
+
 ## Self-Hosting
 
 For a local stdio server, configure `ITM_API_URL`, `ITM_COMPANY`, and either `ITM_API_KEY` or `ITM_TOKEN`.
@@ -221,5 +227,5 @@ If a write succeeds but a later search shows old data, wait up to 60 seconds. Wr
 ## More Help
 
 - MCP docs: [modelcontextprotocol.io](https://modelcontextprotocol.io)
-- ITM Platform help: [help.itmplatform.com](https://help.itmplatform.com)
+- ITM Platform help: [helpcenter.itmplatform.com](https://helpcenter.itmplatform.com)
 - ITM Platform developer docs: [developers.itmplatform.com/documentation](https://developers.itmplatform.com/documentation)

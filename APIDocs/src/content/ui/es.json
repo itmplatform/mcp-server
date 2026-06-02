@@ -8,6 +8,7 @@
   "copy.button": "Copiar",
   "copy.done": "Copiado!",
   "config.hostedMode": "Alojado (OAuth) -- sin clave API",
+  "config.postSetup": "Despues de agregar el servidor, escribe /mcp donde se admita, selecciona itm-platform y autenticate cuando se te solicite.",
   "tools.searchPlaceholder": "Buscar herramientas...",
   "tools.allCategories": "Todas las categorias",
   "tools.noResults": "No se encontraron herramientas.",

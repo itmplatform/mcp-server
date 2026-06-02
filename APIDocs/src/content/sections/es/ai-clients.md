@@ -2,6 +2,8 @@ Hay dos formas de conectarse: **OAuth** (recomendado) se conecta al servidor alo
 
 Elige tu cliente de IA a continuacion. Cada uno muestra ambos metodos.
 
+Despues de agregar el servidor, abre MCP en tu cliente -- escribe `/mcp` donde se admitan comandos con barra -- selecciona `itm-platform` y autenticate cuando se te solicite.
+
 ---
 
 ### Claude Code
@@ -12,7 +14,7 @@ Elige tu cliente de IA a continuacion. Cada uno muestra ambos metodos.
 claude mcp add --scope user --transport http itm-platform https://api.itmplatform.com/v2/_/mcp/
 ```
 
-El flag `--scope user` hace que el servidor este disponible en todos tus proyectos. Claude Code gestiona OAuth automaticamente -- tu navegador se abrira para iniciar sesion la primera vez que se llame a una herramienta.
+El flag `--scope user` hace que el servidor este disponible en todos tus proyectos. Luego escribe `/mcp`, selecciona `itm-platform` y completa el inicio de sesion de ITM Platform cuando se te solicite.
 
 **Clave API (local):**
 
@@ -35,6 +37,8 @@ https://api.itmplatform.com/v2/_/mcp/
 ```
 
 Claude Desktop gestiona el flujo OAuth automaticamente. Disponible en planes Pro, Max, Team y Enterprise.
+
+Despues de agregar el conector, escribe `/mcp`, selecciona el conector de ITM Platform y autenticate cuando se te solicite.
 
 **Clave API (local):**
 
@@ -75,6 +79,8 @@ Edita tu archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json`
 
 Tambien puedes agregar servidores desde **Command Palette > MCP: Add Server**.
 
+Despues de agregar el servidor, abre Copilot Chat, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+
 **Clave API (local):**
 
 ```json
@@ -112,6 +118,8 @@ Crea o edita `.cursor/mcp.json` en la raiz de tu proyecto (o `~/.cursor/mcp.json
 }
 ```
 
+Despues de agregar el servidor, reinicia Cursor, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+
 **Clave API (local):**
 
 ```json
@@ -147,6 +155,8 @@ O agrega manualmente a `~/.codex/config.toml`:
 url = "https://api.itmplatform.com/v2/_/mcp/"
 ```
 
+Despues de agregar el servidor, inicia Codex, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+
 ---
 
 ### Windsurf
@@ -164,6 +174,8 @@ Edita `~/.codeium/windsurf/mcp_config.json` (o `%USERPROFILE%\.codeium\windsurf\
   }
 }
 ```
+
+Despues de agregar el servidor, reinicia Windsurf, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
 
 **Clave API (local):**
 
@@ -191,6 +203,8 @@ Ve a **Settings > Tools > AI Assistant > Model Context Protocol (MCP)** y haz cl
 
 **OAuth (recomendado):** selecciona el protocolo HTTP e introduce `https://api.itmplatform.com/v2/_/mcp/`.
 
+Despues de agregar el servidor, abre AI Assistant, escribe `/mcp` donde se admitan comandos con barra, o abre el panel de servidores MCP. Selecciona `itm-platform` y autenticate cuando se te solicite.
+
 **Clave API (local):** selecciona el protocolo stdio y usa el comando `npx @itm-platform/mcp-server` con las variables de entorno requeridas.
 
 ---
@@ -204,11 +218,13 @@ Cualquier cliente que implemente el [Model Context Protocol](https://modelcontex
 | **URL remota (OAuth)** | `https://api.itmplatform.com/v2/_/mcp/` |
 | **Comando local (Clave API)** | `npx @itm-platform/mcp-server` |
 
+Despues de agregar el servidor, usa el comando MCP o la lista de servidores del cliente. Si el cliente admite comandos con barra, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+
 ---
 
 ### Sobre OAuth
 
-La primera vez que te conectes via OAuth, tu cliente de IA abrira una ventana del navegador. Inicia sesion con tus credenciales de ITM Platform y concede el acceso. El cliente de IA recibe un token con alcance limitado:
+La primera vez que te conectes via OAuth, abre MCP en tu cliente y selecciona `itm-platform`. En clientes que admiten comandos con barra, escribe `/mcp`. El cliente abre una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform y concedas el acceso. El cliente de IA recibe un token con alcance limitado:
 
 | Alcance | Que permite |
 |---------|-------------|

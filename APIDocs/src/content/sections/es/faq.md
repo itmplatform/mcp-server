@@ -24,6 +24,6 @@ Si. Cada usuario se autentica de forma independiente con su propia clave API o t
 
 ### Donde puedo encontrar mas ayuda?
 
-- Para preguntas sobre ITM Platform: [help.itmplatform.com](https://help.itmplatform.com)
+- Para preguntas sobre ITM Platform: [helpcenter.itmplatform.com](https://helpcenter.itmplatform.com)
 - Para acceso REST API sin asistente de IA: [developers.itmplatform.com/documentation](https://developers.itmplatform.com/documentation)
 - Para consultas DataMart (GraphQL): [developers.itmplatform.com/datamart](https://developers.itmplatform.com/datamart)

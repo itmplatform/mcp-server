@@ -12,9 +12,9 @@ https://api.itmplatform.com/v2/_/mcp/
 
 El formato exacto varia segun el cliente. Consulta [Configuracion por cliente de IA](#ai-clients) para instrucciones paso a paso para Claude, VS Code, Cursor, Codex, Windsurf y otros.
 
-### Paso 2: Autoriza
+### Paso 2: Abre MCP y autoriza
 
-La primera vez que uses la conexion, tu cliente de IA abrira una ventana del navegador. Inicia sesion con tus credenciales de ITM Platform y concede el acceso. El cliente de IA recibe un token que le permite actuar en tu nombre.
+Despues de agregar el servidor, abre tu cliente de IA y escribe `/mcp` donde se admitan comandos con barra. Selecciona `itm-platform`; el cliente abrira una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform y concedas el acceso. El cliente de IA recibe un token que le permite actuar en tu nombre.
 
 ### Paso 3: Empieza a preguntar
 
