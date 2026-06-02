@@ -6,5 +6,4 @@ dist/
 .claude
 nul
 NUL
-package-lock.json
 .playwright-mcp
