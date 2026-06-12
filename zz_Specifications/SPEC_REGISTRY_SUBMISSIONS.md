@@ -12,26 +12,29 @@ Before submitting anywhere, these gaps must be closed. Items marked **[Claude]**
 
 | # | Item | Status | Owner | Notes |
 |---|------|--------|-------|-------|
-| P1 | Add `LICENSE` file (MIT) to repo root | Pending | [Claude] | Required by Glama scoring, Cline, Smithery, mcp.directory. Also a trust signal on npm. |
-| P2 | Add `"license": "MIT"` to `package.json` | Pending | [Claude] | npm shows no license currently. |
-| P3 | Add `"keywords"` to `package.json` | Pending | [Claude] | `["mcp", "mcp-server", "project-management", "itm-platform", "ai", "model-context-protocol"]` |
-| P4 | Add `"mcpName"` to `package.json` | Pending | [Claude] | Required by official MCP registry. Value: `"io.github.itmplatform/mcp-server"` (must match `server.json` name). |
-| P5 | Create `server.json` at repo root | Pending | [Claude] | Required by official MCP registry. See section 2.1 for contents. |
-| P6 | Create 400x400 PNG logo | Pending | [Manual] | **Mandatory for Cline.** Nice-to-have for mcp.so and Smithery. Derive from the existing SVG in `APIDocs/public/assets/`. Needs a square crop with the icon mark (not the full horizontal wordmark). |
-| P7 | Republish npm with updated `package.json` | Pending | [Manual] | Push to `main` triggers the existing GitHub Actions workflow. Do this after P1-P4 land. |
+| P1 | Add `LICENSE` file (MIT) to repo root | **Done** | [Claude] | Committed to `develop`, merged to `main`. |
+| P2 | Add `"license": "MIT"` to `package.json` | **Done** | [Claude] | Committed to `develop`, merged to `main`. |
+| P3 | Add `"keywords"` to `package.json` | **Done** | [Claude] | `["mcp", "mcp-server", "project-management", "itm-platform", "ai", "model-context-protocol"]` |
+| P4 | Add `"mcpName"` to `package.json` | **Done** | [Claude] | Value: `"io.github.itmplatform/mcp-server"`. |
+| P5 | Create `server.json` at repo root | **Done** | [Claude] | Committed to `develop`, merged to `main`. |
+| P6 | Create 400x400 PNG logo | **Done** | [Manual] | `zz_Specifications/ITM-Platform-Logo-400px-squared.png` |
+| P7 | Republish npm with updated `package.json` | **Done** | [Manual] | Deployed to `main` on 2026-06-12. CI pipeline republished npm. |
 
 ### Current state
 
 | Asset | Status |
 |-------|--------|
 | Public GitHub repo | `github.com/itmplatform/mcp-server` |
-| npm package | `@itm-platform/mcp-server` v1.0.2, published with `--provenance` |
+| npm package | `@itm-platform/mcp-server`, published with `--provenance` |
 | Hosted remote URL | `https://api.itmplatform.com/v2/_/mcp/` |
 | Docs site | `https://developers.itmplatform.com/mcp/` |
 | OAuth (DCR + PKCE) | Implemented |
-| LICENSE file | **Missing** |
-| 400x400 PNG logo | **Missing** |
-| `server.json` | **Missing** |
+| LICENSE file | **Done** -- MIT, repo root |
+| 400x400 PNG logo | **Done** -- `zz_Specifications/ITM-Platform-Logo-400px-squared.png` |
+| `server.json` | **Done** -- repo root |
+| `mcpName` in package.json | **Done** -- `io.github.itmplatform/mcp-server` |
+| `keywords` in package.json | **Done** |
+| npm republished from `main` | **Done** -- 2026-06-12 |
 
 ---
 
@@ -43,74 +46,25 @@ Before submitting anywhere, these gaps must be closed. Items marked **[Claude]**
 
 **Submission method:** `mcp-publisher` CLI + `server.json` file + GitHub OAuth
 
-**Steps:**
+**Already done (no action needed):** `server.json` created and deployed, `mcpName` added to `package.json`, npm republished, and the `mcp-publisher.exe` CLI downloaded to `%USERPROFILE%\.mcp-publisher\`.
 
-1. Create `server.json` at repo root (see template below).
-2. Add `"mcpName": "io.github.itmplatform/mcp-server"` to `package.json`.
-3. Republish npm so the `mcpName` field is live.
-4. Install the CLI:
-   ```bash
-   # macOS
-   brew install mcp-publisher
-   # or download from GitHub releases
-   ```
-5. Authenticate:
-   ```bash
-   mcp-publisher login github
-   ```
-   This opens a browser OAuth flow. You must be logged into the `itmplatform` GitHub org.
-6. Validate:
-   ```bash
-   mcp-publisher validate
-   ```
-7. Publish:
-   ```bash
-   mcp-publisher publish
-   ```
-8. Verify:
-   ```bash
-   curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.itmplatform/mcp-server"
-   ```
+#### Your steps -- run these from the repo root
 
-**`server.json` template:**
+```powershell
+# 1. Authenticate (opens a browser; sign in to the itmplatform GitHub org)
+& "$env:USERPROFILE\.mcp-publisher\mcp-publisher.exe" login github
 
-```json
-{
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.itmplatform/mcp-server",
-  "title": "ITM Platform",
-  "description": "Connect AI assistants to ITM Platform project management -- projects, tasks, budgets, risks, and team workload.",
-  "version": "1.0.2",
-  "websiteUrl": "https://developers.itmplatform.com/mcp/",
-  "repository": {
-    "url": "https://github.com/itmplatform/mcp-server",
-    "source": "github"
-  },
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "@itm-platform/mcp-server",
-      "version": "1.0.2",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        { "name": "ITM_API_URL", "description": "ITM Platform API gateway URL", "required": true },
-        { "name": "ITM_COMPANY", "description": "Your company/account slug", "required": true },
-        { "name": "ITM_API_KEY", "description": "Your personal API key", "required": true }
-      ]
-    }
-  ],
-  "remotes": [
-    {
-      "transportType": "streamable-http",
-      "url": "https://api.itmplatform.com/v2/_/mcp/"
-    }
-  ]
-}
+# 2. Validate server.json
+& "$env:USERPROFILE\.mcp-publisher\mcp-publisher.exe" validate
+
+# 3. Publish to the registry
+& "$env:USERPROFILE\.mcp-publisher\mcp-publisher.exe" publish
+
+# 4. Verify it is live
+Invoke-RestMethod "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.itmplatform/mcp-server"
 ```
 
-**Owner:** Steps 1-3 are [Claude]. Steps 4-8 are [Manual] (CLI install + auth requires your GitHub session).
+**Gotcha -- namespace must match your login:** `server.json` claims the `io.github.itmplatform/...` namespace, so step 1 must authenticate as a member of the `itmplatform` GitHub org. If your account is not in that org, publish is rejected; either join the org or change the name to `io.github.<your-username>/mcp-server` in `server.json` first.
 
 **Can be CI-automated later:** Yes, via `mcp-publisher login github-oidc` in GitHub Actions.
 
@@ -229,8 +183,8 @@ Before submitting anywhere, these gaps must be closed. Items marked **[Claude]**
 3. Complete the publishing workflow
 
 **CLI approach:**
-```bash
-smithery mcp publish "https://api.itmplatform.com/v2/_/mcp/" -n @itm-platform/mcp-server
+```powershell
+npx @anthropic-ai/smithery mcp publish "https://api.itmplatform.com/v2/_/mcp/" -n @itm-platform/mcp-server
 ```
 
 **Optional:** Serve a static card at `/.well-known/mcp/server-card.json` with `serverInfo`, `authentication`, `tools`, `resources`, `prompts`. If omitted, Smithery auto-scans the server.
@@ -267,56 +221,53 @@ smithery mcp publish "https://api.itmplatform.com/v2/_/mcp/" -n @itm-platform/mc
 
 Recommended sequence, optimized for cascade effects (one listing triggering others):
 
-| Order | Registry | Depends on | Effort | Cascade effect |
-|-------|----------|------------|--------|----------------|
-| 1 | **Official MCP Registry** | P1-P5, P7 | Medium (CLI setup) | PulseMCP auto-ingests; Glama may auto-index |
-| 2 | **mcp.directory** | P1 (LICENSE) | Trivial (paste URL) | None, but fast approval |
-| 3 | **PulseMCP** | Wait ~1 week after #1 | Trivial or automatic | None |
-| 4 | **Smithery** | None | Low (web form or CLI) | Security scan = trust signal |
-| 5 | **mcp.so** | None | Low (web form) | High SEO value |
-| 6 | **Glama** | P1 (LICENSE) | Low (web form or auto) | Quality score visible to users |
-| 7 | **Cline Marketplace** | P6 (400x400 PNG) | Medium (Cline testing) | In-editor install button |
+| Order | Registry | Status | Effort | Cascade effect |
+|-------|----------|--------|--------|----------------|
+| 1 | **Official MCP Registry** | Ready -- run `mcp-publisher` | Medium (CLI setup) | PulseMCP auto-ingests; Glama may auto-index |
+| 2 | **mcp.directory** | Ready -- paste URL | Trivial (~1 min) | None, but fast approval |
+| 3 | **PulseMCP** | Wait until ~2026-06-19 | Trivial or automatic | None |
+| 4 | **Smithery** | Ready -- web form or CLI | Low (~5 min) | Security scan = trust signal |
+| 5 | **mcp.so** | Ready -- web form | Low (~5 min) | High SEO value |
+| 6 | **Glama** | Ready -- web form or auto | Low (~5 min) | Quality score visible to users |
+| 7 | **Cline Marketplace** | Ready -- GitHub issue + logo | Medium (~20 min) | In-editor install button |
 
 ---
 
 ## 4. What I Need From You
 
-### Decisions
+### Decisions (resolved)
 
-| # | Question | Default |
-|---|----------|---------|
-| D1 | License: MIT? | MIT (matches what SPEC_MCP_DEPLOYMENT.md assumed) |
-| D2 | MCP registry namespace: `io.github.itmplatform/mcp-server`? | Yes (matches GitHub org) |
+| # | Question | Decision |
+|---|----------|----------|
+| D1 | License: MIT? | **MIT** -- committed |
+| D2 | MCP registry namespace: `io.github.itmplatform/mcp-server`? | **Yes** -- committed in `server.json` and `package.json` |
 
-### Manual actions (cannot be automated)
+### Manual actions remaining
 
-| # | Action | When | Time |
-|---|--------|------|------|
-| M1 | Create 400x400 PNG logo from the ITM Platform icon | Before Cline submission | ~15 min in any image editor |
-| M2 | Install `mcp-publisher` CLI and run `login github` + `publish` | After P1-P5 land and npm is republished | ~10 min |
-| M3 | Fill mcp.so web form | After prerequisites | ~5 min |
-| M4 | Fill Glama web form (or wait for auto-index) | After prerequisites | ~5 min |
-| M5 | Submit PulseMCP form (if auto-ingest does not trigger) | 1 week after official registry | ~2 min |
-| M6 | Publish on Smithery (web or CLI) | After prerequisites | ~5 min |
-| M7 | Paste GitHub URL on mcp.directory | After LICENSE exists | ~1 min |
-| M8 | Create Cline GitHub issue + upload logo + test with Cline | After P6 (logo) | ~20 min |
+| # | Action | Status | Time |
+|---|--------|--------|------|
+| M1 | Create 400x400 PNG logo | **Done** -- `zz_Specifications/ITM-Platform-Logo-400px-squared.png` | -- |
+| M2 | Install `mcp-publisher` CLI and run `login github` + `publish` | **Ready** -- all prerequisites met | ~10 min |
+| M3 | Fill mcp.so web form at `https://mcp.so/submit` | **Ready** | ~5 min |
+| M4 | Fill Glama web form at `https://glama.ai/mcp/servers` (or wait for auto-index) | **Ready** | ~5 min |
+| M5 | Submit PulseMCP form at `https://pulsemcp.com/submit` (if auto-ingest does not trigger) | Wait until ~2026-06-19 | ~2 min |
+| M6 | Publish on Smithery at `https://smithery.ai/new` (web or CLI) | **Ready** | ~5 min |
+| M7 | Paste GitHub URL on `https://mcp.directory/submit` | **Ready** | ~1 min |
+| M8 | Create Cline GitHub issue + upload logo + test with Cline | **Ready** | ~20 min |
 
-**Total manual time estimate:** ~60-70 minutes, spread across a few days (waiting for approvals and auto-ingest).
+**Total manual time estimate:** ~50 minutes, spread across a few days (waiting for approvals and auto-ingest).
 
 ---
 
-## 5. What Claude Can Do Now
+## 5. Automated work (completed)
 
-With your go-ahead, I can create these files in a single commit:
+All automated prerequisites were committed to `develop`, merged to `main`, and npm was republished on 2026-06-12:
 
 1. **`LICENSE`** -- MIT license file at repo root
 2. **`server.json`** -- official MCP registry manifest at repo root
-3. **`package.json` updates:**
-   - Add `"license": "MIT"`
-   - Add `"mcpName": "io.github.itmplatform/mcp-server"`
-   - Add `"keywords": ["mcp", "mcp-server", "project-management", "itm-platform", "ai", "model-context-protocol"]`
+3. **`package.json` updates** -- `license`, `mcpName`, `keywords` fields added
 
-After these land and you push to `main`, the CI pipeline republishes npm with the updated metadata. Then you can start the submission sequence.
+The submission sequence can start immediately.
 
 ---
 
