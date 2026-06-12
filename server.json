@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.itmplatform/mcp-server",
   "title": "ITM Platform",
-  "description": "Connect AI assistants to ITM Platform project management -- projects, tasks, budgets, risks, and team workload.",
-  "version": "1.0.2",
+  "description": "Connect AI assistants to ITM Platform projects, tasks, budgets, risks, and team workload.",
+  "version": "1.0.3",
   "websiteUrl": "https://developers.itmplatform.com/mcp/",
   "repository": {
     "url": "https://github.com/itmplatform/mcp-server",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@itm-platform/mcp-server",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "transport": {
         "type": "stdio"
       },
@@ -38,7 +38,7 @@
   ],
   "remotes": [
     {
-      "transportType": "streamable-http",
+      "type": "streamable-http",
       "url": "https://api.itmplatform.com/v2/_/mcp/"
     }
   ]
