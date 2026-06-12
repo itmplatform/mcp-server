@@ -2,6 +2,16 @@
   "name": "@itm-platform/mcp-server",
   "version": "1.0.1",
   "description": "MCP server for ITM Platform",
+  "license": "MIT",
+  "mcpName": "io.github.itmplatform/mcp-server",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "project-management",
+    "itm-platform",
+    "ai",
+    "model-context-protocol"
+  ],
   "type": "module",
   "main": "dist/server.js",
   "bin": {
