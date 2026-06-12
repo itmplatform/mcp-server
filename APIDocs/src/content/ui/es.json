@@ -1,6 +1,6 @@
 {
   "header.title": "Documentacion MCP",
-  "header.companyPlaceholder": "tu-cuenta",
+  "header.companyPlaceholder": "su-cuenta",
   "locale.en": "EN",
   "locale.es": "ES",
   "sidebar.endUserTrack": "Usuarios",
@@ -8,7 +8,7 @@
   "copy.button": "Copiar",
   "copy.done": "Copiado!",
   "config.hostedMode": "Alojado (OAuth) -- sin clave API",
-  "config.postSetup": "Despues de agregar el servidor, escribe /mcp donde se admita, selecciona itm-platform y autenticate cuando se te solicite.",
+  "config.postSetup": "Despues de agregar el servidor, escriba /mcp donde se admita, seleccione itm-platform y autentiquese cuando se le solicite.",
   "tools.searchPlaceholder": "Buscar herramientas...",
   "tools.allCategories": "Todas las categorias",
   "tools.noResults": "No se encontraron herramientas.",

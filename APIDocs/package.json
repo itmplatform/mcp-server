@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build --mode prod",
-    "build:prod": "tsc && vite build --mode prod",
-    "build:stage": "tsc && vite build --mode stage",
+    "build": "tsc && vite build --mode prod && node scripts/postbuild.mjs prod",
+    "build:prod": "tsc && vite build --mode prod && node scripts/postbuild.mjs prod",
+    "build:stage": "tsc && vite build --mode stage && node scripts/postbuild.mjs stage",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests"
   },

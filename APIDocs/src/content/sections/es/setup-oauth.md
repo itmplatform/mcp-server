@@ -1,32 +1,32 @@
-Esta es la forma mas rapida de empezar. Tu cliente de IA se conecta al servidor MCP de ITM Platform por internet. Sin instalacion, sin claves API -- solo una URL y tu inicio de sesion de ITM Platform.
+Esta es la forma mas rapida de empezar. Su cliente de IA se conecta al servidor MCP de ITM Platform por internet. Sin instalacion, sin claves API -- solo una URL y su inicio de sesion de ITM Platform.
 
-Si prefieres ejecutar el servidor localmente, consulta [Conectar con clave API](#setup-stdio).
+Si prefiere ejecutar el servidor localmente, consulte [Conectar con clave API](#setup-stdio).
 
-### Paso 1: Agrega la URL del servidor
+### Paso 1: Agregue la URL del servidor
 
-En la configuracion MCP de tu cliente de IA, agrega la URL del servidor:
+En la configuracion MCP de su cliente de IA, agregue la URL del servidor:
 
 ```
 https://api.itmplatform.com/v2/_/mcp/
 ```
 
-El formato exacto varia segun el cliente. Consulta [Configuracion por cliente de IA](#ai-clients) para instrucciones paso a paso para Claude, VS Code, Cursor, Codex, Windsurf y otros.
+El formato exacto varia segun el cliente. Consulte [Configuracion por cliente de IA](#ai-clients) para instrucciones paso a paso para Claude, VS Code, Cursor, Codex, Windsurf y otros.
 
-### Paso 2: Abre MCP y autoriza
+### Paso 2: Abra MCP y autorice
 
-Despues de agregar el servidor, abre tu cliente de IA y escribe `/mcp` donde se admitan comandos con barra. Selecciona `itm-platform`; el cliente abrira una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform y concedas el acceso. El cliente de IA recibe un token que le permite actuar en tu nombre.
+Despues de agregar el servidor, abra su cliente de IA y escriba `/mcp` donde se admitan comandos con barra. Seleccione `itm-platform`; el cliente abrira una ventana del navegador para que inicie sesion con sus credenciales de ITM Platform y conceda el acceso. El cliente de IA recibe un token que le permite actuar en su nombre.
 
-### Paso 3: Empieza a preguntar
+### Paso 3: Empiece a preguntar
 
-Hazle una pregunta a la IA sobre tus proyectos. La autorizacion se recuerda -- no necesitaras iniciar sesion de nuevo a menos que el token expire o elimines el servidor de tu cliente de IA.
+Hagale una pregunta a la IA sobre sus proyectos. La autorizacion se recuerda -- no necesitara iniciar sesion de nuevo a menos que el token expire o elimine el servidor de su cliente de IA.
 
 ### Que hace OAuth
 
-OAuth permite al cliente de IA actuar en tu nombre sin ver nunca tu contrasena. Tu inicias sesion directamente con ITM Platform, y el servidor emite un token con alcance limitado. Para desconectarte, elimina el servidor de tu cliente de IA (consulta [Desconectar y auditoria](#revoke-and-audit)).
+OAuth permite al cliente de IA actuar en su nombre sin ver nunca su contrasena. Usted inicia sesion directamente con ITM Platform, y el servidor emite un token con alcance limitado. Para desconectarse, elimine el servidor de su cliente de IA (consulte [Desconectar y auditoria](#revoke-and-audit)).
 
 ### Alcances (scopes)
 
-Tu token OAuth determina que puede hacer la IA:
+Su token OAuth determina que puede hacer la IA:
 
 | Alcance | Que permite |
 |---------|-------------|

@@ -16,6 +16,7 @@ const SUPPORTED_LOCALES: Locale[] = ['en', 'es']
 const DEFAULT_LOCALE: Locale = 'en'
 
 function detectLocale(): Locale {
+  if (typeof window === 'undefined') return DEFAULT_LOCALE
   const stored = localStorage.getItem(STORAGE_KEYS.LOCALE)
   if (stored && SUPPORTED_LOCALES.includes(stored as Locale)) return stored as Locale
   const lang = navigator.language.split('-')[0].toLowerCase()
