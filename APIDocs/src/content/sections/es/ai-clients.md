@@ -1,8 +1,8 @@
-Hay dos formas de conectarse: **OAuth** (recomendado) se conecta al servidor alojado con solo una URL -- sin instalacion, sin claves. **Clave API** ejecuta el servidor localmente en tu maquina y se autentica con una clave de tu cuenta de ITM Platform.
+Hay dos formas de conectarse: **OAuth** (recomendado) se conecta al servidor alojado con solo una URL -- sin instalacion, sin claves. **Clave API** ejecuta el servidor localmente en su maquina y se autentica con una clave de su cuenta de ITM Platform.
 
-Elige tu cliente de IA a continuacion. Cada uno muestra ambos metodos.
+Elija su cliente de IA a continuacion. Cada uno muestra ambos metodos.
 
-Despues de agregar el servidor, abre MCP en tu cliente -- escribe `/mcp` donde se admitan comandos con barra -- selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, abra MCP en su cliente -- escriba `/mcp` donde se admitan comandos con barra -- seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 ---
 
@@ -14,7 +14,7 @@ Despues de agregar el servidor, abre MCP en tu cliente -- escribe `/mcp` donde s
 claude mcp add --scope user --transport http itm-platform https://api.itmplatform.com/v2/_/mcp/
 ```
 
-El flag `--scope user` hace que el servidor este disponible en todos tus proyectos. Luego escribe `/mcp`, selecciona `itm-platform` y completa el inicio de sesion de ITM Platform cuando se te solicite.
+El flag `--scope user` hace que el servidor este disponible en todos sus proyectos. Luego escriba `/mcp`, seleccione `itm-platform` y complete el inicio de sesion de ITM Platform cuando se le solicite.
 
 **Clave API (local):**
 
@@ -22,7 +22,7 @@ El flag `--scope user` hace que el servidor este disponible en todos tus proyect
 claude mcp add --scope user itm-platform -- npx @itm-platform/mcp-server
 ```
 
-Luego configura tus variables de entorno (consulta [Detalles de clave API](#api-key-details) mas abajo).
+Luego configure sus variables de entorno (consulte [Detalles de clave API](#api-key-details) mas abajo).
 
 ---
 
@@ -30,7 +30,7 @@ Luego configura tus variables de entorno (consulta [Detalles de clave API](#api-
 
 **OAuth (recomendado):**
 
-Ve a **Settings > Connectors > Add custom connector** e introduce la URL del servidor:
+Vaya a **Settings > Connectors > Add custom connector** e introduzca la URL del servidor:
 
 ```
 https://api.itmplatform.com/v2/_/mcp/
@@ -38,11 +38,11 @@ https://api.itmplatform.com/v2/_/mcp/
 
 Claude Desktop gestiona el flujo OAuth automaticamente. Disponible en planes Pro, Max, Team y Enterprise.
 
-Despues de agregar el conector, escribe `/mcp`, selecciona el conector de ITM Platform y autenticate cuando se te solicite.
+Despues de agregar el conector, escriba `/mcp`, seleccione el conector de ITM Platform y autentiquese cuando se le solicite.
 
 **Clave API (local):**
 
-Edita tu archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json` en Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` en macOS):
+Edite su archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json` en Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` en macOS):
 
 ```json
 {
@@ -52,8 +52,8 @@ Edita tu archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json`
       "args": ["@itm-platform/mcp-server"],
       "env": {
         "ITM_API_URL": "https://api.itmplatform.com",
-        "ITM_COMPANY": "{tu-cuenta}",
-        "ITM_API_KEY": "tu-clave-api"
+        "ITM_COMPANY": "{su-cuenta}",
+        "ITM_API_KEY": "su-clave-api"
       }
     }
   }
@@ -64,7 +64,7 @@ Edita tu archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json`
 
 ### VS Code (GitHub Copilot)
 
-**OAuth (recomendado)** -- crea o edita `.vscode/mcp.json` en tu workspace:
+**OAuth (recomendado)** -- cree o edite `.vscode/mcp.json` en su workspace:
 
 ```json
 {
@@ -77,9 +77,9 @@ Edita tu archivo de configuracion (`%APPDATA%\Claude\claude_desktop_config.json`
 }
 ```
 
-Tambien puedes agregar servidores desde **Command Palette > MCP: Add Server**.
+Tambien puede agregar servidores desde **Command Palette > MCP: Add Server**.
 
-Despues de agregar el servidor, abre Copilot Chat, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, abra Copilot Chat, escriba `/mcp`, seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 **Clave API (local):**
 
@@ -92,8 +92,8 @@ Despues de agregar el servidor, abre Copilot Chat, escribe `/mcp`, selecciona `i
       "args": ["@itm-platform/mcp-server"],
       "env": {
         "ITM_API_URL": "https://api.itmplatform.com",
-        "ITM_COMPANY": "{tu-cuenta}",
-        "ITM_API_KEY": "tu-clave-api"
+        "ITM_COMPANY": "{su-cuenta}",
+        "ITM_API_KEY": "su-clave-api"
       }
     }
   }
@@ -104,7 +104,7 @@ Despues de agregar el servidor, abre Copilot Chat, escribe `/mcp`, selecciona `i
 
 ### Cursor
 
-Crea o edita `.cursor/mcp.json` en la raiz de tu proyecto (o `~/.cursor/mcp.json` para acceso global).
+Cree o edite `.cursor/mcp.json` en la raiz de su proyecto (o `~/.cursor/mcp.json` para acceso global).
 
 **OAuth (recomendado):**
 
@@ -118,7 +118,7 @@ Crea o edita `.cursor/mcp.json` en la raiz de tu proyecto (o `~/.cursor/mcp.json
 }
 ```
 
-Despues de agregar el servidor, reinicia Cursor, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, reinicie Cursor, escriba `/mcp`, seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 **Clave API (local):**
 
@@ -130,8 +130,8 @@ Despues de agregar el servidor, reinicia Cursor, escribe `/mcp`, selecciona `itm
       "args": ["@itm-platform/mcp-server"],
       "env": {
         "ITM_API_URL": "https://api.itmplatform.com",
-        "ITM_COMPANY": "{tu-cuenta}",
-        "ITM_API_KEY": "tu-clave-api"
+        "ITM_COMPANY": "{su-cuenta}",
+        "ITM_API_KEY": "su-clave-api"
       }
     }
   }
@@ -148,20 +148,20 @@ Despues de agregar el servidor, reinicia Cursor, escribe `/mcp`, selecciona `itm
 codex mcp add itm-platform --url https://api.itmplatform.com/v2/_/mcp/
 ```
 
-O agrega manualmente a `~/.codex/config.toml`:
+O agregue manualmente a `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.itm-platform]
 url = "https://api.itmplatform.com/v2/_/mcp/"
 ```
 
-Despues de agregar el servidor, inicia Codex, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, inicie Codex, escriba `/mcp`, seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 ---
 
 ### Windsurf
 
-Edita `~/.codeium/windsurf/mcp_config.json` (o `%USERPROFILE%\.codeium\windsurf\mcp_config.json` en Windows):
+Edite `~/.codeium/windsurf/mcp_config.json` (o `%USERPROFILE%\.codeium\windsurf\mcp_config.json` en Windows):
 
 **OAuth (recomendado):**
 
@@ -175,7 +175,7 @@ Edita `~/.codeium/windsurf/mcp_config.json` (o `%USERPROFILE%\.codeium\windsurf\
 }
 ```
 
-Despues de agregar el servidor, reinicia Windsurf, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, reinicie Windsurf, escriba `/mcp`, seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 **Clave API (local):**
 
@@ -187,8 +187,8 @@ Despues de agregar el servidor, reinicia Windsurf, escribe `/mcp`, selecciona `i
       "args": ["@itm-platform/mcp-server"],
       "env": {
         "ITM_API_URL": "https://api.itmplatform.com",
-        "ITM_COMPANY": "{tu-cuenta}",
-        "ITM_API_KEY": "tu-clave-api"
+        "ITM_COMPANY": "{su-cuenta}",
+        "ITM_API_KEY": "su-clave-api"
       }
     }
   }
@@ -199,13 +199,13 @@ Despues de agregar el servidor, reinicia Windsurf, escribe `/mcp`, selecciona `i
 
 ### JetBrains (AI Assistant)
 
-Ve a **Settings > Tools > AI Assistant > Model Context Protocol (MCP)** y haz clic en **Add**.
+Vaya a **Settings > Tools > AI Assistant > Model Context Protocol (MCP)** y haga clic en **Add**.
 
-**OAuth (recomendado):** selecciona el protocolo HTTP e introduce `https://api.itmplatform.com/v2/_/mcp/`.
+**OAuth (recomendado):** seleccione el protocolo HTTP e introduzca `https://api.itmplatform.com/v2/_/mcp/`.
 
-Despues de agregar el servidor, abre AI Assistant, escribe `/mcp` donde se admitan comandos con barra, o abre el panel de servidores MCP. Selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, abra AI Assistant, escriba `/mcp` donde se admitan comandos con barra, o abra el panel de servidores MCP. Seleccione `itm-platform` y autentiquese cuando se le solicite.
 
-**Clave API (local):** selecciona el protocolo stdio y usa el comando `npx @itm-platform/mcp-server` con las variables de entorno requeridas.
+**Clave API (local):** seleccione el protocolo stdio y use el comando `npx @itm-platform/mcp-server` con las variables de entorno requeridas.
 
 ---
 
@@ -218,40 +218,40 @@ Cualquier cliente que implemente el [Model Context Protocol](https://modelcontex
 | **URL remota (OAuth)** | `https://api.itmplatform.com/v2/_/mcp/` |
 | **Comando local (Clave API)** | `npx @itm-platform/mcp-server` |
 
-Despues de agregar el servidor, usa el comando MCP o la lista de servidores del cliente. Si el cliente admite comandos con barra, escribe `/mcp`, selecciona `itm-platform` y autenticate cuando se te solicite.
+Despues de agregar el servidor, use el comando MCP o la lista de servidores del cliente. Si el cliente admite comandos con barra, escriba `/mcp`, seleccione `itm-platform` y autentiquese cuando se le solicite.
 
 ---
 
 ### Sobre OAuth
 
-La primera vez que te conectes via OAuth, abre MCP en tu cliente y selecciona `itm-platform`. En clientes que admiten comandos con barra, escribe `/mcp`. El cliente abre una ventana del navegador para que inicies sesion con tus credenciales de ITM Platform y concedas el acceso. El cliente de IA recibe un token con alcance limitado:
+La primera vez que se conecte via OAuth, abra MCP en su cliente y seleccione `itm-platform`. En clientes que admiten comandos con barra, escriba `/mcp`. El cliente abre una ventana del navegador para que inicie sesion con sus credenciales de ITM Platform y conceda el acceso. El cliente de IA recibe un token con alcance limitado:
 
 | Alcance | Que permite |
 |---------|-------------|
 | `mcp:read` | Buscar proyectos, ver presupuestos, listar tareas, consultar el portafolio |
 | `mcp:write` | Todo lo anterior, mas crear tareas, registrar riesgos/incidencias, actualizar proyectos |
 
-OAuth permite a la IA actuar en tu nombre sin ver nunca tu contrasena.
+OAuth permite a la IA actuar en su nombre sin ver nunca su contrasena.
 
 ### <a id="api-key-details"></a>Sobre claves API
 
-Para usar el metodo local (Clave API), genera una clave en tu cuenta de ITM Platform:
+Para usar el metodo local (Clave API), genere una clave en su cuenta de ITM Platform:
 
-1. Inicia sesion y ve a **Mi perfil** (haz clic en tu avatar en la esquina superior derecha)
-2. En **Clave API**, haz clic en **Generar**
-3. Copia la clave
+1. Inicie sesion y vaya a **Mi perfil** (haga clic en su avatar en la esquina superior derecha)
+2. En **Clave API**, haga clic en **Generar**
+3. Copie la clave
 
-Tu cliente de IA necesita tres variables de entorno:
+Su cliente de IA necesita tres variables de entorno:
 
 | Variable | Valor |
 |----------|-------|
 | `ITM_API_URL` | `https://api.itmplatform.com` |
-| `ITM_COMPANY` | El slug de tu empresa/cuenta (el nombre en tu URL de ITM Platform) |
-| `ITM_API_KEY` | La clave que acabas de generar |
+| `ITM_COMPANY` | El slug de su empresa/cuenta (el nombre en su URL de ITM Platform) |
+| `ITM_API_KEY` | La clave que acaba de generar |
 
 **Cuando usar claves API en lugar de OAuth:**
 
-- Trabajas detras de un firewall corporativo que bloquea el servidor alojado
-- Quieres que el servidor MCP funcione completamente sin conexion
-- Necesitas apuntar el servidor a una instancia de ITM Platform auto-alojada
-- Quieres inspeccionar o personalizar el comportamiento del servidor localmente
+- Trabaja detras de un firewall corporativo que bloquea el servidor alojado
+- Quiere que el servidor MCP funcione completamente sin conexion
+- Necesita apuntar el servidor a una instancia de ITM Platform auto-alojada
+- Quiere inspeccionar o personalizar el comportamiento del servidor localmente

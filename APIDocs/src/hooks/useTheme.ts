@@ -12,6 +12,7 @@ function getResolvedTheme(mode: ThemeMode): 'light' | 'dark' {
 
 export function useTheme() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'system'
     const stored = localStorage.getItem(STORAGE_KEYS.THEME) as ThemeMode | null
     return stored && CYCLE.includes(stored) ? stored : 'system'
   })
