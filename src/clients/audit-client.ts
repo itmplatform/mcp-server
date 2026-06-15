@@ -30,15 +30,15 @@ export function hashParameters(params: unknown): string {
 
 export function createAuditClient(config: AuditClientConfig): AuditClient {
   const url = `${config.apiUrl}/v2/${config.company}/mcp/audit`;
-  const headers: Record<string, string> = {
-    ...config.authHeaders,
-    'Content-Type': 'application/json',
-  };
   const log = config.log;
 
   return {
     async log(entry: AuditEntry): Promise<void> {
       try {
+        const headers: Record<string, string> = {
+          ...config.authHeaders,
+          'Content-Type': 'application/json',
+        };
         const response = await fetch(url, {
           method: 'POST',
           headers,

@@ -154,4 +154,21 @@ describe('RestClient', () => {
     const client = createRestClient(config);
     await expect(client.patch('projects/100', { Name: 'x' })).rejects.toThrow('400');
   });
+
+  it('picks up mutated authHeaders on subsequent calls', async () => {
+    const mutableHeaders: Record<string, string> = { Token: 'old-token' };
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = createRestClient({ ...config, authHeaders: mutableHeaders });
+    await client.get('test');
+    expect(mockFetch.mock.calls[0][1].headers.Token).toBe('old-token');
+
+    mutableHeaders.Token = 'refreshed-token';
+    await client.get('test');
+    expect(mockFetch.mock.calls[1][1].headers.Token).toBe('refreshed-token');
+  });
 });

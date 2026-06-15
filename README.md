@@ -236,4 +236,4 @@ If a write succeeds but a later search shows old data, wait up to 60 seconds. Wr
 
 - MCP docs: [modelcontextprotocol.io](https://modelcontextprotocol.io)
 - ITM Platform help: [helpcenter.itmplatform.com](https://helpcenter.itmplatform.com)
-- ITM Platform developer docs: [developers.itmplatform.com/documentation](https://developers.itmplatform.com/documentation)
+- ITM Platform developer docs: [developers.itmplatform.com](https://developers.itmplatform.com)
