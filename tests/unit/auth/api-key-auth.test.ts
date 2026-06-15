@@ -108,7 +108,7 @@ describe('resolveIdentity', () => {
     await expect(resolveIdentity()).rejects.toThrow('401');
   });
 
-  it('rejects PM-only users in Phase 1 stdio', async () => {
+  it('resolves PM-scoped users with pm-scoped access', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -118,7 +118,9 @@ describe('resolveIdentity', () => {
         pmScopeUserId: 456,
       }),
     });
-    await expect(resolveIdentity()).rejects.toThrow('PM-only');
+    const ctx = await resolveIdentity();
+    expect(ctx.dataMartAccess).toBe('pm-scoped');
+    expect(ctx.pmScopeUserId).toBe(456);
   });
 
   it('rejects Team Members', async () => {

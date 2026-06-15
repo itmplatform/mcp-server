@@ -48,11 +48,6 @@ export async function resolveIdentity(): Promise<EffectiveUserContext> {
   const identity: IdentityResponse = await response.json();
   const { dataMartAccess, pmScopeUserId } = resolveLicenseAccess(identity.licenseTypeIds, identity.userId);
 
-  if (dataMartAccess === 'pm-scoped') {
-    throw new Error(
-      'PM-only access is not yet available for MCP. It will arrive with hosted MCP (Phase 2) or gateway scope injection.',
-    );
-  }
   if (dataMartAccess === 'none') {
     throw new Error('Team Member access is not available for MCP.');
   }

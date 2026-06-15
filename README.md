@@ -159,7 +159,7 @@ License access:
 |---------|------------|
 | Company Admin | Full read and write access |
 | Full User | Full read and write access |
-| Project Manager | Not yet available |
+| Project Manager | Read and write access scoped to managed projects |
 | Team Member | Blocked |
 
 Your AI assistant does not receive your ITM Platform password or API key. Project data is returned to the AI client you choose, so the AI provider's data-handling policy applies to any data it processes.
