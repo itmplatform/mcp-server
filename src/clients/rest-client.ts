@@ -15,14 +15,14 @@ export interface RestClient {
 
 export function createRestClient(config: RestClientConfig): RestClient {
   const baseUrl = `${config.apiUrl}/v2/${config.company}`;
-  const headers: Record<string, string> = {
-    ...config.authHeaders,
-    'Content-Type': 'application/json',
-  };
   const log = config.log;
 
   async function request(method: string, path: string, body?: unknown): Promise<unknown> {
     const start = Date.now();
+    const headers: Record<string, string> = {
+      ...config.authHeaders,
+      'Content-Type': 'application/json',
+    };
 
     const response = await fetch(`${baseUrl}/${path}`, {
       method,

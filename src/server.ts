@@ -137,7 +137,13 @@ async function main() {
   }
 
   const oauthConfig = startupMode.mode === 'http-oauth' ? startupMode.oauthConfig : undefined;
-  const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+  interface SessionEntry {
+    server: McpServer;
+    transport: StreamableHTTPServerTransport;
+    authHeaders?: Record<string, string>;
+    tokenExpiresAt?: number;
+  }
+  const sessions = new Map<string, SessionEntry>();
 
   if (oauthConfig) {
     log.info('OAuth configured -- per-session auth enabled');
@@ -174,10 +180,27 @@ async function main() {
         let transport: StreamableHTTPServerTransport;
 
         if (sessionId && sessions.has(sessionId)) {
-          transport = sessions.get(sessionId)!.transport;
+          const session = sessions.get(sessionId)!;
+          transport = session.transport;
+
+          if (oauthConfig && session.authHeaders && session.tokenExpiresAt
+            && Date.now() >= session.tokenExpiresAt - 30_000) {
+            const freshOAuthToken = extractBearerToken(req.headers as Record<string, string | undefined>);
+            if (freshOAuthToken) {
+              try {
+                const refreshed = await exchangeToken(freshOAuthToken, oauthConfig, log);
+                session.authHeaders['Token'] = refreshed.sessionToken;
+                session.tokenExpiresAt = new Date(refreshed.expiresAt).getTime();
+                log.info({ sessionId }, 'Session token refreshed');
+              } catch (err) {
+                log.warn({ err, sessionId }, 'Session token refresh failed');
+              }
+            }
+          }
         } else if (!sessionId && parsed.method === 'initialize') {
           let sessionUserContext: EffectiveUserContext;
           let sessionClients: Clients;
+          let tokenExpiresAt: number | undefined;
           const aiClientId = parsed.params?.clientInfo?.name ?? 'unknown';
 
           if (oauthConfig) {
@@ -195,6 +218,7 @@ async function main() {
               const exchangeResult = await exchangeToken(oauthToken, oauthConfig, log);
               sessionUserContext = buildEffectiveUserContextFromExchange(exchangeResult);
               sessionClients = buildClientsForUser(sessionUserContext);
+              tokenExpiresAt = new Date(exchangeResult.expiresAt).getTime();
               log.info({ userId: sessionUserContext.userId, email: sessionUserContext.email }, 'Per-session auth resolved');
             } catch (err) {
               log.error({ err }, 'OAuth token exchange failed');
@@ -228,7 +252,11 @@ async function main() {
           await server.connect(transport);
           await transport.handleRequest(req, res, parsed);
           if (transport.sessionId) {
-            sessions.set(transport.sessionId, { server, transport });
+            sessions.set(transport.sessionId, {
+              server, transport,
+              authHeaders: oauthConfig ? sessionUserContext.authHeaders : undefined,
+              tokenExpiresAt,
+            });
             log.debug({ sessionId: transport.sessionId, aiClientId }, 'Session created');
           }
           return;
