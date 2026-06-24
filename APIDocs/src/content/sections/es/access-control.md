@@ -6,7 +6,7 @@ El acceso a las herramientas MCP depende de su tipo de licencia de ITM Platform.
 |----------|-------------------|---------------------|-------|
 | **Company Admin** | Completo | Completo | Puede ver y modificar todos los proyectos, servicios y usuarios |
 | **Full User** | Completo | Completo | Mismo acceso a datos que Company Admin |
-| **Project Manager** | Aun no disponible | Aun no disponible | El acceso limitado para Project Managers esta previsto para una version futura |
+| **Project Manager** | Limitado | Limitado | Solo puede ver y modificar los proyectos que gestiona |
 | **Team Member** | Bloqueado | Bloqueado | No puede usar herramientas MCP |
 
 ### Como funciona
@@ -15,4 +15,4 @@ Cuando conecta su cliente de IA, el servidor MCP resuelve su identidad usando su
 
 ### Permisos a nivel de proyecto
 
-Los Company Admins y Full Users pueden acceder a todos los proyectos. El acceso limitado para Project Managers (restringido a proyectos asignados) esta previsto para una version futura.
+Los Company Admins y Full Users pueden acceder a todos los proyectos. Los Project Managers solo pueden acceder a los proyectos que gestionan.

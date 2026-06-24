@@ -3,7 +3,7 @@ This section is for teams that want to run the MCP server on their own infrastru
 ### Prerequisites
 
 - Node.js 20 or later
-- An ITM Platform account with Company Admin or Full User license
+- An ITM Platform account with Company Admin, Full User, or Project Manager license
 - An API key generated from your ITM Platform user settings (for stdio mode)
 
 ### Install from npm

@@ -29,10 +29,10 @@
   "section.access-control": "Control de acceso",
   "section.revoke-and-audit": "Desconectar y auditoria",
   "section.faq": "Preguntas frecuentes",
-  "section.tools-reference": "Tool Reference",
-  "section.resources": "Resources & Prompts",
-  "section.authentication": "Authentication Deep Dive",
-  "section.self-hosting": "Self-Hosting Guide",
-  "section.troubleshooting": "Troubleshooting",
-  "section.changelog": "Changelog"
+  "section.tools-reference": "Referencia de herramientas",
+  "section.resources": "Recursos y prompts",
+  "section.authentication": "Autenticacion en detalle",
+  "section.self-hosting": "Guia de auto-alojamiento",
+  "section.troubleshooting": "Solucion de problemas",
+  "section.changelog": "Registro de cambios"
 }
