@@ -18,7 +18,7 @@ export function buildSubcomponentPagePipeline(
   return [
     { $match: { id: { $eq: componentId } } },
     { $unwind: `$${arrayField}` },
-    { $replaceRoot: { newRoot: `$${arrayField}` } },
+    { $project: { _id: 0, [arrayField]: 1 } },
     { $skip: skip },
     { $limit: limit },
   ];
@@ -71,7 +71,8 @@ export async function fetchSubcomponentPage(
     }),
   ]);
 
-  const items = (pageData.aggregateComponents as unknown[]) ?? [];
+  const rawItems = (pageData.aggregateComponents as Record<string, unknown>[]) ?? [];
+  const items = rawItems.map(doc => doc[arrayField]);
   const countRow = ((countData.aggregateComponents as unknown[]) ?? [])[0] as { count?: number } | undefined;
   const total = countRow?.count ?? items.length;
 

@@ -7,7 +7,7 @@ describe('buildSubcomponentPagePipeline', () => {
 
     expect(pipeline[0]).toEqual({ $match: { id: { $eq: 100 } } });
     expect(pipeline[1]).toEqual({ $unwind: '$tasks' });
-    expect(pipeline[2]).toEqual({ $replaceRoot: { newRoot: '$tasks' } });
+    expect(pipeline[2]).toEqual({ $project: { _id: 0, tasks: 1 } });
     expect(pipeline[3]).toEqual({ $skip: 0 });
     expect(pipeline[4]).toEqual({ $limit: 50 });
   });
