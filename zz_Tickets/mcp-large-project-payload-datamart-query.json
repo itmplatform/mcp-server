@@ -1,0 +1,28 @@
+{
+  "query": "query($id: ID!, $proj: JSON) {\n  component(id: $id, project: $proj)\n}",
+  "variables": {
+    "id": 77934,
+    "proj": {
+      "id": 1,
+      "name": 1,
+      "code": 1,
+      "componentType": 1,
+      "statusLabel": 1,
+      "priorityLabel": 1,
+      "percentComplete": 1,
+      "startDate": 1,
+      "endDate": 1,
+      "managers.name": 1,
+      "managers.userId": 1,
+      "methodology": 1,
+      "customTypeLabel": 1,
+      "tasks": 1,
+      "budgetTopDown": 1,
+      "budgetBottomUp": 1,
+      "budgetPeriodEndClose": 1,
+      "budgetActual": 1,
+      "risks": 1,
+      "issues": 1
+    }
+  }
+}

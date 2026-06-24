@@ -165,11 +165,13 @@ The server authenticates as you and returns only data your ITM Platform account 
 
 ---
 
-### 2.3 Glama (`glama.ai/mcp`)
+### 2.3 Glama (`glama.ai/mcp`)  ✅ LIVE (auto-ingested)
+
+> **DONE 2026-06-19.** Auto-ingested from the Official MCP Registry / GitHub. No manual submission needed.
 
 **Why:** 32,000+ servers indexed. Scores on license/quality/maintenance. Favors public repos with clear licenses.
 
-**Submission method:** Web form ("Add Server" button)
+**Submission method:** Web form ("Add Server" button) -- not needed; auto-indexed.
 
 **URL:** `https://glama.ai/mcp/servers` (click "Add Server")
 
@@ -184,15 +186,17 @@ The server authenticates as you and returns only data your ITM Platform account 
 
 **Notes:** Glama also auto-indexes from GitHub, so having LICENSE + good README may get you discovered automatically after the official registry listing. Having a LICENSE file (P1) directly impacts Glama's quality score.
 
-**Owner:** [Manual] -- fill the web form. May also appear automatically after prerequisites are met.
+**Owner:** Automatic.
 
 ---
 
-### 2.4 PulseMCP (`pulsemcp.com`)
+### 2.4 PulseMCP (`pulsemcp.com`)  ✅ LIVE (auto-ingested)
+
+> **DONE 2026-06-19.** Auto-ingested from the Official MCP Registry within the weekly cycle. No manual submission needed.
 
 **Why:** 17,000+ servers. "Remote Available" filter is used by buyers evaluating hosted MCP servers. Daily updates.
 
-**Submission method:** Web form OR auto-ingest from official registry
+**Submission method:** Web form OR auto-ingest from official registry -- auto-ingest worked.
 
 **URL:** `https://pulsemcp.com/submit`
 
@@ -200,11 +204,11 @@ The server authenticates as you and returns only data your ITM Platform account 
 - Submission type: "MCP Server"
 - URL: `https://github.com/itmplatform/mcp-server`
 
-**Auto-ingest:** PulseMCP ingests from the Official MCP Registry on a weekly cycle. If you publish to the official registry first (2.1), PulseMCP should pick it up within ~1 week. Submit manually only if it does not appear after that.
+**Auto-ingest:** PulseMCP ingests from the Official MCP Registry on a weekly cycle. Confirmed: appeared automatically ~1 week after the official registry listing (2026-06-12).
 
 **Contact for adjustments:** `hello@pulsemcp.com`
 
-**Owner:** [Manual] or automatic. Submit the form if it does not appear within a week of the official registry listing.
+**Owner:** Automatic.
 
 ---
 
@@ -332,10 +336,10 @@ Recommended sequence, optimized for cascade effects (one listing triggering othe
 |-------|----------|--------|--------|----------------|
 | 1 | **Official MCP Registry** | ✅ **DONE 2026-06-12** -- v1.0.3 active | Medium (CLI setup) | PulseMCP auto-ingests; Glama may auto-index |
 | 2 | **mcp.directory** | ✅ **DONE 2026-06-12** (review ~24h) | Trivial (~1 min) | None, but fast approval |
-| 3 | **PulseMCP** | Wait until ~2026-06-19 | Trivial or automatic | None |
+| 3 | **PulseMCP** | ✅ **DONE 2026-06-19** -- auto-ingested | Automatic | None |
 | 4 | **Smithery** | ✅ **DONE 2026-06-12** (set visibility → Public) | Low (~5 min) | Security scan = trust signal |
 | 5 | **mcp.so** | ✅ **DONE 2026-06-12** (add Content + avatar) | Low (~5 min) | High SEO value |
-| 6 | **Glama** | Ready -- web form or auto | Low (~5 min) | Quality score visible to users |
+| 6 | **Glama** | ✅ **DONE 2026-06-19** -- auto-ingested | Automatic | Quality score visible to users |
 | 7 | **Cline Marketplace** | ✅ **DONE 2026-06-12** (review ~2 days) | Medium (~20 min) | In-editor install button |
 
 ---
@@ -356,13 +360,13 @@ Recommended sequence, optimized for cascade effects (one listing triggering othe
 | M1 | Create 400x400 PNG logo | **Done** -- `zz_Specifications/ITM-Platform-Logo-400px-squared.png` | -- |
 | M2 | Publish to Official MCP Registry (`mcp-publisher`) | ✅ **Done 2026-06-12** -- v1.0.3 active | -- |
 | M3 | Fill mcp.so web form at `https://mcp.so/submit` | ✅ **Done 2026-06-12** (edit to add Content markdown + avatar) | ~2 min left |
-| M4 | Fill Glama web form at `https://glama.ai/mcp/servers` (or wait for auto-index) | **Ready** | ~5 min |
-| M5 | Submit PulseMCP form at `https://pulsemcp.com/submit` (if auto-ingest does not trigger) | Wait until ~2026-06-19 | ~2 min |
+| M4 | Fill Glama web form at `https://glama.ai/mcp/servers` (or wait for auto-index) | ✅ **Done 2026-06-19** -- auto-ingested | -- |
+| M5 | Submit PulseMCP form at `https://pulsemcp.com/submit` (if auto-ingest does not trigger) | ✅ **Done 2026-06-19** -- auto-ingested | -- |
 | M6 | Publish on Smithery at `https://smithery.ai/new` (web or CLI) | ✅ **Done 2026-06-12** (confirm visibility = Public) | ~1 min left |
 | M7 | Paste GitHub URL on `https://mcp.directory/submit` | ✅ **Done 2026-06-12** (publishes ~24h) | -- |
 | M8 | Create Cline GitHub issue + upload logo + test with Cline | ✅ **Done 2026-06-12** (review ~2 days) | -- |
 
-**Remaining manual time estimate:** ~35 minutes, spread across a few days (waiting for approvals and auto-ingest). Now that the Official Registry listing is live (M2), PulseMCP (M5) and possibly Glama (M4) may auto-ingest within ~1 week.
+**All submissions complete.** All seven registries are live as of 2026-06-19. PulseMCP and Glama auto-ingested from the Official MCP Registry as expected.
 
 ---
 
