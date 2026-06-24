@@ -5,7 +5,7 @@ describe('risks pagination', () => {
   it('builds $unwind pipeline for risks', () => {
     const pipeline = buildSubcomponentPagePipeline(100, 'risks', 50, 0);
     expect(pipeline[1]).toEqual({ $unwind: '$risks' });
-    expect(pipeline[2]).toEqual({ $replaceRoot: { newRoot: '$risks' } });
+    expect(pipeline[2]).toEqual({ $project: { _id: 0, risks: 1 } });
   });
 
   it('builds count pipeline for risks', () => {
