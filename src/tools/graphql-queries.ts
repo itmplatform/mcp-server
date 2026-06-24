@@ -27,3 +27,24 @@ export function clampLimit(limit: number | undefined, max: number): number {
   if (limit === undefined || limit <= 0) return 50;
   return Math.min(limit, max);
 }
+
+const SINGULAR: Record<string, string> = {
+  tasks: 'task', risks: 'risk', issues: 'issue',
+  purchases: 'purchase', revenues: 'revenue', activities: 'activity',
+};
+
+export function buildSubcomponentCountPipeline(
+  componentId: number,
+  arrayFields: string[],
+): Record<string, unknown>[] {
+  const projectStage: Record<string, unknown> = {};
+  for (const field of arrayFields) {
+    const singular = SINGULAR[field] ?? field;
+    projectStage[`${singular}Count`] = { $size: { $ifNull: [`$${field}`, []] } };
+  }
+  return [
+    { $match: { id: { $eq: componentId } } },
+    { $project: projectStage },
+    { $limit: 1 },
+  ];
+}

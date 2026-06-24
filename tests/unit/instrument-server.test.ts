@@ -134,6 +134,41 @@ describe('instrumentServer', () => {
     expect(result).toEqual(expectedResult);
   });
 
+  it('replaces oversized result with error via result-size guard', async () => {
+    const big = 'x'.repeat(110_000);
+    const handler = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: big }] });
+    const wrapped = registerAndGetWrapped(handler);
+
+    const result = await wrapped({}, {});
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('110000');
+    expect(result.content[0].text).toContain('subcomponent');
+  });
+
+  it('passes normal-sized results through unchanged', async () => {
+    const handler = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'small' }] });
+    const wrapped = registerAndGetWrapped(handler);
+
+    const result = await wrapped({}, {});
+
+    expect(result).toEqual({ content: [{ type: 'text', text: 'small' }] });
+  });
+
+  it('includes responseBytes and wasTruncated in audit entry', async () => {
+    const handler = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'hello' }] });
+    const wrapped = registerAndGetWrapped(handler);
+
+    await wrapped({}, {});
+
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responseBytes: Buffer.byteLength('hello', 'utf8'),
+        wasTruncated: false,
+      }),
+    );
+  });
+
   it('audits isError result as failure', async () => {
     const errorResult = {
       isError: true,

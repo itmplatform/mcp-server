@@ -1,24 +1,23 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { buildSubcomponentPagePipeline, buildSingleArrayCountPipeline } from '../../../src/tools/subcomponent-page.js';
 
-describe('list_project_tasks query composition', () => {
-  it('requests tasks projection for the given project ID', async () => {
-    const mockQuery = vi.fn().mockResolvedValue({
-      component: { tasks: [{ taskId: 1, name: 'Task 1' }] },
-    });
-
-    const variables = { id: 123, proj: { tasks: 1 } };
-    const data = await mockQuery({ query: 'component', variables });
-    const tasks = (data.component as Record<string, unknown>).tasks;
-
-    expect(mockQuery).toHaveBeenCalledWith({ query: 'component', variables: { id: 123, proj: { tasks: 1 } } });
-    expect(tasks).toEqual([{ taskId: 1, name: 'Task 1' }]);
+describe('list_project_tasks pagination', () => {
+  it('builds $unwind pipeline for tasks', () => {
+    const pipeline = buildSubcomponentPagePipeline(123, 'tasks', 50, 0);
+    expect(pipeline[0]).toEqual({ $match: { id: { $eq: 123 } } });
+    expect(pipeline[1]).toEqual({ $unwind: '$tasks' });
+    expect(pipeline[4]).toEqual({ $limit: 50 });
   });
 
-  it('returns empty array when component has no tasks', async () => {
-    const mockQuery = vi.fn().mockResolvedValue({
-      component: { tasks: [] },
-    });
-    const data = await mockQuery({ query: 'component', variables: { id: 999, proj: { tasks: 1 } } });
-    expect((data.component as Record<string, unknown>).tasks).toEqual([]);
+  it('applies custom skip and limit', () => {
+    const pipeline = buildSubcomponentPagePipeline(123, 'tasks', 10, 20);
+    expect(pipeline[3]).toEqual({ $skip: 20 });
+    expect(pipeline[4]).toEqual({ $limit: 10 });
+  });
+
+  it('builds count pipeline for tasks', () => {
+    const pipeline = buildSingleArrayCountPipeline(123, 'tasks');
+    expect(pipeline[0]).toEqual({ $match: { id: { $eq: 123 } } });
+    expect(pipeline[1]).toEqual({ $project: { count: { $size: { $ifNull: ['$tasks', []] } } } });
   });
 });

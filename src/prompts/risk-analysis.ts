@@ -15,7 +15,11 @@ export function registerRiskAnalysisPrompt(server: McpServer) {
         role: 'user',
         content: {
           type: 'text',
-          text: `Perform a risk assessment for project ${args.projectId}. Use the get_project tool with include: ["risks", "issues", "budget"] to fetch all relevant data. Then analyze:
+          text: `Perform a risk assessment for project ${args.projectId}.
+1. Use get_project with include: ["budget"] to fetch project details and budget.
+2. Use get_project_risks to fetch risks.
+3. Use get_project_issues to fetch issues.
+Then analyze:
 1. Active risks: probability, impact, and mitigation status
 2. Open issues: severity and resolution progress
 3. Budget risk: variance between planned and actual

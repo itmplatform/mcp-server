@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { buildSubcomponentPagePipeline, buildSingleArrayCountPipeline } from '../../../src/tools/subcomponent-page.js';
 
 describe('financial tools query composition', () => {
   it('get_project_budget requests all four budget projections', () => {
@@ -35,5 +36,27 @@ describe('financial tools query composition', () => {
     };
     expect(budget.budgetTopDown).toBeNull();
     expect(budget.budgetActual).toBeNull();
+  });
+});
+
+describe('purchases pagination', () => {
+  it('builds $unwind pipeline for purchases', () => {
+    const pipeline = buildSubcomponentPagePipeline(100, 'purchases', 50, 0);
+    expect(pipeline[1]).toEqual({ $unwind: '$purchases' });
+    expect(pipeline[4]).toEqual({ $limit: 50 });
+  });
+
+  it('builds count pipeline for purchases', () => {
+    const pipeline = buildSingleArrayCountPipeline(100, 'purchases');
+    expect(pipeline[1]).toEqual({ $project: { count: { $size: { $ifNull: ['$purchases', []] } } } });
+  });
+});
+
+describe('revenues pagination', () => {
+  it('builds $unwind pipeline for revenues', () => {
+    const pipeline = buildSubcomponentPagePipeline(200, 'revenues', 10, 5);
+    expect(pipeline[1]).toEqual({ $unwind: '$revenues' });
+    expect(pipeline[3]).toEqual({ $skip: 5 });
+    expect(pipeline[4]).toEqual({ $limit: 10 });
   });
 });

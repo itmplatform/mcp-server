@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Clients } from '../clients/index.js';
-import { COMPONENTS_QUERY, COMPONENT_QUERY, DEFAULT_PROJECT_FIELDS, MAX_LIST_LIMIT, clampLimit } from './graphql-queries.js';
+import { COMPONENTS_QUERY, COMPONENT_QUERY, AGGREGATE_QUERY, DEFAULT_PROJECT_FIELDS, MAX_LIST_LIMIT, clampLimit, buildSubcomponentCountPipeline } from './graphql-queries.js';
 
 interface SearchProjectsArgs {
   query?: string;
@@ -33,11 +33,6 @@ export function buildSearchProjectsVariables(args: SearchProjectsArgs) {
 }
 
 const INCLUDE_MAP: Record<string, Record<string, number>> = {
-  tasks: { tasks: 1 },
-  risks: { risks: 1 },
-  issues: { issues: 1 },
-  purchases: { purchases: 1 },
-  revenues: { revenues: 1 },
   budget: { budgetTopDown: 1, budgetBottomUp: 1, budgetPeriodEndClose: 1, budgetActual: 1 },
 };
 
@@ -48,6 +43,18 @@ export function buildGetProjectProjection(include: string[]): Record<string, num
     if (fields) Object.assign(proj, fields);
   }
   return proj;
+}
+
+const PROJECT_SUBCOMPONENT_ARRAYS = ['tasks', 'risks', 'issues', 'purchases', 'revenues'];
+
+export function buildSubcomponentsSummary(counts: Record<string, number | null>) {
+  return {
+    tasks: { count: counts.taskCount ?? null, tool: 'list_project_tasks' },
+    risks: { count: counts.riskCount ?? null, tool: 'get_project_risks' },
+    issues: { count: counts.issueCount ?? null, tool: 'get_project_issues' },
+    purchases: { count: counts.purchaseCount ?? null, tool: 'get_project_purchases' },
+    revenues: { count: counts.revenueCount ?? null, tool: 'get_project_revenues' },
+  };
 }
 
 export function registerProjectTools(server: McpServer, clients: Clients) {
@@ -76,19 +83,30 @@ export function registerProjectTools(server: McpServer, clients: Clients) {
   server.registerTool(
     'get_project',
     {
-      description: 'Get full project details by ID, optionally including subcomponents (tasks, risks, issues, budget, purchases, revenues). One query returns everything requested.',
+      description: 'Get project details by ID with subcomponent counts. Budget can be included via include: ["budget"]. For tasks, risks, issues, purchases, and revenues use the dedicated tools: list_project_tasks, get_project_risks, get_project_issues, get_project_purchases, get_project_revenues.',
       inputSchema: {
         projectId: z.number().describe('The project ID'),
-        include: z.array(z.enum(['tasks', 'risks', 'issues', 'budget', 'purchases', 'revenues']))
+        include: z.array(z.enum(['budget']))
           .optional()
-          .describe('Subcomponents to include (default: none)'),
+          .describe('Optional data to include. Only "budget" is supported. Subcomponent arrays (tasks, risks, etc.) are accessed via dedicated tools.'),
       },
     },
     async (args) => {
       const proj = buildGetProjectProjection(args.include ?? []);
-      const variables = { id: args.projectId, proj };
-      const data = await clients.datamart.query({ query: COMPONENT_QUERY, variables });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data.component, null, 2) }] };
+
+      const [detailData, countData] = await Promise.all([
+        clients.datamart.query({ query: COMPONENT_QUERY, variables: { id: args.projectId, proj } }),
+        clients.datamart.query({
+          query: AGGREGATE_QUERY,
+          variables: { p: buildSubcomponentCountPipeline(args.projectId, PROJECT_SUBCOMPONENT_ARRAYS) },
+        }).catch(() => null),
+      ]);
+
+      const component = detailData.component as Record<string, unknown> | null;
+      const counts = ((countData?.aggregateComponents as unknown[]) ?? [])[0] as Record<string, number> | undefined;
+      const result = { ...component, subcomponents: buildSubcomponentsSummary(counts ?? {}) };
+
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
 }

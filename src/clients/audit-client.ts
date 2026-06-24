@@ -18,6 +18,8 @@ export interface AuditEntry {
   error?: string;
   aiClientId: string;
   durationMs: number;
+  responseBytes?: number;
+  wasTruncated?: boolean;
 }
 
 export interface AuditClient {

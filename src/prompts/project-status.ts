@@ -5,7 +5,7 @@ export function registerProjectStatusPrompt(server: McpServer) {
   server.registerPrompt(
     'project_status',
     {
-      description: 'Generate a status report for a project. Fetches the project with tasks, risks, issues, and budget in one call.',
+      description: 'Generate a status report for a project. Fetches project details, budget, tasks, risks, and issues using dedicated tools.',
       argsSchema: {
         projectId: z.string().describe('The project ID to report on'),
       },
@@ -15,7 +15,12 @@ export function registerProjectStatusPrompt(server: McpServer) {
         role: 'user',
         content: {
           type: 'text',
-          text: `Generate a comprehensive status report for project ${args.projectId}. Use the get_project tool with include: ["tasks", "risks", "issues", "budget"] to fetch all data in one call. Then summarize:
+          text: `Generate a comprehensive status report for project ${args.projectId}.
+1. Use get_project with include: ["budget"] to fetch project details, subcomponent counts, and budget.
+2. Use list_project_tasks to fetch tasks (paginate if the count is large).
+3. Use get_project_risks to fetch risks.
+4. Use get_project_issues to fetch issues.
+Then summarize:
 1. Overall status and progress
 2. Key task status breakdown (not started / in progress / completed)
 3. Active risks and their mitigation status

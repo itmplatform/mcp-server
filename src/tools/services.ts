@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Clients } from '../clients/index.js';
-import { COMPONENTS_QUERY, COMPONENT_QUERY, DEFAULT_PROJECT_FIELDS, MAX_LIST_LIMIT, clampLimit } from './graphql-queries.js';
+import { COMPONENTS_QUERY, COMPONENT_QUERY, AGGREGATE_QUERY, DEFAULT_PROJECT_FIELDS, MAX_LIST_LIMIT, clampLimit, buildSubcomponentCountPipeline } from './graphql-queries.js';
+import { fetchSubcomponentPage } from './subcomponent-page.js';
 
 interface SearchServicesArgs {
   query?: string;
@@ -32,6 +33,29 @@ export function buildSearchServicesVariables(args: SearchServicesArgs) {
   };
 }
 
+const SERVICE_INCLUDE_MAP: Record<string, Record<string, number>> = {
+  budget: { budgetTopDown: 1, budgetBottomUp: 1, budgetPeriodEndClose: 1, budgetActual: 1 },
+};
+
+const SERVICE_SUBCOMPONENT_ARRAYS = ['activities', 'purchases', 'revenues'];
+
+export function buildGetServiceProjection(include: string[]): Record<string, number> {
+  const proj: Record<string, number> = { ...DEFAULT_PROJECT_FIELDS };
+  for (const inc of include) {
+    const fields = SERVICE_INCLUDE_MAP[inc];
+    if (fields) Object.assign(proj, fields);
+  }
+  return proj;
+}
+
+export function buildServiceSubcomponentsSummary(counts: Record<string, number | null>) {
+  return {
+    activities: { count: counts.activityCount ?? null, tool: 'list_service_activities' },
+    purchases: { count: counts.purchaseCount ?? null, tool: 'get_service_purchases' },
+    revenues: { count: counts.revenueCount ?? null, tool: 'get_service_revenues' },
+  };
+}
+
 export function registerServiceTools(server: McpServer, clients: Clients) {
   server.registerTool(
     'search_services',
@@ -58,29 +82,78 @@ export function registerServiceTools(server: McpServer, clients: Clients) {
   server.registerTool(
     'get_service',
     {
-      description: 'Get full service details by ID, optionally including subcomponents (activities, purchases, revenues). Note: services have activities instead of tasks, and do not have risks or issues.',
+      description: 'Get service details by ID with subcomponent counts. Budget can be included via include: ["budget"]. For activities, purchases, and revenues use the dedicated tools: list_service_activities, get_service_purchases, get_service_revenues.',
       inputSchema: {
         serviceId: z.number().describe('The service ID'),
-        include: z.array(z.enum(['activities', 'purchases', 'revenues', 'budget']))
+        include: z.array(z.enum(['budget']))
           .optional()
-          .describe('Subcomponents to include (default: none)'),
+          .describe('Optional data to include. Only "budget" is supported. Subcomponent arrays (activities, etc.) are accessed via dedicated tools.'),
       },
     },
     async (args) => {
-      const proj: Record<string, number> = { ...DEFAULT_PROJECT_FIELDS };
-      const includeMap: Record<string, Record<string, number>> = {
-        activities: { activities: 1 },
-        purchases: { purchases: 1 },
-        revenues: { revenues: 1 },
-        budget: { budgetTopDown: 1, budgetBottomUp: 1, budgetPeriodEndClose: 1, budgetActual: 1 },
-      };
-      for (const inc of args.include ?? []) {
-        const fields = includeMap[inc];
-        if (fields) Object.assign(proj, fields);
-      }
-      const variables = { id: args.serviceId, proj };
-      const data = await clients.datamart.query({ query: COMPONENT_QUERY, variables });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data.component, null, 2) }] };
+      const proj = buildGetServiceProjection(args.include ?? []);
+
+      const [detailData, countData] = await Promise.all([
+        clients.datamart.query({ query: COMPONENT_QUERY, variables: { id: args.serviceId, proj } }),
+        clients.datamart.query({
+          query: AGGREGATE_QUERY,
+          variables: { p: buildSubcomponentCountPipeline(args.serviceId, SERVICE_SUBCOMPONENT_ARRAYS) },
+        }).catch(() => null),
+      ]);
+
+      const component = detailData.component as Record<string, unknown> | null;
+      const counts = ((countData?.aggregateComponents as unknown[]) ?? [])[0] as Record<string, number> | undefined;
+      const result = { ...component, subcomponents: buildServiceSubcomponentsSummary(counts ?? {}) };
+
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'list_service_activities',
+    {
+      description: 'List activities for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID'),
+        limit: z.number().optional().describe('Max activities to return (default 50, max 200)'),
+        skip: z.number().optional().describe('Number of activities to skip (for pagination)'),
+      },
+    },
+    async (args) => {
+      const page = await fetchSubcomponentPage(clients, args.serviceId, 'activities', args.limit, args.skip);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'get_service_purchases',
+    {
+      description: 'Get purchase orders for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID'),
+        limit: z.number().optional().describe('Max purchases to return (default 50, max 200)'),
+        skip: z.number().optional().describe('Number of purchases to skip (for pagination)'),
+      },
+    },
+    async (args) => {
+      const page = await fetchSubcomponentPage(clients, args.serviceId, 'purchases', args.limit, args.skip);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'get_service_revenues',
+    {
+      description: 'Get revenue items for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID'),
+        limit: z.number().optional().describe('Max revenue items to return (default 50, max 200)'),
+        skip: z.number().optional().describe('Number of revenue items to skip (for pagination)'),
+      },
+    },
+    async (args) => {
+      const page = await fetchSubcomponentPage(clients, args.serviceId, 'revenues', args.limit, args.skip);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
     },
   );
 }
