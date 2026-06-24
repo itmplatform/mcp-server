@@ -4,7 +4,7 @@ The MCP server runs between your AI client and ITM Platform. Your project data f
 
 ### Can the AI modify my projects?
 
-Yes, if you have the right license (Company Admin or Full User) and have granted write permissions. The AI can create tasks, update projects, and log risks and issues. To stop access, remove the MCP server from your AI client (see [Disconnecting & Audit](#revoke-and-audit)).
+Yes, if you have the right license and have granted write permissions. Company Admins and Full Users have full access; Project Managers can modify only the projects they manage. The AI can create tasks, update projects, and log risks and issues. To stop access, remove the MCP server from your AI client (see [Disconnecting & Audit](#revoke-and-audit)).
 
 ### Which AI clients are supported?
 

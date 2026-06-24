@@ -4,7 +4,7 @@ El servidor MCP funciona entre su cliente de IA e ITM Platform. Los datos de sus
 
 ### Puede la IA modificar mis proyectos?
 
-Si, si tiene la licencia adecuada (Company Admin o Full User) y ha otorgado permisos de escritura. La IA puede crear tareas, actualizar proyectos y registrar riesgos e incidencias. Para detener el acceso, elimine el servidor MCP de su cliente de IA (consulte [Desconectar y auditoria](#revoke-and-audit)).
+Si, si tiene la licencia adecuada y ha otorgado permisos de escritura. Los Company Admins y Full Users tienen acceso completo; los Project Managers solo pueden modificar los proyectos que gestionan. La IA puede crear tareas, actualizar proyectos y registrar riesgos e incidencias. Para detener el acceso, elimine el servidor MCP de su cliente de IA (consulte [Desconectar y auditoria](#revoke-and-audit)).
 
 ### Que clientes de IA son compatibles?
 
