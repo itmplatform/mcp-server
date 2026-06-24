@@ -1,23 +1,29 @@
 import { describe, it, expect } from 'vitest';
+import { buildSubcomponentPagePipeline, buildSingleArrayCountPipeline } from '../../../src/tools/subcomponent-page.js';
 
-describe('risks-issues tools query composition', () => {
-  it('extracts risks array from component', () => {
-    const component = { risks: [{ name: 'Risk 1', statusLabel: 'Open' }] };
-    const risks = component.risks ?? [];
-    expect(risks).toHaveLength(1);
-    expect(risks[0].name).toBe('Risk 1');
+describe('risks pagination', () => {
+  it('builds $unwind pipeline for risks', () => {
+    const pipeline = buildSubcomponentPagePipeline(100, 'risks', 50, 0);
+    expect(pipeline[1]).toEqual({ $unwind: '$risks' });
+    expect(pipeline[2]).toEqual({ $replaceRoot: { newRoot: '$risks' } });
   });
 
-  it('returns empty array when no risks', () => {
-    const component: Record<string, unknown> = {};
-    const risks = component.risks ?? [];
-    expect(risks).toEqual([]);
+  it('builds count pipeline for risks', () => {
+    const pipeline = buildSingleArrayCountPipeline(100, 'risks');
+    expect(pipeline[1]).toEqual({ $project: { count: { $size: { $ifNull: ['$risks', []] } } } });
+  });
+});
+
+describe('issues pagination', () => {
+  it('builds $unwind pipeline for issues', () => {
+    const pipeline = buildSubcomponentPagePipeline(200, 'issues', 10, 5);
+    expect(pipeline[1]).toEqual({ $unwind: '$issues' });
+    expect(pipeline[3]).toEqual({ $skip: 5 });
+    expect(pipeline[4]).toEqual({ $limit: 10 });
   });
 
-  it('extracts issues array from component', () => {
-    const component = { issues: [{ name: 'Issue 1', statusLabel: 'Open' }] };
-    const issues = component.issues ?? [];
-    expect(issues).toHaveLength(1);
-    expect(issues[0].name).toBe('Issue 1');
+  it('builds count pipeline for issues', () => {
+    const pipeline = buildSingleArrayCountPipeline(200, 'issues');
+    expect(pipeline[1]).toEqual({ $project: { count: { $size: { $ifNull: ['$issues', []] } } } });
   });
 });

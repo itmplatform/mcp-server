@@ -16,6 +16,10 @@ interface DataMartBody {
   variables?: Record<string, unknown>;
 }
 
+export const HEAVY_ARRAY_FIELDS = new Set([
+  'tasks', 'purchases', 'revenues', 'risks', 'issues', 'activities',
+]);
+
 const ALLOWED_WHERE_OPERATORS = new Set([
   '$eq', '$ne', '$in', '$nin', '$gt', '$gte', '$lt', '$lte',
   '$regex', '$options', '$exists', '$not', '$and', '$or', '$nor',
@@ -111,6 +115,22 @@ function validatePipeline(pipeline: unknown): ValidationResult {
   return { ok: true };
 }
 
+function validateProjection(proj: unknown): ValidationResult {
+  if (proj == null || typeof proj !== 'object') return { ok: true };
+  for (const [key, value] of Object.entries(proj as Record<string, unknown>)) {
+    if (HEAVY_ARRAY_FIELDS.has(key) && value === 1) {
+      return {
+        ok: false,
+        error: {
+          code: 'CLIENT_VALIDATION',
+          message: `Projection "${key}: 1" returns the full embedded array and may be too large. Use dot notation like "${key}.id": 1, "${key}.name": 1, or use the dedicated subcomponent tool with limit/skip.`,
+        },
+      };
+    }
+  }
+  return { ok: true };
+}
+
 export function validateDataMartQuery(body: DataMartBody | null | undefined): ValidationResult {
   if (!body || typeof body !== 'object') return { ok: true };
 
@@ -119,6 +139,12 @@ export function validateDataMartQuery(body: DataMartBody | null | undefined): Va
 
   if (selectsJsonSubfields(query)) {
     return { ok: false, error: { code: 'CLIENT_VALIDATION', message: 'Do not select subfields of JSON; project fields via variables (proj / w / p) instead.' } };
+  }
+
+  const proj = variables.proj ?? variables.project;
+  if (proj) {
+    const projRes = validateProjection(proj);
+    if (!projRes.ok) return projRes;
   }
 
   if (isAggregateQuery(query)) {

@@ -90,22 +90,25 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 20 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 23 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
 | Tool | What it does |
 |------|--------------|
 | `search_projects` | Find projects by name, status, type, or date range |
-| `get_project` | Retrieve project details, including optional tasks, risks, issues, budget, purchases, and revenues |
+| `get_project` | Retrieve project details with subcomponent counts and optional budget |
 | `search_services` | Find services by name, status, type, or date range |
-| `get_service` | Retrieve service details |
-| `list_project_tasks` | List tasks for a project |
+| `get_service` | Retrieve service details with subcomponent counts and optional budget |
+| `list_project_tasks` | List tasks for a project with pagination |
 | `get_project_budget` | Get budget, actuals, revenue, cost, and margin information |
-| `get_project_purchases` | List purchase orders for a project |
-| `get_project_revenues` | List revenue items for a project |
-| `get_project_risks` | List project risks |
-| `get_project_issues` | List project issues |
+| `get_project_purchases` | List purchase orders for a project with pagination |
+| `get_project_revenues` | List revenue items for a project with pagination |
+| `get_project_risks` | List project risks with pagination |
+| `get_project_issues` | List project issues with pagination |
+| `list_service_activities` | List activities for a service with pagination |
+| `get_service_purchases` | List purchase orders for a service with pagination |
+| `get_service_revenues` | List revenue items for a service with pagination |
 | `aggregate_portfolio` | Group and summarize portfolio data |
 | `query_datamart` | Run validated DataMart queries for advanced analysis |
 | `search_users` | Find users and team members |

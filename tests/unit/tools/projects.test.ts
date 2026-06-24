@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { z } from 'zod';
-import { buildSearchProjectsVariables, buildGetProjectProjection } from '../../../src/tools/projects.js';
+import { describe, it, expect } from 'vitest';
+import { buildSearchProjectsVariables, buildGetProjectProjection, buildSubcomponentsSummary } from '../../../src/tools/projects.js';
+import { buildSubcomponentCountPipeline } from '../../../src/tools/graphql-queries.js';
 
 describe('buildSearchProjectsVariables', () => {
   it('builds variables with name regex filter', () => {
@@ -50,9 +50,17 @@ describe('buildGetProjectProjection', () => {
     expect(proj.tasks).toBeUndefined();
   });
 
-  it('adds tasks when included', () => {
+  it('does NOT include tasks when tasks is in include list', () => {
     const proj = buildGetProjectProjection(['tasks']);
-    expect(proj.tasks).toBe(1);
+    expect(proj.tasks).toBeUndefined();
+  });
+
+  it('does NOT include risks, issues, purchases, or revenues', () => {
+    const proj = buildGetProjectProjection(['risks', 'issues', 'purchases', 'revenues']);
+    expect(proj.risks).toBeUndefined();
+    expect(proj.issues).toBeUndefined();
+    expect(proj.purchases).toBeUndefined();
+    expect(proj.revenues).toBeUndefined();
   });
 
   it('adds all four budget fields when budget included', () => {
@@ -63,10 +71,56 @@ describe('buildGetProjectProjection', () => {
     expect(proj.budgetActual).toBe(1);
   });
 
-  it('adds multiple includes', () => {
-    const proj = buildGetProjectProjection(['tasks', 'risks', 'issues']);
-    expect(proj.tasks).toBe(1);
-    expect(proj.risks).toBe(1);
-    expect(proj.issues).toBe(1);
+  it('includes budget but not tasks when both requested', () => {
+    const proj = buildGetProjectProjection(['tasks', 'budget']);
+    expect(proj.tasks).toBeUndefined();
+    expect(proj.budgetTopDown).toBe(1);
+  });
+});
+
+describe('buildSubcomponentCountPipeline', () => {
+  it('returns a valid aggregation pipeline', () => {
+    const pipeline = buildSubcomponentCountPipeline(77934, ['tasks', 'risks', 'issues', 'purchases', 'revenues']);
+    expect(Array.isArray(pipeline)).toBe(true);
+    expect(pipeline.length).toBe(3);
+  });
+
+  it('matches the specific component ID', () => {
+    const pipeline = buildSubcomponentCountPipeline(77934, ['tasks']);
+    expect(pipeline[0]).toEqual({ $match: { id: { $eq: 77934 } } });
+  });
+
+  it('projects $size for each requested array field', () => {
+    const pipeline = buildSubcomponentCountPipeline(100, ['tasks', 'risks']);
+    const projectStage = pipeline[1]['$project'];
+    expect(projectStage.taskCount).toEqual({ $size: { $ifNull: ['$tasks', []] } });
+    expect(projectStage.riskCount).toEqual({ $size: { $ifNull: ['$risks', []] } });
+  });
+
+  it('ends with $limit: 1', () => {
+    const pipeline = buildSubcomponentCountPipeline(1, ['tasks']);
+    const last = pipeline[pipeline.length - 1];
+    expect(last).toEqual({ $limit: 1 });
+  });
+});
+
+describe('buildSubcomponentsSummary', () => {
+  it('returns correct shape with tool names for projects', () => {
+    const counts = { taskCount: 189, riskCount: 6, issueCount: 0, purchaseCount: 3, revenueCount: 1 };
+    const summary = buildSubcomponentsSummary(counts);
+
+    expect(summary.tasks).toEqual({ count: 189, tool: 'list_project_tasks' });
+    expect(summary.risks).toEqual({ count: 6, tool: 'get_project_risks' });
+    expect(summary.issues).toEqual({ count: 0, tool: 'get_project_issues' });
+    expect(summary.purchases).toEqual({ count: 3, tool: 'get_project_purchases' });
+    expect(summary.revenues).toEqual({ count: 1, tool: 'get_project_revenues' });
+  });
+
+  it('handles null counts gracefully', () => {
+    const counts = { taskCount: null, riskCount: null, issueCount: null, purchaseCount: null, revenueCount: null };
+    const summary = buildSubcomponentsSummary(counts as any);
+
+    expect(summary.tasks.count).toBeNull();
+    expect(summary.tasks.tool).toBe('list_project_tasks');
   });
 });
