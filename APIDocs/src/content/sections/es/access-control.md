@@ -1,4 +1,4 @@
-El acceso a las herramientas MCP depende de su tipo de licencia de ITM Platform. El servidor MCP aplica los mismos permisos que la aplicacion web de ITM Platform.
+El acceso a las herramientas MCP depende de su tipo de licencia de ITM Platform. El servidor MCP aplica los mismos permisos que la aplicación web de ITM Platform.
 
 ### Tipos de licencia
 
@@ -9,9 +9,9 @@ El acceso a las herramientas MCP depende de su tipo de licencia de ITM Platform.
 | **Project Manager** | Limitado | Limitado | Solo puede ver y modificar los proyectos que gestiona |
 | **Team Member** | Bloqueado | Bloqueado | No puede usar herramientas MCP |
 
-### Como funciona
+### Cómo funciona
 
-Cuando conecta su cliente de IA, el servidor MCP resuelve su identidad usando su clave API o token OAuth. Su tipo de licencia determina a que proyectos y datos puede acceder la IA. La IA nunca ve datos que usted no podria ver en la aplicacion web de ITM Platform.
+Cuando conecta su cliente de IA, el servidor MCP resuelve su identidad usando su clave API o token OAuth. Su tipo de licencia determina a qué proyectos y datos puede acceder la IA. La IA nunca ve datos que usted no podría ver en la aplicación web de ITM Platform.
 
 ### Permisos a nivel de proyecto
 
