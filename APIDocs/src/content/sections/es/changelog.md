@@ -13,10 +13,10 @@ Lanzamiento inicial del servidor MCP de ITM Platform.
 **Prompts (4):**
 - project_status, portfolio_overview, team_workload, risk_analysis
 
-**Autenticacion:**
+**Autenticación:**
 - Clave API (modo stdio)
 - OAuth 2.1 con PKCE (modo HTTP)
-- Aplicacion de alcances (mcp:read, mcp:write)
+- Aplicación de alcances (mcp:read, mcp:write)
 
 **Transportes:**
 - stdio (clientes de IA locales)

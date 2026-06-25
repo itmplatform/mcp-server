@@ -22,7 +22,7 @@ Ask the AI something about your projects. The authorization is remembered -- you
 
 ### What OAuth does
 
-OAuth lets the AI client act on your behalf without ever seeing your password. You log in directly with ITM Platform, and the server issues a scoped token. To disconnect, remove the server from your AI client (see [Disconnecting & Audit](#revoke-and-audit)).
+OAuth lets the AI client act on your behalf without ever seeing your password. You log in directly with ITM Platform, and the server issues a scoped token. To disconnect, remove the server from your AI client (see [Disconnecting](#revoke-and-audit)).
 
 ### Scopes
 
