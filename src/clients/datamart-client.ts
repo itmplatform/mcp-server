@@ -6,6 +6,7 @@ export interface DataMartClientConfig {
   company: string;
   authHeaders: Record<string, string>;
   log?: Logger;
+  onUnauthorized?: () => Promise<void>;
 }
 
 export interface DataMartQuery {
@@ -25,16 +26,30 @@ export function createDataMartClient(config: DataMartClientConfig): DataMartClie
     async query(body: DataMartQuery): Promise<Record<string, unknown>> {
       const requestId = randomUUID();
       const start = Date.now();
+      const buildHeaders = () => ({
+        ...config.authHeaders,
+        'Content-Type': 'application/json',
+        'X-Request-Id': requestId,
+      });
 
-      const response = await fetch(baseUrl, {
+      let response = await fetch(baseUrl, {
         method: 'POST',
-        headers: {
-          ...config.authHeaders,
-          'Content-Type': 'application/json',
-          'X-Request-Id': requestId,
-        },
+        headers: buildHeaders(),
         body: JSON.stringify(body),
       });
+
+      if (response.status === 401 && config.onUnauthorized) {
+        try {
+          await config.onUnauthorized();
+          response = await fetch(baseUrl, {
+            method: 'POST',
+            headers: buildHeaders(),
+            body: JSON.stringify(body),
+          });
+        } catch {
+          // re-exchange failed; fall through to the error below
+        }
+      }
 
       if (!response.ok) {
         log?.error({ requestId, status: response.status, ms: Date.now() - start }, 'DataMart request failed');

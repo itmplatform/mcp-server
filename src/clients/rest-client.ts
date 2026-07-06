@@ -5,6 +5,7 @@ export interface RestClientConfig {
   company: string;
   authHeaders: Record<string, string>;
   log?: Logger;
+  onUnauthorized?: () => Promise<void>;
 }
 
 export interface RestClient {
@@ -19,16 +20,26 @@ export function createRestClient(config: RestClientConfig): RestClient {
 
   async function request(method: string, path: string, body?: unknown): Promise<unknown> {
     const start = Date.now();
-    const headers: Record<string, string> = {
+    const buildHeaders = (): Record<string, string> => ({
       ...config.authHeaders,
       'Content-Type': 'application/json',
-    };
-
-    const response = await fetch(`${baseUrl}/${path}`, {
+    });
+    const buildFetchOpts = () => ({
       method,
-      headers,
+      headers: buildHeaders(),
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
+
+    let response = await fetch(`${baseUrl}/${path}`, buildFetchOpts());
+
+    if (response.status === 401 && config.onUnauthorized) {
+      try {
+        await config.onUnauthorized();
+        response = await fetch(`${baseUrl}/${path}`, buildFetchOpts());
+      } catch {
+        // re-exchange failed; fall through to the error below
+      }
+    }
 
     if (!response.ok) {
       log?.error({ method, path, status: response.status, ms: Date.now() - start }, 'REST request failed');

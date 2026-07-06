@@ -233,6 +233,8 @@ If tools do not appear in your AI client, confirm that the server configuration 
 
 If authentication fails, regenerate your API key or reconnect the OAuth server so your client receives a fresh token.
 
+OAuth sessions automatically retry once on a downstream 401 by re-exchanging the OAuth bearer token for a fresh session token. This handles cases where the session token is invalidated externally (e.g. by a concurrent browser login). If 401 errors persist, the OAuth bearer token itself has likely expired and the AI client needs to re-authenticate.
+
 If a write succeeds but a later search shows old data, wait up to 60 seconds. Writes are confirmed from the REST API immediately, while DataMart search indexes update asynchronously.
 
 ## More Help

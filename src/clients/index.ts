@@ -8,6 +8,7 @@ export interface ClientConfig {
   company: string;
   authHeaders: Record<string, string>;
   log?: Logger;
+  onUnauthorized?: () => Promise<void>;
 }
 
 export interface Clients {
