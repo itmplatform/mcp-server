@@ -95,6 +95,108 @@ describe('DataMartClient', () => {
       .rejects.toThrow('Validation error');
   });
 
+  describe('401 retry with onUnauthorized', () => {
+    it('calls onUnauthorized and retries on 401, succeeding with updated headers', async () => {
+      const authHeaders: Record<string, string> = { Token: 'mcp_stale' };
+      const onUnauthorized = vi.fn().mockImplementation(() => {
+        authHeaders.Token = 'mcp_fresh';
+        return Promise.resolve();
+      });
+
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: { projects: [] } }),
+        });
+      globalThis.fetch = mockFetch;
+
+      const client = createDataMartClient({ ...config, authHeaders, onUnauthorized });
+      const result = await client.query({ query: 'query { projects }', variables: {} });
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[1][1].headers.Token).toBe('mcp_fresh');
+      expect(result).toEqual({ projects: [] });
+    });
+
+    it('throws immediately on 401 when onUnauthorized is not provided', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+      const client = createDataMartClient(config);
+      await expect(client.query({ query: 'q', variables: {} }))
+        .rejects.toThrow('401');
+    });
+
+    it('throws when retry also returns 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+      globalThis.fetch = mockFetch;
+
+      const client = createDataMartClient({ ...config, onUnauthorized });
+      await expect(client.query({ query: 'q', variables: {} }))
+        .rejects.toThrow('401');
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry non-401 errors even when onUnauthorized is provided', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      const client = createDataMartClient({ ...config, onUnauthorized });
+      await expect(client.query({ query: 'q', variables: {} }))
+        .rejects.toThrow('500');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('reuses the same requestId on retry', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: {} }),
+        });
+      globalThis.fetch = mockFetch;
+
+      const client = createDataMartClient({ ...config, onUnauthorized });
+      await client.query({ query: 'q', variables: {} });
+
+      const firstRequestId = mockFetch.mock.calls[0][1].headers['X-Request-Id'];
+      const retryRequestId = mockFetch.mock.calls[1][1].headers['X-Request-Id'];
+      expect(firstRequestId).toBe(retryRequestId);
+    });
+
+    it('throws original 401 error when onUnauthorized rejects', async () => {
+      const onUnauthorized = vi.fn().mockRejectedValue(new Error('exchange failed'));
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+      globalThis.fetch = mockFetch;
+
+      const log = mockLogger();
+      const client = createDataMartClient({ ...config, onUnauthorized, log });
+      await expect(client.query({ query: 'q', variables: {} }))
+        .rejects.toThrow('401');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('logging', () => {
     it('logs debug on successful request with requestId and duration', async () => {
       const log = mockLogger();

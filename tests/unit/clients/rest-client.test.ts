@@ -155,6 +155,116 @@ describe('RestClient', () => {
     await expect(client.patch('projects/100', { Name: 'x' })).rejects.toThrow('400');
   });
 
+  describe('401 retry with onUnauthorized', () => {
+    it('calls onUnauthorized and retries GET on 401', async () => {
+      const authHeaders: Record<string, string> = { Token: 'mcp_stale' };
+      const onUnauthorized = vi.fn().mockImplementation(() => {
+        authHeaders.Token = 'mcp_fresh';
+        return Promise.resolve();
+      });
+
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([{ id: 1 }]),
+        });
+      globalThis.fetch = mockFetch;
+
+      const client = createRestClient({ ...config, authHeaders, onUnauthorized });
+      const result = await client.get('projects');
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[1][1].headers.Token).toBe('mcp_fresh');
+      expect(result).toEqual([{ id: 1 }]);
+    });
+
+    it('calls onUnauthorized and retries POST on 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: [] }),
+        });
+      globalThis.fetch = mockFetch;
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      const result = await client.post('AllUsers', { page: 1 });
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ data: [] });
+    });
+
+    it('calls onUnauthorized and retries PATCH on 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 42 }),
+        });
+      globalThis.fetch = mockFetch;
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      const result = await client.patch('projects/100', { Name: 'x' });
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ id: 42 });
+    });
+
+    it('throws immediately on 401 when onUnauthorized is not provided', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+      const client = createRestClient(config);
+      await expect(client.get('test')).rejects.toThrow('401');
+    });
+
+    it('throws when retry also returns 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      await expect(client.get('test')).rejects.toThrow('401');
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry non-401 errors', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+      });
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      await expect(client.get('test')).rejects.toThrow('403');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('throws original 401 error when onUnauthorized rejects', async () => {
+      const onUnauthorized = vi.fn().mockRejectedValue(new Error('exchange failed'));
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      await expect(client.get('test')).rejects.toThrow('401');
+    });
+  });
+
   it('picks up mutated authHeaders on subsequent calls', async () => {
     const mutableHeaders: Record<string, string> = { Token: 'old-token' };
     const mockFetch = vi.fn().mockResolvedValue({
