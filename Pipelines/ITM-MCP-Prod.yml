@@ -206,8 +206,10 @@ stages:
   - job: DeployAPIDocsJob
     displayName: 'Deploy APIDocs to developers.itmplatform.com/mcp'
     pool:
-      vmImage: ubuntu-latest
+      name: Ubuntu-Server
     steps:
+      - checkout: none
+
       - task: DownloadBuildArtifacts@0
         displayName: 'Download APIDocs artifact'
         inputs:
@@ -216,25 +218,13 @@ stages:
           artifactName: 'apidocs-drop'
           downloadPath: '$(Pipeline.Workspace)'
 
-      - task: SSH@0
-        displayName: 'Clean target folder'
-        inputs:
-          sshEndpoint: 'itmplatform.com-3.16.9.171'
-          runOptions: 'inline'
-          inline: |
-            set -e
-            TARGET="/var/www/developers.itmplatform.com/htdocs/mcp"
-            mkdir -p "$TARGET"
-            echo "=== Cleaning $TARGET ==="
-            rm -rf "$TARGET"/*
-            echo "=== Done ==="
-          failOnStdErr: false
-
-      - task: CopyFilesOverSSH@0
-        displayName: 'Copy APIDocs to server'
-        inputs:
-          sshEndpoint: 'itmplatform.com-3.16.9.171'
-          sourceFolder: '$(Pipeline.Workspace)/apidocs-drop'
-          contents: '**'
-          targetFolder: '/var/www/developers.itmplatform.com/htdocs/mcp'
-          overwrite: true
+      - bash: |
+          set -e
+          TARGET="/var/www/developers.itmplatform.com/htdocs/mcp"
+          mkdir -p "$TARGET"
+          echo "=== Cleaning $TARGET ==="
+          rm -rf "$TARGET"/*
+          echo "=== Copying APIDocs ==="
+          cp -a "$(Pipeline.Workspace)/apidocs-drop/." "$TARGET/"
+          echo "=== Done ==="
+        displayName: 'Deploy APIDocs to target folder'
