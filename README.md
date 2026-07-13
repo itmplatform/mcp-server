@@ -121,15 +121,16 @@ The server exposes 27 MCP tools, 6 resources, and 4 prompt templates.
 
 | Tool | What it does |
 |------|--------------|
-| `create_task` | Add a task to a project |
+| `create_task` | Add a task; Waterfall projects require status, start date, and end date, while Kanban uses board defaults |
 | `update_task` | Update task fields such as status, dates, and assignee |
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `create_risk` | Log a project risk |
-| `create_issue` | Log a project issue |
+| `create_issue` | Log a project issue with a required issue type and status |
 | `update_project` | Update project fields such as name, status, dates, and priority |
 
 Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
+Validation failures include the actionable message returned by REST instead of only the HTTP status.
 
 ### Resources and Prompts
 

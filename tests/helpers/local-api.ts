@@ -72,10 +72,15 @@ function responseId(response: unknown): number {
   throw new Error(`Could not read id from response: ${JSON.stringify(response)}`);
 }
 
-export async function createProjectViaRest(name: string, rest = createLocalRestClient()): Promise<number> {
-  const typeId = (await getReferenceItems('getprojecttypes', rest))[0]?.Id;
+export async function createProjectViaRest(
+  name: string,
+  rest = createLocalRestClient(),
+  projectMethodTypeId = 1,
+  projectTypeId?: number,
+): Promise<number> {
+  const typeId = projectTypeId ?? (await getReferenceItems('getprojecttypes', rest))[0]?.Id;
   if (!typeId) throw new Error('No project types available');
-  return responseId(await rest.post('projects', { Name: name, TypeId: typeId }));
+  return responseId(await rest.post('projects', { Name: name, TypeId: typeId, ProjectMethodTypeId: projectMethodTypeId }));
 }
 
 export async function getReferenceItems(entity: string, rest = createLocalRestClient()): Promise<ReferenceItem[]> {
@@ -91,7 +96,12 @@ export async function getReferenceBaseIds(entity: string, rest = createLocalRest
 }
 
 export async function deleteProjectViaRest(projectId: number): Promise<void> {
-  await cleanupDelete('projects', { ProjectIds: String(projectId) });
+  await deleteProjectsViaRest([projectId]);
+}
+
+export async function deleteProjectsViaRest(projectIds: number[]): Promise<void> {
+  if (!projectIds.length) return;
+  await cleanupDelete('projects', { ProjectIds: projectIds.join(',') });
 }
 
 export async function deleteTasksViaRest(projectId: number, taskIds: number[]): Promise<void> {
