@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.0",
+  "serverVersion": "1.0.8",
   "tools": [
     {
       "name": "search_projects",
@@ -46,7 +46,7 @@
     },
     {
       "name": "get_project",
-      "description": "Get full project details by ID, optionally including subcomponents (tasks, risks, issues, budget, purchases, revenues). One query returns everything requested.",
+      "description": "Get project details by ID with subcomponent counts. Budget can be included via include: [\"budget\"]. For tasks, risks, issues, purchases, and revenues use the dedicated tools: list_project_tasks, get_project_risks, get_project_issues, get_project_purchases, get_project_revenues.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -59,15 +59,10 @@
             "items": {
               "type": "string",
               "enum": [
-                "tasks",
-                "risks",
-                "issues",
-                "budget",
-                "purchases",
-                "revenues"
+                "budget"
               ]
             },
-            "description": "Subcomponents to include (default: none)"
+            "description": "Optional data to include. Only \"budget\" is supported. Subcomponent arrays (tasks, risks, etc.) are accessed via dedicated tools."
           }
         },
         "required": [
@@ -122,7 +117,7 @@
     },
     {
       "name": "get_service",
-      "description": "Get full service details by ID, optionally including subcomponents (activities, purchases, revenues). Note: services have activities instead of tasks, and do not have risks or issues.",
+      "description": "Get service details by ID with subcomponent counts. Budget can be included via include: [\"budget\"]. For activities, purchases, and revenues use the dedicated tools: list_service_activities, get_service_purchases, get_service_revenues.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -135,13 +130,88 @@
             "items": {
               "type": "string",
               "enum": [
-                "activities",
-                "purchases",
-                "revenues",
                 "budget"
               ]
             },
-            "description": "Subcomponents to include (default: none)"
+            "description": "Optional data to include. Only \"budget\" is supported. Subcomponent arrays (activities, etc.) are accessed via dedicated tools."
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_service_activities",
+      "description": "List activities for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max activities to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of activities to skip (for pagination)"
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_service_purchases",
+      "description": "Get purchase orders for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max purchases to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of purchases to skip (for pagination)"
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_service_revenues",
+      "description": "Get revenue items for a service with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max revenue items to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of revenue items to skip (for pagination)"
           }
         },
         "required": [
@@ -153,13 +223,21 @@
     },
     {
       "name": "list_project_tasks",
-      "description": "List all tasks for a project. Returns task details: taskId, name, statusLabel, priorityLabel, assignedTo, startDate, endDate, percentComplete.",
+      "description": "List tasks for a project with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max tasks to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of tasks to skip (for pagination)"
           }
         },
         "required": [
@@ -189,13 +267,21 @@
     },
     {
       "name": "get_project_purchases",
-      "description": "Get purchase orders for a project. Returns an array of purchase items with amount, status, dates, and provider.",
+      "description": "Get purchase orders for a project with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max purchases to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of purchases to skip (for pagination)"
           }
         },
         "required": [
@@ -207,13 +293,21 @@
     },
     {
       "name": "get_project_revenues",
-      "description": "Get revenue items for a project. Returns an array of revenue entries with amount, status, and dates.",
+      "description": "Get revenue items for a project with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max revenue items to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of revenue items to skip (for pagination)"
           }
         },
         "required": [
@@ -225,13 +319,21 @@
     },
     {
       "name": "get_project_risks",
-      "description": "Get risks for a project. Returns an array of risk items with name, description, status, probability, impact, and mitigation plan.",
+      "description": "Get risks for a project with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max risks to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of risks to skip (for pagination)"
           }
         },
         "required": [
@@ -243,17 +345,165 @@
     },
     {
       "name": "get_project_issues",
-      "description": "Get issues for a project. Returns an array of issue items with name, description, status, severity, and resolution.",
+      "description": "Get issues for a project with pagination. Returns { items, total, limit, skip, hasMore }. Default limit: 50, max: 200.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max issues to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of issues to skip (for pagination)"
           }
         },
         "required": [
           "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_task_progress",
+      "description": "List the progress (seguimiento/follow-up) history for a task, newest first. Each entry contains TaskFollowUpId, Percentage, AssessmentId, ShortDescription, Description, ReportDate, CreatedBy, IsCompleted. Task progress is a time-series of entries, not a single field on the task; this is why update_task rejects PercentComplete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID to list progress entries for"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_project_progress",
+      "description": "Get the project progress report: the expected progress curve (from task dates and working days), the baseline expected curve, and the historical follow-up entries (date + percentage). Useful to compare planned vs actual progress.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to get the progress report for"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_task_progress",
+      "description": "Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task's completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Use get_reference_data with entity \"assessments\" to discover valid assessmentId values. Returns the created entry read back from v2 REST.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID to report progress on"
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "Report date (ISO 8601, e.g. 2026-07-13)"
+          },
+          "percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Progress percentage completed, 0-100"
+          },
+          "assessmentId": {
+            "type": "number",
+            "description": "Assessment rating ID (required). Discover valid values with get_reference_data entity \"assessments\""
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "Brief progress summary (required)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed progress notes"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId",
+          "reportDate",
+          "percentage",
+          "assessmentId",
+          "shortDescription"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_task_progress",
+      "description": "Update an existing task progress (seguimiento/follow-up) entry via PATCH. Only send the fields you want to change. Use list_task_progress to find the progressId. Returns the updated entry read back from v2 REST.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID the progress entry belongs to"
+          },
+          "progressId": {
+            "type": "number",
+            "description": "The progress entry ID to update (TaskFollowUpId from list_task_progress)"
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "New report date (ISO 8601)"
+          },
+          "percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "New progress percentage, 0-100"
+          },
+          "assessmentId": {
+            "type": "number",
+            "description": "New assessment rating ID"
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "New brief progress summary"
+          },
+          "description": {
+            "type": "string",
+            "description": "New detailed progress notes"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId",
+          "progressId"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -302,7 +552,7 @@
     },
     {
       "name": "query_datamart",
-      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, tasks, risks, issues, purchases, revenues, budgetTopDown, budgetActual.",
+      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual.\n\nImportant: Projecting full embedded arrays (tasks: 1, risks: 1, issues: 1, purchases: 1, revenues: 1, activities: 1) is rejected because they can be too large. Use dot notation (e.g. \"tasks.name\": 1) or the dedicated subcomponent tools with limit/skip.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -397,7 +647,7 @@
     },
     {
       "name": "get_reference_data",
-      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -418,7 +668,8 @@
               "issuetypes",
               "purchasestatuses",
               "purchasetypes",
-              "revenuestatuses"
+              "revenuestatuses",
+              "assessments"
             ],
             "description": "The reference data entity to retrieve"
           }

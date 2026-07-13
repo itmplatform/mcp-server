@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-
-const ALLOWED_ENTITIES = [
-  'projectstatuses', 'gettaskstatuses', 'gettasktypes', 'gettaskpriorities',
-  'getprojecttypes', 'projectpriorities', 'riskstatuses', 'risktypes',
-  'riskimpacts', 'riskprobabilities',
-  'issuestatuses', 'issuetypes', 'purchasestatuses', 'purchasetypes',
-  'revenuestatuses',
-] as const;
+import { ALLOWED_ENTITIES } from '../../../src/tools/reference-data.js';
 
 const entitySchema = z.enum(ALLOWED_ENTITIES);
 
@@ -27,6 +20,10 @@ describe('reference-data entity validation', () => {
   });
 
   it('covers all reference data endpoints exposed by the tool', () => {
-    expect(ALLOWED_ENTITIES).toHaveLength(15);
+    expect(ALLOWED_ENTITIES).toHaveLength(16);
+  });
+
+  it('includes assessments for task progress ratings', () => {
+    expect(ALLOWED_ENTITIES).toContain('assessments');
   });
 });
