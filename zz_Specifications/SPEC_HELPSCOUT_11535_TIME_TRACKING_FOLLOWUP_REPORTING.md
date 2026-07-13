@@ -1,206 +1,50 @@
-# Help Scout 11535 — MCP time tracking, follow-up, reporting, and Clockify migration
+# Help Scout 11535 -- MCP time tracking, follow-up, and reporting
 
-**Source:** [Help Scout conversation 3382659721 / 11535](https://secure.helpscout.net/conversation/3382659721/11535/)  
-**Requester:** Gilsandro Cezar, UCloud Global PMO  
-**Date:** 2026-07-11  
-**Status:** Product and technical recommendation  
+**Source:** [Help Scout conversation 3382659721 / 11535](https://secure.helpscout.net/conversation/3382659721/11535/)
+**Requester:** Gilsandro Cezar, UCloud Global PMO
+**Date:** 2026-07-13
+**Status:** Product and technical recommendation
 **Explicitly out of scope:** the reported `query_datamart` 401 error
 
-## Executive recommendation
+```
+Hola,
 
-UCloud has identified real gaps, but the safest answer is not to expose the legacy modules wholesale through MCP.
+Utilizamos la integración MCP de ITM Platform con Claude para consultas y algunas operaciones de escritura (creación/actualización de tareas e issues). Identificamos limitaciones que impactan nuestro flujo de trabajo de PMO:
 
-1. **Clockify history:** offer a controlled one-time migration using a dry-run CSV importer or an assisted internal import. Do not use MCP calls as the bulk-import mechanism.
-2. **Ongoing time entries:** add narrow `list_time_entries` and `log_time_entry` MCP tools, backed by a new v2 time-entry API. In normal operation, a caller may write time only for their own licensed user identity.
-3. **Follow-up / progress:** add typed MCP tools around the progress-report domain. Much of the v2 write logic already exists, but exact read coverage and project/service parity need completing.
-4. **Reports / BI:** expose governed report data and aggregations, starting with time-report detail and summaries. Do not expose the legacy report designer or a generic “run anything” report tool in the first release.
-5. **Protect licensing:** never let one administrator or service account continuously submit time on behalf of an arbitrary workforce under one paid seat. One-time historical migration is low risk; ongoing delegated entry is high risk.
+1. **Registro de horas consumidas (time entries / imputación de horas):** no existe ninguna herramienta en el MCP para registrar horas trabajadas en una tarea. Las tools disponibles (`create_task`, `update_task`) no cuentan con un campo de horas.
+2. **Módulo de Seguimiento:** no podemos crear ni consultar entradas de seguimiento a través del MCP.
+3. **Acceso al módulo de Informes/BI:** este módulo permanece completamente fuera del alcance del MCP.
+4. **`query_datamart`:** devuelve error 401 de forma consistente, lo que sugiere que requiere un scope de autenticación separado del resto del MCP.
 
-This gives the customer a practical answer now, fills the product gaps in reusable increments, and avoids turning integrations into a substitute for Team Member or Full Access licenses.
+**Solicitud:** Nos gustaría saber si existen planes para exponer estas funcionalidades (especialmente el registro de horas) a través del MCP, y si existe algún workaround oficial en este momento.
+```
 
-## What the customer is asking for
+See the [parent README.md](../../README.md) for access, credentials, and other repos.
 
-The two customer messages contain these requests, excluding the 401 item:
+---
 
-| Request | What they need in practice | Current finding |
+## Where each request is handled
+
+The customer filed one ticket, but the work lands in four repos. **This document only covers the MCP part.** Everything else is a reference.
+
+| Customer request | Verdict | Where it is tracked |
 |---|---|---|
-| Log consumed hours through MCP | Create time entries for project/task/user/date/duration | Not exposed in MCP |
-| Create and query “Seguimiento” entries | Read and write task/project progress reports, not merely edit task fields | Not exposed in MCP; partial v2 APIs already exist |
-| Access Reports / BI through MCP | Analyze reportable data, including time-report detail | MCP/DataMart covers part of the analytical domain, not the legacy reporting module or detailed daily time rows |
-| Native CSV/Excel time-entry import | Load Clockify history in bulk | No native time-entry importer was found |
-| Complete REST API outside MCP | Programmatically create/import time entries | A documented v1 REST API already exists at `GET/POST /{company}/timehours` |
-| Best official workaround | Safely consolidate Clockify and ITM hours without losing existing data | Use the REST API only through a controlled migration process; do not send raw Clockify rows directly |
+| **2. Seguimiento (progress)** | **Build it in MCP.** No blockers. Ship this first | **This document, section "Progress tools"** |
+| **3. Reports / BI** | Already solved in MCP (`query_datamart`, `aggregate_portfolio`). The gap is data, not tools | Data gap: [ITM.DataMart/zz_Specifications/time-reports-datamart-research.md](../../ITM.DataMart/zz_Specifications/time-reports-datamart-research.md) |
+| **1. Time entries** | **Not an MCP feature.** What they want is their Clockify time in ITM. That is a connector | [ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md) |
+| (security finding from 1) | Fixed locally: caller authentication is mandatory and only Company Admin/Full Access may write for another user | [Completed ITM.Web timehours authorization ticket](../../ITM.Web/zz_Tickets/done/2026-07-13-timehours-userid-impersonation.md) |
 
-## Evidence from the codebase
+The single most useful reframing: **the customer did not ask for a migration, and they did not really ask for an MCP tool.** They asked for their tracked time to be in ITM Platform. MCP was just the surface they happened to be using.
 
-The investigation searched for `time entry`, `timeentry`, `timesheet`, `TaskTime`, `tblTaskTime`, `followup`, `progress`, `report`, `BI`, `import`, and `license` across ITM.MCP, ITM.Web/API, ITM.Tasks, ITM.Account, and ITM.DataMart.
+---
 
-Relevant existing implementation:
+## 1. Progress / Seguimiento tools (the MCP deliverable)
 
-- `ITM.Web/ITM.API/Controllers/TaskTimeController.cs`
-  - `GET /{company}/timehours` reads a user-oriented timesheet for a maximum range of about 31 days.
-  - `POST /{company}/timehours` writes a list of time rows.
-- `ITM.Web/ITM.BusinessAccess/TaskTime.cs`
-  - Validates project, task, assignment, dates, hours, and editability.
-  - Writes `tblTaskTime`, comments, accepted effort, and update events.
-  - Treats the effective key as user + task + date and updates/replaces an existing entry for that key.
-- `ITM.Tasks/Controllers/TaskFollowUpController.cs`
-  - v2 task progress `POST` and `PATCH` already exist.
-- `ITM.Tasks/Controllers/ProjectFollowUpController.cs`
-  - v2 project progress-report graph/history read already exists.
-- Legacy v1 project/task/activity follow-up controllers provide broader CRUD coverage, but they should not become the long-term MCP dependency.
-- `ITM.DataMart/zz_Specifications/time-reports-datamart-research.md`
-  - Confirms that DataMart has aggregate task effort fields but not daily time-report rows.
-  - Recommends summaries on component documents and exact detail in a separate indexed collection because large projects can exceed MongoDB's 16 MB document limit if rows are embedded.
-- Local license/menu configuration confirms an important commercial distinction:
-  - Team Member has My Timesheet access.
-  - Reporting is a Full Access capability in the current PPM configuration.
-  - Project Manager and Team Member do not have the Reporting menu entitlement in that configuration.
-- No implementation for CSV/Excel import of time entries was found. Existing import areas concern other entities.
+This is the part of the ticket with no dependencies. It should ship first and can ship alone.
 
-## Current REST workaround: useful, but not a migration contract
+"Seguimiento" is a separate domain from time entry. `update_task.PercentComplete` is intentionally rejected today because progress is stored through the follow-up/progress APIs and has side effects: task status transitions, parent rollups, automatic project progress, events, and notifications. Setting a percentage directly on the task would bypass all of them.
 
-The existing public endpoint is:
-
-```http
-POST https://api.itmplatform.com/{company}/timehours
-Token: {session-token}
-Content-Type: application/json
-
-{
-  "TimeReports": [
-    {
-      "EntityId": 55767,
-      "WorkItemId": 1193245,
-      "Date": "2026-03-24",
-      "ReportedHours": "3:00",
-      "UserComment": "Imported from Clockify"
-    }
-  ]
-}
-```
-
-This is a valid answer to “does a REST endpoint exist?” The answer is **yes**. It is documented and used by ITM's own timesheet UI.
-
-It is not safe to tell UCloud to post its Clockify export directly for the following reasons:
-
-1. **Overwrite/consolidation semantics:** for the same user, task, and date, the code updates or replaces the existing ITM row. Posting only the Clockify duration can destroy the ITM duration instead of adding to it.
-2. **Rerun duplicates or changed totals:** there is no external source row ID or import idempotency key in the contract.
-3. **Partial success:** rows are processed in a loop and errors are accumulated; the batch is not an atomic migration transaction.
-4. **User assignment:** the user must be assigned to the work item for public calls.
-5. **Date restrictions:** entries outside task dates are rejected unless the account setting permits them.
-6. **Closed/invoiced periods and editing rules:** existing entries may no longer be editable.
-7. **Historical user mapping:** Clockify users, projects, and tasks may not map one-to-one to active ITM records.
-8. **Delegated-user authorization:** the request model accepts an optional `UserId`. The current business path validates the target user's page access rather than clearly binding the target user to the authenticated caller. This needs a security review and must not be promoted as an admin impersonation feature.
-
-For ordinary self-entry, omit `UserId`; the authenticated token determines the user.
-
-## Recommendation by request
-
-### 1. Consolidate Clockify historical hours
-
-#### Recommendation
-
-Offer UCloud an **assisted, one-time historical import** first. Build it as a reusable import pipeline if another customer requests the same capability; do not build a full UI before validating repeat demand.
-
-The importer may accept CSV or XLSX, but should normalize to a canonical CSV-like row model:
-
-| Field | Required | Mapping rule |
-|---|---:|---|
-| `sourceEntryId` | Yes | Clockify time-entry ID; used for idempotency |
-| `userEmail` | Yes | Map to exactly one ITM user or reject |
-| `projectKey` | Yes | Prefer an explicit ITM project ID/code mapping file; do not fuzzy-match silently |
-| `taskKey` | Yes | Prefer an explicit ITM task ID/code mapping; unmatched rows require a reviewed fallback task |
-| `date` | Yes | Normalize to tenant-local `YYYY-MM-DD` |
-| `durationMinutes` | Yes | Positive integer; split cross-midnight entries by local date |
-| `description` | No | Store as time-entry comment, subject to length/privacy policy |
-| `billable` | No | Map to ITM billing/non-billing fields only when the customer supplies a reviewed mapping |
-| `billingCategory` | No | Map explicitly; no name-only silent matching |
-
-#### Import workflow
-
-1. Export Clockify with stable entry IDs and user emails.
-2. Upload into a staging/import batch; do not write production rows yet.
-3. Validate account, users, project/task relationships, assignments, dates, duration, billing categories, invoiced periods, duplicates, and existing ITM entries.
-4. Produce a dry-run report with counts and totals:
-   - accepted rows;
-   - already imported rows;
-   - unmapped users/projects/tasks;
-   - date or permission failures;
-   - collisions with existing ITM hours;
-   - totals by user and project before, Clockify delta, and after.
-5. Require an explicit approval of the mapping and totals.
-6. Consolidate Clockify rows by user + task + date.
-7. Atomically calculate `new total = existing ITM total + not-previously-imported Clockify minutes`.
-8. Write in bounded batches with a durable import ledger keyed by source system + source workspace + `sourceEntryId`.
-9. Re-read totals and reconcile against the approved dry run.
-10. Retain an audit report and a rollback plan for the import batch.
-
-#### Important policy choices
-
-- Historical former employees should be importable as inactive/non-login contributors without forcing a current paid interactive seat, if commercial policy permits it.
-- Ongoing entries for active workers must require the worker to hold the appropriate current license.
-- If Clockify has no task mapping, the customer may approve one dedicated “Clockify historical hours” task per ITM project. This preserves project totals but intentionally loses task-level fidelity and must not be the silent default.
-
-#### Why not MCP for the migration
-
-MCP is useful for interactive decisions and small writes, not as an ETL engine. Thousands of model-driven calls are slower, harder to reconcile, more expensive, and more likely to be retried ambiguously than a deterministic importer.
-
-### 2. Ongoing time entries through MCP
-
-#### Recommended tool surface
-
-Phase 1 should be deliberately narrow:
-
-```text
-list_my_time_entries(startDate, endDate, projectId?, taskId?)
-log_time_entry(projectId, taskId, date, durationMinutes, comment?, billingCategoryId?, nonBillableMinutes?, idempotencyKey)
-```
-
-Rules:
-
-- The user is always the authenticated caller; there is no `userId` parameter.
-- The caller must have `mcp:write`, a time-entry-capable license, access to My Timesheet, and assignment to the task/activity.
-- `durationMinutes` is numeric; MCP should not make the model format `H:MM`.
-- The API returns the before value, applied delta, after value, time-entry identifier, and idempotency result.
-- The first release supports additive logging with an idempotency key. It does not expose destructive replacement or deletion through MCP.
-- The server re-reads the source-of-truth time row after writing.
-- Every call is audit logged with caller, AI client, project/task, date, delta, and idempotency key.
-
-Example response:
-
-```json
-{
-  "timeEntryId": 12345,
-  "userId": 789,
-  "projectId": 100,
-  "taskId": 200,
-  "date": "2026-07-10",
-  "beforeMinutes": 60,
-  "appliedMinutes": 90,
-  "afterMinutes": 150,
-  "idempotentReplay": false
-}
-```
-
-#### Required platform work
-
-Do not make the MCP REST client call the legacy v1 controller directly as the final architecture. Add a v2 API, for example:
-
-```http
-GET  /v2/{account}/time-entries/search
-POST /v2/{account}/time-entries
-```
-
-The v2 endpoint should centralize authentication, page/menu rights, target-user rules, PM scope, assignment, date policies, billing fields, idempotency, transactions, and audit. It can reuse the existing `tblTaskTime` business rules initially, but must not reuse the unsafe caller-selectable `UserId` behavior.
-
-For an immediate customer workaround before the v2/MCP feature exists, support can provide the documented v1 `POST /{company}/timehours` instructions for **self-entry only**, or run the controlled historical import on UCloud's behalf.
-
-### 3. Seguimiento / progress through MCP
-
-“Seguimiento” is a separate domain from time entry. `update_task.PercentComplete` is intentionally rejected today because progress is stored through follow-up/progress APIs and has side effects such as task status transitions, parent rollups, automatic project progress, events, and notifications.
-
-#### Recommended tools
+### Recommended tool surface
 
 ```text
 list_task_progress(projectId, taskId, limit?, skip?)
@@ -217,220 +61,144 @@ list_activity_progress(serviceId, activityId, ...)
 create_activity_progress(...)
 ```
 
-#### Implementation take
+### Implementation notes
 
-- Reuse the existing v2 task progress `POST` and `PATCH` routes.
-- Add a paginated v2 task-progress `GET`; do not fall back permanently to the v1 controller.
-- Reuse the existing v2 project progress-report graph/history read.
-- Add explicit v2 project-progress creation only after its payload and side effects are aligned with the current UI path.
-- Add service/activity parity as a separate increment because the routes and permission model differ.
-- Discover valid assessment values through a typed reference-data endpoint/tool; `assessmentId` is mandatory for a main task follow-up in current validation.
-- Confirm writes by reading the created progress record, as other MCP write tools do.
+- Reuse the existing v2 task progress `POST` and `PATCH` routes (`ITM.Tasks/Controllers/TaskFollowUpController.cs`). The write logic already exists.
+- Add a paginated v2 task-progress `GET`. Do not fall back permanently to the v1 controller.
+- Reuse the existing v2 project progress-report graph/history read (`ITM.Tasks/Controllers/ProjectFollowUpController.cs`).
+- Add service/activity parity as a separate increment. The routes and permission model differ.
+- Discover valid assessment values through `get_reference_data`. `assessmentId` is mandatory for a main task follow-up in current validation.
+- Confirm writes by reading back the created progress record, as the other MCP write tools do.
+- Respect PM scoping: a Project Manager must not write progress outside their managed projects.
 
-This is a relatively high-value, moderate-effort MCP addition because most domain logic already exists and `update_task` already points users toward it.
+⚠️ Related: [2026-07-07-cross-tenant-project-progress-leak.md](../../ITM.Web/zz_Tickets/2026-07-07-cross-tenant-project-progress-leak.md) is an open cross-tenant authorization leak in the **legacy v1** project progress API, found with this same customer. The MCP tools should use the **v2** routes, which are not implicated, but confirm that before wiring anything up.
 
-### 4. Reports / BI through MCP
+High value, moderate effort: most domain logic already exists, and `update_task` already points users toward it.
 
-#### Product interpretation
+### Acceptance criteria
 
-“Access to the Reports/BI module” is too broad to implement literally. An AI client does not need the legacy report designer UI; it needs permission-aware data, aggregations, and exportable results.
-
-The first useful gap is detailed time reporting. DataMart currently exposes aggregate fields such as estimated, accepted, and actual time-entry effort on tasks/activities, but not daily rows by user, date, task, cost, or comment.
-
-#### Recommended first capabilities
-
-```text
-query_time_entries(startDate, endDate, projectIds?, taskIds?, userIds?, includeComments?, limit?, skip?)
-aggregate_time_entries(startDate, endDate, groupBy, projectIds?, userIds?, includeCosts?)
-```
-
-Supported `groupBy` values should be explicit, for example `project`, `task`, `user`, `date`, `week`, `month`, and selected combinations. Do not accept arbitrary SQL or arbitrary report definitions.
-
-#### Data architecture
-
-Follow the existing DataMart research recommendation:
-
-- Keep compact time-report summaries on task/activity documents.
-- Store exact daily rows in a separate indexed time-report collection.
-- Add a v2 paginated `TimeReports/Search` source API with component/task/user/date filters and numeric minute fields.
-- Use event-driven refresh plus a scheduled reconciliation window.
-- Do not embed full history under component documents; some current documents already exceed 2 MB and MongoDB caps a document at 16 MB.
-
-Costs and comments require field-level authorization:
-
-- `includeCosts` must be allowed only when the caller has the corresponding native financial/report right.
-- Comments may contain personal or sensitive text and should default to excluded.
-- PM callers must remain restricted to managed projects.
-- Report access must check the native menu/right entitlement, not only the coarse MCP/DataMart license type.
-
-#### What not to ship initially
-
-- No generic `run_report(reportId, parameters)` until saved-report ownership, parameter validation, output size, cost visibility, and row-level permissions are proven.
-- No MCP tools for creating/editing legacy report definitions.
-- No unrestricted SQL, stored-procedure, or report-generator access.
-
-This preserves the value of the native reporting product while providing the analytical building blocks agents actually need.
-
-## License cannibalization risk
-
-### Risk by capability
-
-| Capability | Risk of fewer licenses | Reason | Recommended control |
-|---|---|---|---|
-| One-time Clockify historical import | Low | It removes migration friction and does not replace daily product use | Treat as onboarding/professional service; mark the batch historical |
-| Self-only MCP time entry | Low | Each contributor still needs an eligible user/license | Bind target user to authenticated caller and verify entitlement on every write |
-| Team Member narrow MCP time tool | Low to medium | It changes the interface, but still consumes the same Team Member seat | Allow only with a current Team Member-or-higher license; expose only timesheet tools |
-| Admin/service account enters time for all active workers | **High** | One Full/Admin seat could replace many Team Member seats | Do not allow ongoing delegated entry under one identity |
-| External Clockify/Calendar connector writes for many users | **High unless licensed per contributor** | ITM becomes a passive data sink and workers no longer need to log in | Require each target worker to have an active eligible seat, or sell an integration/automation entitlement priced by active contributors |
-| PM access to managed-project analytics | Medium | It may substitute some Full Access reporting use | Respect native report/menu rights; offer curated PM summaries, not unrestricted BI |
-| Team Member access to broad BI | High | Reporting is currently a higher-tier capability | Do not expose broad BI to Team Members without a packaging decision |
-| Full-user governed BI through MCP | Low | The same paid user gets a new interface to an existing entitlement | Preserve field/menu rights and audit |
-
-### The main commercial failure mode
-
-The dangerous design is:
-
-```text
-one integration credential + arbitrary userId -> write time for every worker
-```
-
-That allows a customer to maintain many worker identities while purchasing only one powerful interactive license. The gross seat exposure is approximately:
-
-```text
-active contributors written by the integration × Team Member seat price
-```
-
-minus any integration fee. The exact value depends on contract/product, but the mechanism is clear even without assuming a current list price.
-
-### Packaging recommendation
-
-Use one of these defensible models:
-
-1. **Seat-preserving default:** API/MCP writes are included, but every active target contributor must have an eligible paid license.
-2. **Automation add-on:** delegated integrations are licensed by monthly active contributor or by a committed contributor tier, not by number of service credentials.
-3. **Historical migration exception:** a time-limited import permission may write for inactive/non-login historical identities, but cannot be used for current-period entries.
-
-Recommendation: start with model 1 plus the historical exception. Consider model 2 only when multiple customers need ongoing delegated ingestion from Clockify, Calendar, ERP, or similar systems.
-
-### Upside that offsets cannibalization
-
-The integrations can also protect or grow revenue:
-
-- Removing migration friction makes replacing Clockify easier and can improve onboarding/conversion.
-- Better MCP progress and analytics make Full and PM licenses more valuable.
-- Requiring licensed active contributors can move time tracking into ITM without reducing seat count.
-- A separately packaged automation entitlement creates an expansion path for customers who want ITM as the system of record without using the UI daily.
-
-The product decision should therefore be “license the actor or the active represented contributor,” not “avoid integrations.”
-
-## Suggested delivery phases
-
-### Phase 0 — answer and assisted migration
-
-- Confirm to UCloud that the v1 time-entry REST endpoint exists.
-- Explain that there is no native time-entry CSV import currently.
-- Obtain a sample Clockify export and mapping fields.
-- Run a read-only dry-run assessment and quote/approve an assisted import.
-- Security-review the optional `TimeSheet.UserId` path before any delegated use.
-
-### Phase 1 — progress tools and safe v2 time API
-
-- Complete v2 task progress read coverage and add MCP progress tools.
-- Design and build v2 self-only time-entry read/write endpoints with idempotency.
-- Add `list_my_time_entries` and `log_time_entry` MCP tools.
-- Enforce native timesheet entitlement and audit every write.
-
-### Phase 2 — reusable import
-
-- Add import batch, row ledger, dry run, reconciliation, and rollback support.
-- Support CSV first; XLSX can be converted at the boundary.
-- Add a narrowly permissioned admin UI only if repeat demand justifies it.
-
-### Phase 3 — governed time-report analytics
-
-- Add `TimeReports/Search` v2 API.
-- Add DataMart summaries plus a separate detail collection.
-- Add query and aggregation MCP tools with PM scope and field rights.
-- Measure usage before considering saved-report execution or report-designer functions.
-
-## Acceptance criteria
-
-### Historical import
-
-- A rerun with the same Clockify source IDs changes no totals.
-- Existing ITM hours are added to, never silently replaced.
-- Dry-run totals match committed and read-back totals by user and project.
-- Unmapped or invalid rows are rejected with actionable reasons.
-- A batch audit identifies every inserted/updated value and source row.
-- Current invoiced/locked entries cannot be changed without an explicit authorized override.
-
-### MCP time entry
-
-- The authenticated user cannot specify or impersonate another `userId`.
-- A Team Member with the narrow capability can access no broader MCP data/tools than licensed.
-- Duplicate retries with the same idempotency key apply the duration once.
-- Assignment, date, billing, page-right, and license rules match the native timesheet.
-- The response reports the source-of-truth before and after totals.
-
-### MCP progress
-
-- Progress creates/updates preserve existing side effects: status transitions, parent/project rollups, events, and notifications.
+- Progress creates and updates preserve the existing side effects: status transitions, parent and project rollups, events, notifications.
 - PM scope prevents writes outside managed projects.
-- Created/updated progress is read back and returned.
+- Created and updated progress is read back and returned.
 - Assessment references are discoverable and validated.
 
-### Reporting
+---
 
-- PM results contain only managed projects.
-- Costs and comments are absent unless explicitly requested and authorized.
-- Large result sets are paginated and bounded.
-- Time-report detail is not embedded into unbounded component documents.
-- Native Reporting entitlements are not bypassed through a coarse MCP license check.
+## 2. Reports / BI
 
-## Required tests if implemented
+**The tools already exist.** MCP has `query_datamart` (validated DataMart queries) and `aggregate_portfolio` (group and summarize portfolio data). An AI client can already produce custom reports, summaries, and analyses from portfolio data. There is nothing to build in MCP here.
 
-- Unit tests for time parsing, consolidation, mappings, collision behavior, idempotency, entitlement decisions, and field-level report authorization.
-- Integration tests for `tblTaskTime` transaction behavior, rollback, partial failures, locked/invoiced periods, events, and read-back.
-- Contract tests comparing new v2 time/progress output with the existing v1/UI behavior.
-- MCP unit/E2E tests for tool schemas, scope enforcement, cross-user rejection, PM scoping, audit, and source-of-truth verification.
-- Import tests must create isolated test data and remove it afterward.
-- Any import or reporting UI requires Playwright verification and a corresponding UI E2E specification.
+What is genuinely missing is **daily time-entry detail rows in DataMart**. Today DataMart carries aggregate effort fields on tasks (`actualEffortTimeEntryInMinutes`, `acceptedEffortInMinutes`, `estimatedEffortInMinutes`) but not the per-user, per-date, per-task rows needed to answer "how many hours did each person log last week?"
 
-## Open questions for UCloud
+That work belongs to DataMart and is already researched in depth in
+[time-reports-datamart-research.md](../../ITM.DataMart/zz_Specifications/time-reports-datamart-research.md),
+which covers the document-size problem (some component documents already exceed 2 MB against MongoDB's 16 MB cap), the separate-collection design, the sync strategy, and the v2 `TimeReports/Search` source API it needs. Do not duplicate that analysis here.
 
-These do not block giving them the REST/API answer, but they are required before importing:
+Once that data is in DataMart, `query_datamart` covers the reporting use cases with **no new MCP tools**.
 
-1. Can they provide a Clockify export containing stable entry ID, user email, project, task, local date/start time, duration, description, billable flag, and tags?
-2. Do Clockify project/task names or codes contain ITM IDs, or must they approve a mapping file?
-3. When a Clockify row collides with existing ITM hours for the same user/task/date, do they confirm that the desired result is the sum?
-4. How should unmatched Clockify tasks be handled: reject, map manually, or use an approved project-level historical task?
-5. Are former employees still present in ITM, and should their hours remain attributed to their original identities?
-6. Are billing categories, non-billable minutes, comments, approvals, and costs required, or only consumed-hour totals?
-7. Is this a one-time retirement of Clockify, or do they expect an ongoing Clockify-to-ITM synchronization?
-8. For “Seguimiento,” do they need task progress, project progress, service activity progress, or all three?
-9. For BI, which outputs are missing beyond time-report detail: saved reports, exports, charts, scheduled delivery, or conversational aggregation?
+### What not to build in MCP
+
+- No `query_time_entries` or `aggregate_time_entries` tools. `query_datamart` already does this.
+- No generic `run_report(reportId)` tool. The legacy report designer is a UI concern.
+- No tools for creating or editing legacy report definitions.
+
+---
+
+## 3. Time entries: deferred, and not an MCP feature
+
+### Why not
+
+Two independent reasons, either of which is sufficient.
+
+**It is the wrong surface for the customer's actual need.** They track time in Clockify and want it in ITM. That is a recurring bulk sync of many users' entries, which is a connector's job: scheduled, deterministic, server-side, reconcilable. An MCP tool is a model-driven, interactive, per-call surface. Using it as an ETL engine would be slow, expensive, and impossible to reconcile. Full design in the [Clockify connector spec](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md).
+
+**The former API safety blocker is resolved locally.** `POST /{company}/timehours` now validates the caller first; self-service remains available to every license, while only Company Admin or Full Access callers may set another active same-account user's `UserId`. Target/account/task/entity, assignment, and editability checks apply before writes. See the [completed ITM.Web ticket](../../ITM.Web/zz_Tickets/done/2026-07-13-timehours-userid-impersonation.md). Deployment is required before a deployed consumer relies on the contract.
+
+The deferral remains a **product/surface decision**, not a security dependency: the customer's Clockify synchronization belongs in ITM.Connector, and an MCP time-entry tool may still be unnecessary.
+
+### If and when MCP time-entry tools are built
+
+If product later chooses to build MCP time-entry tools, use these constraints:
+
+**The user is always the authenticated caller. No `userId` parameter.** Impersonation is not an MCP use case. The agreed platform rule is that only a Company Admin or Full Access user may write on behalf of another user, and that exists to serve connectors, not AI clients.
+
+**Time entries have three distinct concepts,** and a naive "add an hours field" would get this wrong:
+
+1. **Actual effort, direct hours** (`intTimeEntryType = 2`). The common type. A total for user + task + date, stored in `tblTaskTime`, no clock times. This is what `POST /{company}/timehours` writes, always.
+2. **Actual effort, time range** (`intTimeEntryType = 1`). Explicit start and end clock times, used by the legacy time-table UI. **No public write API.** Types 1 and 2 are mutually exclusive for a given user + task + date: creating one deletes the other.
+3. **Accepted effort.** Not a time entry at all. A derived aggregate on `tblTaskUser`, auto-recalculated as the SUM of `tblTaskTime` rows after every save when `IsAutomaticActualEffortAccepted = 1` (the default). **No MCP tool should ever write it.**
+
+**The write is a replace, not an append.** The effective key is user + task + date, and posting 90 minutes when 60 already exist yields 90, not 150. Any tool description must say "sets the total reported time for this user on this task for this date," or the model will get it wrong. If additive behavior is wanted, the tool must read first and add.
+
+Licensing is not a constraint: Team Member licenses are free, so there is no commercial reason to withhold time logging. The MCP-level Team Member block is a separate product decision (`src/auth/license-resolver.ts`).
+
+---
+
+## Delivery order
+
+| # | Work | Repo | Blocked by |
+|---|---|---|---|
+| 1 | **MCP progress tools** | ITM.MCP | Nothing. **Start here** |
+| 2 | Fix the `timehours` authorization defect | ITM.Web | **Implemented locally; deploy before consumers** |
+| 3 | Clockify connector | ITM.Connector | Build-ready; deployed item 2 required before enablement |
+| 4 | Time-entry detail in DataMart | ITM.DataMart | Nothing (but shares a v2 source API with 3) |
+| 5 | MCP time-entry tools | ITM.MCP | **Deferred on product merit**, may never be needed |
+
+Items 1, 2 and 4 can run in parallel. Only the MCP progress tools are needed to give this customer something real in the near term.
+
+---
+
+## Open questions
+
+### For MCP (needed to scope item 1)
+
+1. For "Seguimiento," do they need task progress, project progress, service activity progress, or all three?
+
+### For the Clockify connector
+
+Tracked in the [connector spec](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md#10-open-questions-for-ucloud). The two that matter most, because they change the design rather than just the scope:
+
+- Are daily totals per task sufficient, or do they need Clockify's start and end clock times preserved? (ITM's writable time entry has no clock times.)
+- Will users log time in **both** systems for the same task and day, or is Clockify the single source for synced projects? (There is no way to merge safely: `tblTaskTime` has no external-source column.)
+
+---
 
 ## Suggested customer response (Spanish)
 
-> Gracias por el detalle. Hemos confirmado que actualmente MCP no expone ni las imputaciones de horas ni las entradas de Seguimiento, y tampoco controla el módulo de Informes como tal.
+> Gracias por el detalle. Confirmamos que actualmente MCP no expone ni las imputaciones de horas ni las entradas de Seguimiento.
 >
-> Sí existe una API REST para consultar y registrar imputaciones (`GET/POST /{empresa}/timehours`). No obstante, para migrar el histórico de Clockify no recomendamos enviar el CSV directamente contra ese endpoint: hay que mapear usuarios/proyectos/tareas, sumar de forma segura las horas que ya existen en ITM, controlar periodos bloqueados y hacer la carga idempotente para que una repetición no duplique ni sobrescriba datos.
+> **Seguimiento:** vamos a incorporar herramientas de MCP para el progreso de tareas y proyectos, respetando los permisos y la identidad del usuario conectado. Es la parte que podemos abordar antes, y no depende de nada más.
 >
-> Nuestra propuesta para vuestro caso es revisar primero una muestra del export de Clockify y preparar una carga histórica con validación previa y un informe de conciliación por usuario y proyecto. En paralelo, proponemos incorporar a MCP herramientas específicas para registrar/consultar horas y Seguimiento, respetando los permisos y la identidad del usuario conectado. Para BI, la opción más útil es exponer consultas y agregaciones controladas —especialmente el detalle diario de horas— en lugar de reproducir dentro de MCP el diseñador de informes completo.
+> **Registro de horas:** entendemos que el objetivo real es que las horas que registran en Clockify lleguen a ITM Platform. Para eso, el camino correcto no es una herramienta de MCP sino un **conector**, que puede ejecutarse de forma programada o mediante webhooks de Clockify. Ya tenemos un precedente equivalente con el conector de Jira.
 >
-> Para preparar la migración necesitaremos una muestra del archivo de Clockify y confirmar cómo se relacionan sus proyectos/tareas con los identificadores de ITM, además de qué hacer cuando ya existen horas para el mismo usuario, tarea y fecha.
+> Antes de construirlo necesitamos confirmar dos puntos con ustedes. El primero: ITM Platform almacena **un registro de horas por usuario, tarea y día** (un total diario), no intervalos de hora de inicio y fin como Clockify. Las entradas de Clockify se consolidarían en totales diarios por tarea, y queremos confirmar que eso les sirve. El segundo: si sus usuarios imputarán horas en ambos sistemas o si Clockify será la única fuente para los proyectos sincronizados, ya que eso cambia el diseño de la sincronización.
+>
+> **BI:** MCP ya permite consultas analíticas mediante `query_datamart` y `aggregate_portfolio`, así que ese módulo no está fuera de alcance. Lo que falta es incluir el detalle diario de horas en el DataMart, que es lo que vamos a agregar.
+
+---
 
 ## TODO checklist
 
-- [x] Read the full Help Scout conversation and verify that it has no relevant attachments.
+Investigation (done):
+
+- [x] Read the full Help Scout conversation and verify it has no relevant attachments.
 - [x] Exclude the 401 issue from this document.
 - [x] Trace current MCP tools and license behavior.
-- [x] Trace time entry, follow-up, reports, DataMart, and import prior art.
+- [x] Trace time entry, follow-up, reports, and DataMart prior art.
 - [x] Confirm the existing REST time-entry endpoint and its payload.
-- [x] Assess overwrite, idempotency, assignment, date, authorization, and migration risks.
-- [x] Assess license cannibalization by capability.
-- [ ] Product owner: approve self-only MCP time entry and the active-contributor licensing rule.
-- [ ] Security owner: review the current v1 `TimeSheet.UserId` authorization path.
-- [ ] Support/account owner: request a representative Clockify export and answers to the migration questions.
-- [ ] Engineering: produce an implementation specification for Phase 1 after product/security decisions.
-- [ ] Commercial owner: decide whether repeated delegated integrations require an automation add-on.
+- [x] Document the three time-entry concepts (direct hours, time range, accepted effort).
+- [x] Verify how the time-entry API resolves user identity. **Found an authorization defect.**
+- [x] Check whether `UserId` is documented in APIDocs (**no**) and whether the web UI sends it (**no**). The Jira connector does, which is why the field exists.
+- [x] Check the Clockify API model against ITM's (start/end vs daily totals, ISO-8601 durations, webhooks).
+- [x] Confirm the extension framework can host the connector, and that a single global extension for all tenants is feasible.
+- [x] Confirm the "Company Admin or Full Access" authorization rule is implementable and compatible with how extensions authenticate.
+- [x] Split the work into per-repo tickets and specs.
+
+Next:
+
+- [x] Engineering (ITM.MCP): progress tools. Implemented locally on 2026-07-13 (4 MCP tools, v2 GET endpoints in ITM.Tasks, assessments reference endpoint + gateway entry); all unit and E2E tests green. See [SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Pending deployment via pipeline.
+- [x] Engineering (ITM.Web): implement and locally verify the `timehours` authorization fix; deployment remains a release step.
+- [ ] Support/account owner: ask UCloud the open questions above.
+- [ ] Engineering (ITM.Connector): Clockify connector; the API contract is ready, and the ITM.Web fix must be deployed before enablement.
+- [ ] Engineering (ITM.DataMart): time-entry detail collection.
+- [ ] Confirm whether the Jira worklog sync is actually live in production (its loops are gated by `"condition": "1 == 0"`).

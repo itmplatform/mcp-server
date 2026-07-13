@@ -233,4 +233,74 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       ProjectStatusId: 2,
     },
   },
+  list_service_activities: {
+    category: 'Projects & Services',
+    narrative:
+      'When you ask "What activities does the IT Support service have?", the AI lists the activities of a service with pagination.',
+    exampleResponse: {
+      items: [{ id: 91001, name: 'Ticket triage', percentComplete: 40 }],
+      total: 6,
+    },
+  },
+  get_service_purchases: {
+    category: 'Financials',
+    narrative:
+      'Like get_project_purchases but for services: lists the purchase orders of a service with pagination.',
+    exampleResponse: {
+      items: [{ id: 5101, description: 'Monitoring licenses', amount: 1200 }],
+      total: 3,
+    },
+  },
+  get_service_revenues: {
+    category: 'Financials',
+    narrative:
+      'Like get_project_revenues but for services: lists the revenue items of a service with pagination.',
+    exampleResponse: {
+      items: [{ id: 6101, description: 'Support retainer', amount: 5000 }],
+      total: 2,
+    },
+  },
+  list_task_progress: {
+    category: 'Tasks',
+    narrative:
+      'When you ask "How has the API migration task progressed?", the AI lists the task\'s progress (follow-up) history, newest first. Task progress is a time-series of dated entries, not a single field on the task.',
+    exampleResponse: [
+      { TaskFollowUpId: 9012, Percentage: 60, ShortDescription: 'Backend done', ReportDate: '2026-07-10T09:30:00' },
+      { TaskFollowUpId: 8998, Percentage: 30, ShortDescription: 'Kickoff', ReportDate: '2026-07-01T14:00:00' },
+    ],
+  },
+  get_project_progress: {
+    category: 'Projects & Services',
+    narrative:
+      'When you ask "Is the Website Redesign on track?", the AI compares the expected progress curve (from task dates and working days) and the baseline curve against the actual follow-up history.',
+    exampleResponse: {
+      Expected: [{ Date: '2026-07-01', Percentage: 45 }],
+      BaselineExpected: [{ Date: '2026-07-01', Percentage: 50 }],
+      FollowUps: [{ Date: '2026-07-01', Percentage: 40 }],
+    },
+  },
+  create_task_progress: {
+    category: 'Write Operations',
+    narrative:
+      'When you say "Report 60% progress on the API migration task," the AI creates a progress entry with a date, percentage, assessment rating, and summary. This is the correct way to set task completion: it triggers status transitions, parent rollups, and automatic project progress. Assessment ratings are discovered with get_reference_data.',
+    exampleResponse: {
+      TaskFollowUpId: 9013,
+      TaskId: 1859241,
+      Percentage: 60,
+      AssessmentId: 152744,
+      ShortDescription: 'Backend migration complete',
+      ReportDate: '2026-07-13T10:00:00',
+    },
+  },
+  update_task_progress: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Correct yesterday\'s progress entry to 75%," the AI updates an existing progress entry, sending only the fields that change.',
+    exampleResponse: {
+      TaskFollowUpId: 9013,
+      TaskId: 1859241,
+      Percentage: 75,
+      ShortDescription: 'Backend migration complete',
+    },
+  },
 }

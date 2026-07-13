@@ -25,8 +25,11 @@ describe('project tools', () => {
     if (items.length === 0) return;
 
     const projectId = items[0].id;
-    const result = await callTool('get_project', { projectId, include: ['tasks', 'budget'] });
+    const result = await callTool('get_project', { projectId, include: ['budget'] });
     expect(result.result).toBeDefined();
     expect(result.result.isError).toBeFalsy();
+    const project = JSON.parse(result.result.content[0].text);
+    expect(project.id).toBe(projectId);
+    expect(project).toHaveProperty('subcomponents');
   });
 });

@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 23 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 27 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -106,6 +106,8 @@ The server exposes 23 MCP tools, 6 resources, and 4 prompt templates.
 | `get_project_revenues` | List revenue items for a project with pagination |
 | `get_project_risks` | List project risks with pagination |
 | `get_project_issues` | List project issues with pagination |
+| `list_task_progress` | List the progress (follow-up) history for a task |
+| `get_project_progress` | Get project progress report: expected, baseline, and actual curves |
 | `list_service_activities` | List activities for a service with pagination |
 | `get_service_purchases` | List purchase orders for a service with pagination |
 | `get_service_revenues` | List revenue items for a service with pagination |
@@ -120,7 +122,9 @@ The server exposes 23 MCP tools, 6 resources, and 4 prompt templates.
 | Tool | What it does |
 |------|--------------|
 | `create_task` | Add a task to a project |
-| `update_task` | Update task fields such as status, dates, assignee, and progress |
+| `update_task` | Update task fields such as status, dates, and assignee |
+| `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
+| `update_task_progress` | Update an existing task progress entry |
 | `create_risk` | Log a project risk |
 | `create_issue` | Log a project issue |
 | `update_project` | Update project fields such as name, status, dates, and priority |

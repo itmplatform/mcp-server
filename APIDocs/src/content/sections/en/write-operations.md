@@ -6,6 +6,8 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 |-----------|-------------|
 | **Create task** | Add a new task to a project |
 | **Update task** | Change task name, status, priority, or dates |
+| **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress |
+| **Update task progress** | Correct an existing progress entry |
 | **Create risk** | Log a new risk in a project |
 | **Create issue** | Log a new issue in a project |
 | **Update project** | Change project name, status, priority, or dates |

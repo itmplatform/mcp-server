@@ -218,7 +218,7 @@ async function normalizeReferenceIds(
   }
 }
 
-function extractResponseId(data: unknown, label: string): number | string {
+export function extractResponseId(data: unknown, label: string): number | string {
   if (data && typeof data === 'object') {
     const record = data as JsonRecord;
     const id = record.Id ?? record.id ?? record.ProjectId ?? record.projectId ?? record.TaskId ?? record.taskId;

@@ -1,3 +1,17 @@
+### v1.0.8
+
+Task and project progress (seguimiento) support.
+
+**New tools (4):**
+- 2 read tools: list_task_progress (task progress history), get_project_progress (expected vs baseline vs actual curves)
+- 2 write tools: create_task_progress, update_task_progress. Creating progress preserves all platform side effects: task status transitions at 100%, parent task rollups, and automatic project progress
+
+**Reference data:**
+- New `assessments` entity in get_reference_data to discover the progress rating IDs required by create_task_progress
+
+**Documentation:**
+- The tool catalog now also documents list_service_activities, get_service_purchases, and get_service_revenues, which shipped in an earlier server release
+
 ### v1.0.0
 
 Initial release of the ITM Platform MCP server.
