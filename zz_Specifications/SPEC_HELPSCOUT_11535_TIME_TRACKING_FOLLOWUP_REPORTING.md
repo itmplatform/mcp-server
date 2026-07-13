@@ -3,7 +3,7 @@
 **Source:** [Help Scout conversation 3382659721 / 11535](https://secure.helpscout.net/conversation/3382659721/11535/)
 **Requester:** Gilsandro Cezar, UCloud Global PMO
 **Date:** 2026-07-13
-**Status:** Product and technical recommendation
+**Status:** Product and technical recommendation. Item 1 (MCP progress tools) implemented on 2026-07-13 and pushed to develop; awaiting stage/prod deployment
 **Explicitly out of scope:** the reported `query_datamart` 401 error
 
 ```
@@ -40,6 +40,8 @@ The single most useful reframing: **the customer did not ask for a migration, an
 
 ## 1. Progress / Seguimiento tools (the MCP deliverable)
 
+> **Implemented 2026-07-13.** The four tools, the v2 GET endpoints in ITM.Tasks, and the assessments reference endpoint are on develop in ITM.MCP, ITM.Tasks, and ITM.Web (gateway route). All unit and E2E tests green. Implementation record: [done/SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Remaining: deploy ITM.Tasks and ITM.Web, then release the MCP server.
+
 This is the part of the ticket with no dependencies. It should ship first and can ship alone.
 
 "Seguimiento" is a separate domain from time entry. `update_task.PercentComplete` is intentionally rejected today because progress is stored through the follow-up/progress APIs and has side effects: task status transitions, parent rollups, automatic project progress, events, and notifications. Setting a percentage directly on the task would bypass all of them.
@@ -64,7 +66,7 @@ create_activity_progress(...)
 ### Implementation notes
 
 - Reuse the existing v2 task progress `POST` and `PATCH` routes (`ITM.Tasks/Controllers/TaskFollowUpController.cs`). The write logic already exists.
-- Add a paginated v2 task-progress `GET`. Do not fall back permanently to the v1 controller.
+- Add a v2 task-progress `GET`. Do not fall back permanently to the v1 controller. (Shipped unpaginated: per-task follow-up volumes are tens of rows; the decision is recorded in the [implementation spec](done/SPEC_MCP_PROGRESS_TOOLS.md).)
 - Reuse the existing v2 project progress-report graph/history read (`ITM.Tasks/Controllers/ProjectFollowUpController.cs`).
 - Add service/activity parity as a separate increment. The routes and permission model differ.
 - Discover valid assessment values through `get_reference_data`. `assessmentId` is mandatory for a main task follow-up in current validation.
@@ -138,8 +140,8 @@ Licensing is not a constraint: Team Member licenses are free, so there is no com
 
 | # | Work | Repo | Blocked by |
 |---|---|---|---|
-| 1 | **MCP progress tools** | ITM.MCP | Nothing. **Start here** |
-| 2 | Fix the `timehours` authorization defect | ITM.Web | **Implemented locally; deploy before consumers** |
+| 1 | **MCP progress tools** | ITM.MCP | **Done, on develop.** Deploy ITM.Tasks + ITM.Web, then release MCP |
+| 2 | Fix the `timehours` authorization defect | ITM.Web | **Implemented, on develop; deploy before consumers** |
 | 3 | Clockify connector | ITM.Connector | Build-ready; deployed item 2 required before enablement |
 | 4 | Time-entry detail in DataMart | ITM.DataMart | Nothing (but shares a v2 source API with 3) |
 | 5 | MCP time-entry tools | ITM.MCP | **Deferred on product merit**, may never be needed |
