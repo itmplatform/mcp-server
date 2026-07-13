@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.8",
+  "serverVersion": "1.0.9",
   "tools": [
     {
       "name": "search_projects",
@@ -683,7 +683,7 @@
     },
     {
       "name": "create_task",
-      "description": "Create a new task in a project. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid IDs.",
+      "description": "Create a new task in a project. Waterfall projects require StatusId, StartDate, and EndDate; Kanban projects use board defaults and do not require dates. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -705,7 +705,7 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Task status ID"
+            "description": "Task status ID. Required for Waterfall projects; Kanban uses board-specific status defaults."
           },
           "TypeId": {
             "type": "number",
@@ -717,11 +717,11 @@
           },
           "StartDate": {
             "type": "string",
-            "description": "Start date (ISO 8601)"
+            "description": "Start date (ISO 8601). Required for Waterfall projects."
           },
           "EndDate": {
             "type": "string",
-            "description": "End date (ISO 8601)"
+            "description": "End date (ISO 8601). Required for Waterfall projects."
           }
         },
         "required": [
@@ -859,11 +859,11 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Issue status ID. Mapped to the v2 REST Status field."
+            "description": "Issue status ID (required). Mapped to the v2 REST Status field."
           },
           "TypeId": {
             "type": "number",
-            "description": "Issue type ID. Mapped to the v2 REST Type field."
+            "description": "Issue type ID (required). Mapped to the v2 REST Type field."
           },
           "Resolution": {
             "type": "string",
@@ -872,7 +872,9 @@
         },
         "required": [
           "projectId",
-          "Name"
+          "Name",
+          "StatusId",
+          "TypeId"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"

@@ -26,6 +26,13 @@ export function buildWriteResponse(data: unknown): { content: Array<{ type: 'tex
   };
 }
 
+function buildValidationErrorResponse(message: string): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+  return {
+    content: [{ type: 'text' as const, text: `Validation error: ${message}` }],
+    isError: true,
+  };
+}
+
 function hasSuppliedField(body: JsonRecord, field: string): boolean {
   return Object.prototype.hasOwnProperty.call(body, field) && body[field] !== undefined;
 }
@@ -102,6 +109,39 @@ export function splitCreateTaskArgs(args: { projectId: number; [key: string]: un
   return { path: `projects/${projectId}/tasks`, body };
 }
 
+export function getCreateTaskValidationError(body: JsonRecord, project: unknown): string | undefined {
+  if (project === null || typeof project !== 'object') {
+    return 'Could not determine project methodology before creating the task.';
+  }
+
+  const projectRecord = project as JsonRecord;
+  const methodTypeId = numericValue(
+    projectRecord.MethodTypeId
+      ?? projectRecord.ProjectMethodTypeId
+      ?? (projectRecord.MethodType as JsonRecord | undefined)?.Id,
+  );
+
+  if (methodTypeId === undefined) {
+    return 'Could not determine project methodology before creating the task.';
+  }
+
+  if (methodTypeId === 2) return undefined;
+  if (methodTypeId !== 1) {
+    return `Unsupported project methodology (${methodTypeId}) for task creation.`;
+  }
+
+  const requiredFields = ['StatusId', 'StartDate', 'EndDate'];
+  const missingFields = requiredFields.filter(field => {
+    const value = body[field];
+    if (!hasSuppliedField(body, field)) return true;
+    if (field === 'StatusId') return numericValue(value) === undefined || Number(value) <= 0;
+    return typeof value !== 'string' || value.trim() === '';
+  });
+  if (!missingFields.length) return undefined;
+
+  return `Waterfall task creation requires StatusId, StartDate, and EndDate. Missing: ${missingFields.join(', ')}.`;
+}
+
 export function splitUpdateTaskArgs(args: { projectId: number; taskId: number; [key: string]: unknown }) {
   const { projectId, taskId, ...body } = args;
   normalizeAlias(body, 'Description', 'Details');
@@ -127,6 +167,8 @@ export function splitCreateRiskArgs(args: { projectId: number; [key: string]: un
 
 export function splitCreateIssueArgs(args: { projectId: number; [key: string]: unknown }) {
   const { projectId, ...body } = args;
+  requireSuppliedField('create_issue', body, 'TypeId', 'the v2 issue create route requires a valid issue type');
+  requireSuppliedField('create_issue', body, 'StatusId', 'the v2 issue create route requires a valid issue status');
   normalizeAlias(body, 'TypeId', 'Type');
   normalizeAlias(body, 'StatusId', 'Status');
   normalizeAlias(body, 'Resolution', 'FinalResolution');
@@ -275,22 +317,25 @@ export function registerWriteTools(
   server.registerTool(
     'create_task',
     {
-      description: 'Create a new task in a project. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid IDs.',
+      description: 'Create a new task in a project. Waterfall projects require StatusId, StartDate, and EndDate; Kanban projects use board defaults and do not require dates. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid Waterfall IDs.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the task in'),
         Name: z.string().describe('Task name (required)'),
         Description: z.string().optional().describe('Task description. Compatibility alias for the v2 REST Details field.'),
         Details: z.string().optional().describe('Task details/description field used by v2 REST'),
-        StatusId: z.number().optional().describe('Task status ID'),
+        StatusId: z.number().optional().describe('Task status ID. Required for Waterfall projects; Kanban uses board-specific status defaults.'),
         TypeId: z.number().optional().describe('Task type ID'),
         PriorityId: z.number().optional().describe('Task priority ID'),
-        StartDate: z.string().optional().describe('Start date (ISO 8601)'),
-        EndDate: z.string().optional().describe('End date (ISO 8601)'),
+        StartDate: z.string().optional().describe('Start date (ISO 8601). Required for Waterfall projects.'),
+        EndDate: z.string().optional().describe('End date (ISO 8601). Required for Waterfall projects.'),
       },
     },
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateTaskArgs(args);
+      const project = await clients.rest.get(`projects/${args.projectId}`);
+      const validationError = getCreateTaskValidationError(body, project);
+      if (validationError) return buildValidationErrorResponse(validationError);
       const data = await clients.rest.post(path, body);
       const taskId = extractResponseId(data, 'created task');
       const readback = await clients.rest.get(`${path}/${taskId}`);
@@ -367,8 +412,8 @@ export function registerWriteTools(
         projectId: z.number().describe('The project ID to create the issue in'),
         Name: z.string().describe('Issue name (required)'),
         Description: z.string().optional().describe('Issue description'),
-        StatusId: z.number().optional().describe('Issue status ID. Mapped to the v2 REST Status field.'),
-        TypeId: z.number().optional().describe('Issue type ID. Mapped to the v2 REST Type field.'),
+        StatusId: z.number().describe('Issue status ID (required). Mapped to the v2 REST Status field.'),
+        TypeId: z.number().describe('Issue type ID (required). Mapped to the v2 REST Type field.'),
         Resolution: z.string().optional().describe('Resolution description. Mapped to the v2 REST FinalResolution field.'),
       },
     },

@@ -1,3 +1,12 @@
+### v1.0.9
+
+Correcciones del contrato de creación de tareas e incidencias.
+
+**Validación de escritura:**
+- `create_task` comprueba la metodología del proyecto antes de escribir. Las tareas Waterfall requieren `StatusId`, `StartDate` y `EndDate`; las tareas Kanban siguen utilizando los valores predeterminados del tablero.
+- `create_issue` publica ahora `TypeId` y `StatusId` como entradas MCP obligatorias.
+- Las respuestas de validación REST conservan el `StatusMessage` del servicio, con texto alternativo limitado, en vez de devolver solo un estado HTTP genérico.
+
 ### v1.0.8
 
 Soporte de seguimiento (avance) de tareas y proyectos.

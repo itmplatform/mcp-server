@@ -58,10 +58,42 @@ describe('RestClient', () => {
       ok: false,
       status: 404,
       statusText: 'Not Found',
+      text: () => Promise.resolve(''),
     });
 
     const client = createRestClient(config);
     await expect(client.get('nonexistent')).rejects.toThrow('404');
+  });
+
+  it('preserves a downstream JSON StatusMessage in the thrown error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: () => Promise.resolve(JSON.stringify({
+        StatusCode: 400,
+        StatusMessage: 'Please enter task end date.<br/>',
+      })),
+    });
+
+    const client = createRestClient(config);
+    await expect(client.post('projects/100/tasks', { Name: 'Task' }))
+      .rejects.toThrow('REST request failed: 400 Bad Request -- Please enter task end date.');
+  });
+
+  it('falls back to bounded plain response text for non-JSON errors', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      text: () => Promise.resolve(`proxy failure ${'x'.repeat(5000)}`),
+    });
+
+    const client = createRestClient(config);
+    const promise = client.get('projects');
+
+    await expect(promise).rejects.toThrow('proxy failure');
+    await expect(promise).rejects.not.toThrow('x'.repeat(5000));
   });
 
   describe('logging', () => {
@@ -103,6 +135,7 @@ describe('RestClient', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        text: () => Promise.resolve(''),
       });
 
       const client = createRestClient({ ...config, log });
@@ -149,6 +182,7 @@ describe('RestClient', () => {
       ok: false,
       status: 400,
       statusText: 'Bad Request',
+      text: () => Promise.resolve(''),
     });
 
     const client = createRestClient(config);

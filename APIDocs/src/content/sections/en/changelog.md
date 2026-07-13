@@ -1,3 +1,12 @@
+### v1.0.9
+
+Task and issue creation contract corrections.
+
+**Write validation:**
+- `create_task` checks the project methodology before writing. Waterfall tasks require `StatusId`, `StartDate`, and `EndDate`; Kanban tasks continue to use board defaults.
+- `create_issue` now publishes `TypeId` and `StatusId` as required MCP inputs.
+- REST validation responses retain the downstream `StatusMessage`, with bounded plain-text fallback, instead of returning only a generic HTTP status.
+
 ### v1.0.8
 
 Task and project progress (seguimiento) support.

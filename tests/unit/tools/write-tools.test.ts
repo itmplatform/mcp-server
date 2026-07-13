@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildWriteResponse, buildInsufficientScopeResponse, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
   splitCreateIssueArgs, splitUpdateProjectArgs, mapReferenceIdToBaseId,
-  verifyRequestedFields,
+  verifyRequestedFields, getCreateTaskValidationError, registerWriteTools,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -64,6 +64,59 @@ describe('splitCreateTaskArgs', () => {
   });
 });
 
+describe('getCreateTaskValidationError', () => {
+  it('lists the fields required by Waterfall task creation', () => {
+    const error = getCreateTaskValidationError(
+      { Name: 'New Task' },
+      { MethodTypeId: 1 },
+    );
+
+    expect(error).toContain('Waterfall');
+    expect(error).toContain('StatusId');
+    expect(error).toContain('StartDate');
+    expect(error).toContain('EndDate');
+  });
+
+  it('accepts a Waterfall task with status and both dates', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'New Task', StatusId: 10, StartDate: '2026-07-13', EndDate: '2026-07-17' },
+      { MethodTypeId: 1 },
+    )).toBeUndefined();
+  });
+
+  it('allows Kanban task creation to use board defaults without dates', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'Backlog item' },
+      { MethodTypeId: 2 },
+    )).toBeUndefined();
+  });
+
+  it('fails safely when the project response has no methodology', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'New Task' },
+      { Id: 100 },
+    )).toContain('project methodology');
+  });
+
+  it('treats zero status and blank dates as missing Waterfall values', () => {
+    const error = getCreateTaskValidationError(
+      { Name: 'New Task', StatusId: 0, StartDate: '', EndDate: '   ' },
+      { MethodTypeId: 1 },
+    );
+
+    expect(error).toContain('StatusId');
+    expect(error).toContain('StartDate');
+    expect(error).toContain('EndDate');
+  });
+
+  it('rejects an unknown project methodology instead of bypassing validation', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'New Task' },
+      { MethodTypeId: 99 },
+    )).toContain('Unsupported project methodology');
+  });
+});
+
 describe('splitUpdateTaskArgs', () => {
   it('builds path with taskId, separates IDs, and maps Description to Details', () => {
     const { path, body } = splitUpdateTaskArgs({ projectId: 100, taskId: 42, Name: 'Updated', Description: 'New details' });
@@ -117,8 +170,84 @@ describe('splitCreateIssueArgs', () => {
     expect(() => splitCreateIssueArgs({
       projectId: 100,
       Name: 'Issue B',
+      TypeId: 820,
+      StatusId: 547,
       Severity: 2,
     })).toThrow('Severity is not supported');
+  });
+
+  it('rejects a missing issue type', () => {
+    expect(() => splitCreateIssueArgs({
+      projectId: 100,
+      Name: 'Issue B',
+      StatusId: 547,
+    })).toThrow('TypeId is required');
+  });
+
+  it('rejects a missing issue status', () => {
+    expect(() => splitCreateIssueArgs({
+      projectId: 100,
+      Name: 'Issue B',
+      TypeId: 820,
+    })).toThrow('StatusId is required');
+  });
+});
+
+describe('published write tool schemas', () => {
+  it('publishes issue type and status as required inputs', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+
+    registerWriteTools(server as any, {} as any);
+
+    const schema = registrations.get('create_issue').config.inputSchema;
+    expect(schema.TypeId.safeParse(undefined).success).toBe(false);
+    expect(schema.StatusId.safeParse(undefined).success).toBe(false);
+  });
+
+  it('documents the methodology-dependent Waterfall task requirements', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+
+    registerWriteTools(server as any, {} as any);
+
+    const description = registrations.get('create_task').config.description;
+    expect(description).toContain('Waterfall');
+    expect(description).toContain('StatusId');
+    expect(description).toContain('StartDate');
+    expect(description).toContain('EndDate');
+  });
+
+  it('preflights Waterfall requirements before posting a task', async () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    const rest = {
+      get: vi.fn().mockResolvedValue({ Id: 100, MethodTypeId: 1 }),
+      post: vi.fn(),
+      patch: vi.fn(),
+    };
+
+    registerWriteTools(server as any, { rest } as any);
+    const result = await registrations.get('create_task').handler({ projectId: 100, Name: 'Missing fields' });
+
+    expect(rest.get).toHaveBeenCalledWith('projects/100');
+    expect(rest.post).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('StatusId');
+    expect(result.content[0].text).toContain('StartDate');
+    expect(result.content[0].text).toContain('EndDate');
   });
 });
 
