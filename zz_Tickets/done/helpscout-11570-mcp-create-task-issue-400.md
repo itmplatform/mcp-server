@@ -5,7 +5,7 @@ Help Scout conversation: `3385099189` / ticket `11570`
 Customer: uCloud (`ucloud`, account `29908`, user `62847`)  
 Severity: High  
 Diagnosis: Confirmed  
-Implementation: Completed locally; pending review/deployment
+Implementation: Completed; verified on stage and deployed to production on 2026-07-14
 
 ## Executive summary
 
@@ -138,6 +138,27 @@ Verification completed on 2026-07-13:
 
 The local IIS worker temporarily became unresponsive during an early project-cleanup request. The two interrupted fixtures were verified by ID/name and removed directly from the local test database. The worker subsequently recovered, after which both the REST integration suite and the complete local MCP E2E suite passed with normal API cleanup.
 
+## Stage verification (2026-07-14)
+
+All three components were deployed to stage on 2026-07-14 (pipeline runs: ITM.Web-Stage 7215, ITM.Tasks-Stage 7219, ITM.MCP-Stage 7227, all succeeded) and the fix was verified end to end against the deployed stage MCP server.
+
+Method: JSON-RPC calls against `https://new-api.itmplatform.com/revamping/v2/_/mcp/`, authenticated through the complete OAuth 2.1 + PKCE flow (dynamic client registration, browser login as `daniel.piret@itmplatform.com`, company `testsmarter`, scopes `mcp:read mcp:write`). The run created its own fixtures through the stage v2 REST API: one Waterfall project (81282) and one Kanban project (81283).
+
+| # | Test | Result |
+|---|---|---|
+| 1 | `tools/list` publishes the corrected contract: `create_issue` requires `projectId`, `Name`, `StatusId`, `TypeId`; `create_task` description documents the Waterfall requirements | Pass |
+| 2 | `create_task` on a Waterfall project with only `Name`: structured preflight error `Validation error: Waterfall task creation requires StatusId, StartDate, and EndDate. Missing: StatusId, StartDate, EndDate.` (no POST reaches ITM.Tasks) | Pass |
+| 3 | `create_task` reproducing the customer's most complete attempt (`Name`, `StatusId`, `StartDate`, no `EndDate`): preflight error names exactly `Missing: EndDate.` | Pass |
+| 4 | `create_task` on the Waterfall project with `StatusId` + `StartDate` + `EndDate`: task 1865967 created and read back from v2 REST | Pass |
+| 5 | `create_task` on the Kanban project with only `Name`: task 1865968 created via board defaults, no Waterfall-only fields needed | Pass |
+| 6 | `create_issue` without `TypeId`/`StatusId`: rejected by the published schema (MCP `-32602` input validation error naming both missing fields), the handler never runs | Pass |
+| 7 | `create_issue` with valid `TypeId` (820) and `StatusId` (547) from `get_reference_data`: issue 1182 created and read back | Pass |
+| 8 | Downstream validation detail preserved: `create_task` with `EndDate` before `StartDate` passes preflight and returns `REST request failed: 400 Bad Request -- Task start date should be less than or equal to task end date. Task: ...` instead of the bare status line | Pass |
+
+The same run also verified the four new progress tools from Help Scout 11535 (documented in [SPEC_MCP_PROGRESS_TOOLS.md](../zz_Specifications/done/SPEC_MCP_PROGRESS_TOOLS.md)). All fixtures (issue, both tasks, both projects) were deleted through the REST API afterwards; deletion was confirmed by a 404 readback on the projects.
+
+Production deployment completed later the same day (ITM.MCP-Prod run 7228, with ITM.Web-Prod 7218 and ITM.Tasks-Prod 7220). Remaining: the Spanish issue-status label cleanup below, tracked in [ITM.Web/zz_Tickets/2026-07-14-issue-status-spanish-seed-labels-swapped.md](../../../ITM.Web/zz_Tickets/2026-07-14-issue-status-spanish-seed-labels-swapped.md).
+
 ## Suggested solution
 
 ### P0 — Align the MCP contract with downstream validation
@@ -204,14 +225,30 @@ Likewise, an explicit prompt could ask Claude to call `get_reference_data` for `
 
 The current MCP normalizes either localized IDs or BaseIds before calling REST. The dependable resolution is to correct the tool schema/runtime validation and redeploy MCP.
 
-## Secondary data-quality finding
+## Secondary data-quality finding: platform-wide, not account-specific (updated 2026-07-14)
 
 Account `29908` has the Spanish labels for its two issue-status base records reversed:
 
 - open/default base `52191` is labeled `Cerrada` in Spanish;
 - closed base `52192` is labeled `Abierta` in Spanish.
 
-This did not cause the 400, but it can make an AI or user choose the semantically wrong status after the required-field fix. Correct the localized labels as a separate data cleanup.
+This did not cause the 400, but it can make an AI or user choose the semantically wrong status after the required-field fix.
+
+Follow-up investigation on 2026-07-14 shows this is **not** a uCloud data problem. The defect is in the platform's default-value catalog: `tblDefaultSiteValue` rows for `strCatName = 'ISSUE_STATUS'`, language 2 (Spanish), have the labels swapped at the source (row 508 `Cerrada` with `blnCompleted = 0`, selected/default; row 511 `Abierta` with `blnCompleted = 1`). `tblAccountLanguageInsertWithDefaultValues` copies these rows into `tblIssueStatus` whenever an account language is seeded, so every Spanish-seeded account inherits the swap. English (`Open`/`Closed`) and Portuguese (`Aberto`/`Fechado`) are correct.
+
+Production scope, measured on 2026-07-14:
+
+- 2,815 of 2,816 accounts with Spanish issue-status rows have `Cerrad%` on an open row and `Abiert%` on a closed row;
+- zero accounts have the correct orientation;
+- the behavior flags (`blnClosed`, `blnIsDefault`) are correct everywhere; only the Spanish display labels are swapped.
+
+Verified in uCloud's production UI (Configuration > Parámetros de incidencias > Estado de la incidencia): the list shows `Cerrada` as status 1 and default, `Abierta` as status 2. Screenshot: `.playwright-mcp/ucloud-issue-status-swapped-labels.png` (gitignored artifact). The stage `testsmarter` account shows the same pattern through MCP reference data (`Cerrada` with `IsClosed: false`).
+
+The fix is therefore a platform data cleanup, tracked separately from this ticket:
+
+1. Swap the two Spanish labels in `tblDefaultSiteValue` (rows 508 and 511) so new accounts seed correctly.
+2. One-time migration swapping the Spanish labels in `tblIssueStatus` only where the row still carries the seeded name and it contradicts `blnClosed` (do not touch renamed/custom statuses).
+3. Consider the user-facing impact before running the migration: Spanish-language users in ~2,800 accounts have seen the reversed labels since account creation, so existing issues will display the other label after the fix (semantically correct for the first time).
 
 ## Recommended support response
 

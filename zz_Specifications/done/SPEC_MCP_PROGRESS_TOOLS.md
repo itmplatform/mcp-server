@@ -1,7 +1,7 @@
 # MCP progress tools
 
 **Source:** [SPEC_HELPSCOUT_11535 section 1](../SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md#1-progress--seguimiento-tools-the-mcp-deliverable)
-**Status:** Implemented locally (ITM.Tasks + ITM.Web gateway + ITM.MCP), all unit and E2E tests green on 2026-07-13. Pending deployment via pipeline.
+**Status:** Implemented (ITM.Tasks + ITM.Web gateway + ITM.MCP), all unit and E2E tests green on 2026-07-13. Deployed to stage and verified there on 2026-07-14 (see [Stage verification](#stage-verification-2026-07-14)); deployed to production the same day (ITM.MCP-Prod run 7228).
 **Scope:** ITM.MCP plus the backend prerequisites below
 
 This document is the implementation spec for the four MCP progress tools identified in Help Scout 11535. Everything about the customer context, the other three work items (time entries, DataMart, Clockify connector), and the delivery order lives in the parent spec -- do not duplicate it here.
@@ -291,6 +291,24 @@ Done: `tests/e2e/progress.e2e.test.ts` passed 8/8 on 2026-07-13 against the loca
 8. Scoping negative: a task outside the project returns an error.
 
 Cleanup: the suite deletes its own task and project in `afterAll`, which removes the follow-up rows.
+
+### Stage verification (2026-07-14)
+
+Verified end to end against the deployed stage environment after the 2026-07-14 stage deployments (pipeline runs: ITM.Web-Stage 7215, ITM.Tasks-Stage 7219, ITM.MCP-Stage 7227, all succeeded).
+
+Method: JSON-RPC calls against `https://new-api.itmplatform.com/revamping/v2/_/mcp/`, authenticated through the complete OAuth 2.1 + PKCE flow (dynamic client registration, browser login as `daniel.piret@itmplatform.com`, company `testsmarter`, scopes `mcp:read mcp:write`). Fixtures (Waterfall project 81282 with task 1865967, Kanban project 81283) were created through the stage v2 REST API and deleted after the run, confirmed by 404 readback.
+
+| # | Test | Result |
+|---|---|---|
+| 1 | `tools/list` returns 27 tools including `list_task_progress`, `create_task_progress`, `update_task_progress`, `get_project_progress` | Pass |
+| 2 | `get_reference_data({ entity: 'assessments' })` returns the account's assessment values (3 records; used Id 152744 "Bueno") | Pass |
+| 3 | `create_task_progress` (reportDate today, percentage 25, assessmentId, shortDescription) creates entry 1238345 and reads it back with `Percentage: 25` | Pass |
+| 4 | `list_task_progress` lists the created entry for the task | Pass |
+| 5 | `update_task_progress` (percentage 50) updates entry 1238345 and reads back `Percentage: 50` | Pass |
+| 6 | `get_project_progress` returns the graph (`Expected`, `BaselineExpected`, `FollowUps`); `FollowUps` contains 2 entries, confirming the automatic project progress cascade from the task creates/updates | Pass |
+| 7 | Scoping negative: `list_task_progress` with a task that does not belong to the given project returns a 404 error | Pass |
+
+The same run verified the Help Scout 11570 contract fixes; that record lives in [helpscout-11570-mcp-create-task-issue-400.md](../../zz_Tickets/done/helpscout-11570-mcp-create-task-issue-400.md).
 
 ---
 

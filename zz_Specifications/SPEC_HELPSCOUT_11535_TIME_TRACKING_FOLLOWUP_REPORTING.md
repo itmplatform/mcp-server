@@ -3,7 +3,7 @@
 **Source:** [Help Scout conversation 3382659721 / 11535](https://secure.helpscout.net/conversation/3382659721/11535/)
 **Requester:** Gilsandro Cezar, UCloud Global PMO
 **Date:** 2026-07-13
-**Status:** Product and technical recommendation. Item 1 (MCP progress tools) implemented on 2026-07-13 and pushed to develop; awaiting stage/prod deployment
+**Status:** Product and technical recommendation. Item 1 (MCP progress tools) implemented on 2026-07-13; verified on stage and deployed to production on 2026-07-14
 **Explicitly out of scope:** the reported `query_datamart` 401 error
 
 ```
@@ -40,7 +40,7 @@ The single most useful reframing: **the customer did not ask for a migration, an
 
 ## 1. Progress / Seguimiento tools (the MCP deliverable)
 
-> **Implemented 2026-07-13.** The four tools, the v2 GET endpoints in ITM.Tasks, and the assessments reference endpoint are on develop in ITM.MCP, ITM.Tasks, and ITM.Web (gateway route). All unit and E2E tests green. Implementation record: [done/SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Remaining: deploy ITM.Tasks and ITM.Web, then release the MCP server.
+> **Implemented 2026-07-13; verified on stage 2026-07-14.** The four tools, the v2 GET endpoints in ITM.Tasks, and the assessments reference endpoint are on develop in ITM.MCP, ITM.Tasks, and ITM.Web (gateway route). All unit and E2E tests green. Deployed to stage on 2026-07-14 and all seven stage checks passed against the live server (tool listing, assessment discovery, create/list/update task progress with readback, project progress graph with cascade, cross-project scoping negative). Implementation record and stage test log: [done/SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Deployed to production on 2026-07-14.
 
 This is the part of the ticket with no dependencies. It should ship first and can ship alone.
 
@@ -140,7 +140,7 @@ Licensing is not a constraint: Team Member licenses are free, so there is no com
 
 | # | Work | Repo | Blocked by |
 |---|---|---|---|
-| 1 | **MCP progress tools** | ITM.MCP | **Done, on develop.** Deploy ITM.Tasks + ITM.Web, then release MCP |
+| 1 | **MCP progress tools** | ITM.MCP | **Done; in production since 2026-07-14** |
 | 2 | Fix the `timehours` authorization defect | ITM.Web | **Implemented, on develop; deploy before consumers** |
 | 3 | Clockify connector | ITM.Connector | Build-ready; deployed item 2 required before enablement |
 | 4 | Time-entry detail in DataMart | ITM.DataMart | Nothing (but shares a v2 source API with 3) |
@@ -198,7 +198,7 @@ Investigation (done):
 
 Next:
 
-- [x] Engineering (ITM.MCP): progress tools. Implemented locally on 2026-07-13 (4 MCP tools, v2 GET endpoints in ITM.Tasks, assessments reference endpoint + gateway entry); all unit and E2E tests green. See [SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Pending deployment via pipeline.
+- [x] Engineering (ITM.MCP): progress tools. Implemented locally on 2026-07-13 (4 MCP tools, v2 GET endpoints in ITM.Tasks, assessments reference endpoint + gateway entry); all unit and E2E tests green. Deployed to stage and verified there on 2026-07-14. See [SPEC_MCP_PROGRESS_TOOLS.md](done/SPEC_MCP_PROGRESS_TOOLS.md). Pending prod deployment.
 - [x] Engineering (ITM.Web): implement and locally verify the `timehours` authorization fix; deployment remains a release step.
 - [ ] Support/account owner: ask UCloud the open questions above.
 - [ ] Engineering (ITM.Connector): Clockify connector; the API contract is ready, and the ITM.Web fix must be deployed before enablement.
