@@ -8,10 +8,14 @@ export interface RestClientConfig {
   onUnauthorized?: () => Promise<void>;
 }
 
+export interface RequestOptions {
+  timeoutMs?: number;
+}
+
 export interface RestClient {
-  get(path: string): Promise<unknown>;
-  post(path: string, body: unknown): Promise<unknown>;
-  patch(path: string, body: unknown): Promise<unknown>;
+  get(path: string, opts?: RequestOptions): Promise<unknown>;
+  post(path: string, body: unknown, opts?: RequestOptions): Promise<unknown>;
+  patch(path: string, body: unknown, opts?: RequestOptions): Promise<unknown>;
 }
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
@@ -59,44 +63,60 @@ export function createRestClient(config: RestClientConfig): RestClient {
   const baseUrl = `${config.apiUrl}/v2/${config.company}`;
   const log = config.log;
 
-  async function request(method: string, path: string, body?: unknown): Promise<unknown> {
+  async function request(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<unknown> {
     const start = Date.now();
     const buildHeaders = (): Record<string, string> => ({
       ...config.authHeaders,
       'Content-Type': 'application/json',
     });
-    const buildFetchOpts = () => ({
+    const buildFetchOpts = (signal?: AbortSignal) => ({
       method,
       headers: buildHeaders(),
+      ...(signal ? { signal } : {}),
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
 
-    let response = await fetch(`${baseUrl}/${path}`, buildFetchOpts());
+    const controller = opts?.timeoutMs ? new AbortController() : undefined;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), opts!.timeoutMs)
+      : undefined;
 
-    if (response.status === 401 && config.onUnauthorized) {
-      try {
-        await config.onUnauthorized();
-        response = await fetch(`${baseUrl}/${path}`, buildFetchOpts());
-      } catch {
-        // re-exchange failed; fall through to the error below
+    try {
+      let response = await fetch(`${baseUrl}/${path}`, buildFetchOpts(controller?.signal));
+
+      if (response.status === 401 && config.onUnauthorized) {
+        try {
+          await config.onUnauthorized();
+          response = await fetch(`${baseUrl}/${path}`, buildFetchOpts(controller?.signal));
+        } catch {
+          // re-exchange failed; fall through to the error below
+        }
       }
-    }
 
-    if (!response.ok) {
-      const detail = await readErrorDetail(response);
-      log?.error({ method, path, status: response.status, detail, ms: Date.now() - start }, 'REST request failed');
-      const detailSuffix = detail ? ` -- ${detail}` : '';
-      throw new Error(`REST request failed: ${response.status} ${response.statusText}${detailSuffix}`);
-    }
+      if (!response.ok) {
+        const detail = await readErrorDetail(response);
+        log?.error({ method, path, status: response.status, detail, ms: Date.now() - start }, 'REST request failed');
+        const detailSuffix = detail ? ` -- ${detail}` : '';
+        throw new Error(`REST request failed: ${response.status} ${response.statusText}${detailSuffix}`);
+      }
 
-    const result = await response.json();
-    log?.debug({ method, path, ms: Date.now() - start }, 'REST request OK');
-    return result;
+      const result = await response.json();
+      log?.debug({ method, path, ms: Date.now() - start }, 'REST request OK');
+      return result;
+    } catch (err) {
+      if (controller?.signal.aborted) {
+        log?.error({ method, path, ms: Date.now() - start }, 'REST request timed out');
+        throw new Error(`REST request timed out after ${opts!.timeoutMs}ms: ${method} ${path}`);
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   return {
-    get: (path: string) => request('GET', path),
-    post: (path: string, body: unknown) => request('POST', path, body),
-    patch: (path: string, body: unknown) => request('PATCH', path, body),
+    get: (path: string, opts?: RequestOptions) => request('GET', path, undefined, opts),
+    post: (path: string, body: unknown, opts?: RequestOptions) => request('POST', path, body, opts),
+    patch: (path: string, body: unknown, opts?: RequestOptions) => request('PATCH', path, body, opts),
   };
 }

@@ -4,6 +4,8 @@ import {
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
   splitCreateIssueArgs, splitUpdateProjectArgs, mapReferenceIdToBaseId,
   verifyRequestedFields, getCreateTaskValidationError, registerWriteTools,
+  getBulkStatusValidationError, buildBulkStatusBody, summarizeBulkStatusResponse,
+  BULK_STATUS_MAX_IDS, BULK_STATUS_TIMEOUT_MS,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -283,6 +285,233 @@ describe('mapReferenceIdToBaseId', () => {
 
   it('keeps unknown values for REST validation/readback to catch', () => {
     expect(mapReferenceIdToBaseId(999, referenceData)).toBe(999);
+  });
+});
+
+describe('getBulkStatusValidationError', () => {
+  it('rejects a call with neither statusId nor statusName', () => {
+    expect(getBulkStatusValidationError({})).toContain('statusId or statusName');
+  });
+
+  it('rejects a blank statusName without statusId', () => {
+    expect(getBulkStatusValidationError({ statusName: '   ' })).toContain('statusId or statusName');
+  });
+
+  it('accepts statusId alone', () => {
+    expect(getBulkStatusValidationError({ statusId: 5 })).toBeUndefined();
+  });
+
+  it('accepts statusName alone', () => {
+    expect(getBulkStatusValidationError({ statusName: 'Completed' })).toBeUndefined();
+  });
+});
+
+describe('buildBulkStatusBody', () => {
+  it('joins IDs into the comma-separated TaskIds body key', () => {
+    const body = buildBulkStatusBody([101, 102, 103], { statusId: 5 });
+    expect(body.TaskIds).toBe('101,102,103');
+  });
+
+  it('sends statusId as SelectedStatus with empty SelectedStatusName', () => {
+    const body = buildBulkStatusBody([101], { statusId: 5, projectMethodTypeId: 1 });
+    expect(body).toEqual({ TaskIds: '101', SelectedStatus: 5, SelectedStatusName: '', ProjectMethodTypeId: 1 });
+  });
+
+  it('falls back to SelectedStatus 0 with SelectedStatusName for name resolution', () => {
+    const body = buildBulkStatusBody([101], { statusName: 'Completed' });
+    expect(body).toEqual({ TaskIds: '101', SelectedStatus: 0, SelectedStatusName: 'Completed', ProjectMethodTypeId: 0 });
+  });
+});
+
+describe('summarizeBulkStatusResponse', () => {
+  it('counts StatusCode 200 items as succeeded', () => {
+    const summary = summarizeBulkStatusResponse([101, 102], [
+      { Id: 101, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+      { Id: 102, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+    ], 'taskId');
+    expect(summary).toEqual({ requested: 2, succeeded: 2, failed: [] });
+  });
+
+  it('collects non-200 items into failed with id and message', () => {
+    const summary = summarizeBulkStatusResponse([101, 104], [
+      { Id: 101, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+      { Id: 104, StatusCode: 400, StatusMessage: 'Task does not exist.' },
+    ], 'taskId');
+    expect(summary.requested).toBe(2);
+    expect(summary.succeeded).toBe(1);
+    expect(summary.failed).toEqual([{ taskId: 104, message: 'Task does not exist.' }]);
+  });
+
+  it('keys failed items as activityId for the activity tool', () => {
+    const summary = summarizeBulkStatusResponse([55], [
+      { Id: 55, StatusCode: 500, StatusMessage: 'Boom' },
+    ], 'activityId');
+    expect(summary.failed).toEqual([{ activityId: 55, message: 'Boom' }]);
+  });
+
+  it('defaults a missing failure message', () => {
+    const summary = summarizeBulkStatusResponse([55], [{ Id: 55, StatusCode: 400 }], 'taskId');
+    expect(summary.failed[0].message).toContain('status code 400');
+  });
+
+  it('throws on a non-array response so the agent sees the raw contract break', () => {
+    expect(() => summarizeBulkStatusResponse([101], { StatusCode: 200 }, 'taskId'))
+      .toThrow('array');
+  });
+});
+
+describe('bulk status tools registration', () => {
+  function register(rest: any = {}, ctx?: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any, ctx);
+    return registrations;
+  }
+
+  it('registers both bulk status tools', () => {
+    const registrations = register();
+    expect(registrations.has('bulk_update_task_status')).toBe(true);
+    expect(registrations.has('bulk_update_activity_status')).toBe(true);
+  });
+
+  it('caps taskIds at 100 and rejects empty arrays', () => {
+    const schema = register().get('bulk_update_task_status').config.inputSchema;
+    expect(schema.taskIds.safeParse([]).success).toBe(false);
+    expect(schema.taskIds.safeParse(Array.from({ length: 100 }, (_, i) => i + 1)).success).toBe(true);
+    expect(schema.taskIds.safeParse(Array.from({ length: 101 }, (_, i) => i + 1)).success).toBe(false);
+    expect(BULK_STATUS_MAX_IDS).toBe(100);
+  });
+
+  it('caps activityIds at 100', () => {
+    const schema = register().get('bulk_update_activity_status').config.inputSchema;
+    expect(schema.activityIds.safeParse(Array.from({ length: 101 }, (_, i) => i + 1)).success).toBe(false);
+  });
+
+  it('tells the agent to chunk, resolve statuses, and check failures', () => {
+    const description = register().get('bulk_update_task_status').config.description;
+    expect(description).toContain('100');
+    expect(description).toContain('list_project_tasks');
+    expect(description).toContain('get_reference_data');
+    expect(description).toContain('failed');
+  });
+
+  it('refuses the call without the mcp:write scope', async () => {
+    const registrations = register({}, { grantedScopes: ['mcp:read'] });
+    const result = await registrations.get('bulk_update_task_status').handler({
+      projectId: 100, taskIds: [1], statusId: 5,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('insufficient_scope');
+  });
+
+  it('rejects a call without statusId or statusName before POSTing', async () => {
+    const rest = { post: vi.fn() };
+    const registrations = register(rest);
+    const result = await registrations.get('bulk_update_task_status').handler({
+      projectId: 100, taskIds: [1, 2],
+    });
+    expect(rest.post).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('statusId or statusName');
+  });
+
+  it('POSTs UpdateTaskStatuses with the joined payload and a request timeout', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue([
+        { Id: 101, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+        { Id: 102, StatusCode: 400, StatusMessage: 'Task does not exist.' },
+      ]),
+    };
+    const registrations = register(rest);
+    const result = await registrations.get('bulk_update_task_status').handler({
+      projectId: 100, taskIds: [101, 102], statusId: 5, projectMethodTypeId: 1,
+    });
+
+    expect(rest.post).toHaveBeenCalledWith(
+      'projects/100/UpdateTaskStatuses',
+      { TaskIds: '101,102', SelectedStatus: 5, SelectedStatusName: '', ProjectMethodTypeId: 1 },
+      { timeoutMs: BULK_STATUS_TIMEOUT_MS },
+    );
+    expect(result.isError).toBeFalsy();
+    const summary = JSON.parse(result.content[0].text);
+    expect(summary).toEqual({
+      requested: 2,
+      succeeded: 1,
+      failed: [{ taskId: 102, message: 'Task does not exist.' }],
+    });
+    expect(result.content[1].text).toBe(STALE_AFTER_WRITE_NOTICE);
+  });
+
+  it('POSTs UpdateActivityStatuses joining activityIds into the TaskIds body key', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue([
+        { Id: 55, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+      ]),
+    };
+    const registrations = register(rest);
+    const result = await registrations.get('bulk_update_activity_status').handler({
+      serviceId: 77, activityIds: [55], statusId: 544592,
+    });
+
+    expect(rest.post).toHaveBeenCalledWith(
+      'services/77/UpdateActivityStatuses',
+      { TaskIds: '55', SelectedStatus: 544592, SelectedStatusName: '', ProjectMethodTypeId: 0 },
+      { timeoutMs: BULK_STATUS_TIMEOUT_MS },
+    );
+    const summary = JSON.parse(result.content[0].text);
+    expect(summary).toEqual({ requested: 1, succeeded: 1, failed: [] });
+  });
+
+  it('resolves activity statusName client-side against activity statuses, never server-side', async () => {
+    const rest = {
+      get: vi.fn().mockResolvedValue([
+        { Id: 544589, Name: 'Scheduled' },
+        { Id: 544590, Name: 'In Progress' },
+      ]),
+      post: vi.fn().mockResolvedValue([
+        { Id: 55, StatusCode: 200, StatusMessage: 'Task status updated successfully.' },
+      ]),
+    };
+    const registrations = register(rest);
+    const result = await registrations.get('bulk_update_activity_status').handler({
+      serviceId: 77, activityIds: [55], statusName: 'in progress',
+    });
+
+    expect(rest.get).toHaveBeenCalledWith('gettaskstatuses?IsService=true');
+    expect(rest.post).toHaveBeenCalledWith(
+      'services/77/UpdateActivityStatuses',
+      { TaskIds: '55', SelectedStatus: 544590, SelectedStatusName: '', ProjectMethodTypeId: 0 },
+      { timeoutMs: BULK_STATUS_TIMEOUT_MS },
+    );
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('rejects an unknown activity statusName without POSTing', async () => {
+    const rest = {
+      get: vi.fn().mockResolvedValue([{ Id: 544589, Name: 'Scheduled' }]),
+      post: vi.fn(),
+    };
+    const registrations = register(rest);
+    const result = await registrations.get('bulk_update_activity_status').handler({
+      serviceId: 77, activityIds: [55], statusName: 'Nonexistent',
+    });
+
+    expect(rest.post).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Nonexistent');
+    expect(result.content[0].text).toContain('activitystatuses');
+  });
+
+  it('propagates REST errors (full-rollback 500s) to the caller', async () => {
+    const rest = { post: vi.fn().mockRejectedValue(new Error('REST request failed: 500 Internal Server Error')) };
+    const registrations = register(rest);
+    await expect(registrations.get('bulk_update_task_status').handler({
+      projectId: 100, taskIds: [1], statusId: 5,
+    })).rejects.toThrow('500');
   });
 });
 

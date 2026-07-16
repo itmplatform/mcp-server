@@ -11,6 +11,12 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 | **Create risk** | Log a new risk in a project |
 | **Create issue** | Log a new issue in a project |
 | **Update project** | Change project name, status, priority, or dates |
+| **Bulk update task status** | Apply one status to up to 100 tasks of a project in a single call |
+| **Bulk update activity status** | Apply one status to up to 100 activities of a service in a single call |
+
+### Bulk status updates
+
+The bulk tools return a compact per-chunk summary (`requested`, `succeeded`, `failed`) instead of full record readbacks. The whole chunk runs in one database transaction on the server: an unexpected error rolls back the entire chunk, while per-item validation failures are reported in the `failed` array and do not block the other items. Re-applying the same status is harmless, so retrying a failed chunk is safe.
 
 ### Safety design
 

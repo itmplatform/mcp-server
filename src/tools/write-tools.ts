@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Clients } from '../clients/index.js';
 import { hasScope, type EffectiveUserContext } from '../auth/effective-user-context.js';
+import { ACTIVITY_STATUSES_PATH } from './reference-data.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -182,6 +183,74 @@ export function splitUpdateProjectArgs(args: { projectId: number; [key: string]:
   const { projectId, ...body } = args;
   normalizeAlias(body, 'StatusId', 'ProjectStatusId');
   return { path: `projects/${projectId}`, body };
+}
+
+export const BULK_STATUS_MAX_IDS = 100;
+export const BULK_STATUS_TIMEOUT_MS = 90_000;
+
+export function getBulkStatusValidationError(args: { statusId?: number; statusName?: string }): string | undefined {
+  if (args.statusId === undefined && (args.statusName === undefined || args.statusName.trim() === '')) {
+    return 'Either statusId or statusName must be provided.';
+  }
+  return undefined;
+}
+
+export function buildBulkStatusBody(
+  ids: number[],
+  args: { statusId?: number; statusName?: string; projectMethodTypeId?: number },
+): JsonRecord {
+  return {
+    TaskIds: ids.join(','),
+    SelectedStatus: args.statusId ?? 0,
+    SelectedStatusName: args.statusId === undefined ? args.statusName ?? '' : '',
+    ProjectMethodTypeId: args.projectMethodTypeId ?? 0,
+  };
+}
+
+export async function resolveActivityStatusIdByName(clients: Clients, statusName: string): Promise<number | undefined> {
+  const statuses = await clients.rest.get(ACTIVITY_STATUSES_PATH);
+  if (!Array.isArray(statuses)) return undefined;
+
+  const wanted = statusName.trim().toLowerCase();
+  const match = statuses.find(status => {
+    const name = (status as JsonRecord)?.Name;
+    return typeof name === 'string' && name.trim().toLowerCase() === wanted;
+  });
+  return match ? numericValue((match as JsonRecord).Id) : undefined;
+}
+
+export interface BulkStatusSummary {
+  requested: number;
+  succeeded: number;
+  failed: Array<Record<string, unknown>>;
+}
+
+export function summarizeBulkStatusResponse(
+  requestedIds: number[],
+  response: unknown,
+  idField: 'taskId' | 'activityId',
+): BulkStatusSummary {
+  if (!Array.isArray(response)) {
+    throw new Error(`Expected an array of per-item results from the bulk status endpoint, got: ${JSON.stringify(response)}`);
+  }
+
+  const failed = response
+    .filter(item => numericValue((item as JsonRecord)?.StatusCode) !== 200)
+    .map(item => {
+      const record = item as JsonRecord;
+      return {
+        [idField]: record?.Id,
+        message: typeof record?.StatusMessage === 'string' && record.StatusMessage.trim() !== ''
+          ? record.StatusMessage
+          : `Update failed with status code ${record?.StatusCode}`,
+      };
+    });
+
+  return {
+    requested: requestedIds.length,
+    succeeded: response.length - failed.length,
+    failed,
+  };
 }
 
 export interface VerificationField {
@@ -454,6 +523,73 @@ export function registerWriteTools(
       const readback = await clients.rest.get(path);
       verifyRequestedFields(body, readback, PROJECT_VERIFICATION_FIELDS, 'update_project');
       return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'bulk_update_task_status',
+    {
+      description: 'Apply one status to many tasks of a project in a single call (much faster than looping update_task). '
+        + `Collect task IDs first via list_project_tasks or search, then chunk into calls of at most ${BULK_STATUS_MAX_IDS} IDs. `
+        + 'Resolve valid status IDs via get_reference_data (entity "gettaskstatuses"): statuses differ between Waterfall and Kanban projects, '
+        + 'and Kanban projects interpret statusId as the Kanban column ID, so pass projectMethodTypeId (1=Waterfall, 2=Kanban) or use statusName instead. '
+        + 'Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.',
+      inputSchema: {
+        projectId: z.number().describe('The project ID containing the tasks'),
+        taskIds: z.array(z.number()).min(1).max(BULK_STATUS_MAX_IDS)
+          .describe(`Task IDs to update (1-${BULK_STATUS_MAX_IDS} per call; chunk larger sets into multiple calls)`),
+        statusId: z.number().optional().describe('Target status ID (Kanban column ID for Kanban projects). Either statusId or statusName is required.'),
+        statusName: z.string().optional().describe('Target status name, resolved server-side when statusId is omitted'),
+        projectMethodTypeId: z.number().optional().describe('Project methodology: 1=Waterfall, 2=Kanban. Needed for Kanban status resolution and name lookup.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const validationError = getBulkStatusValidationError(args);
+      if (validationError) return buildValidationErrorResponse(validationError);
+      const body = buildBulkStatusBody(args.taskIds, args);
+      const data = await clients.rest.post(`projects/${args.projectId}/UpdateTaskStatuses`, body, { timeoutMs: BULK_STATUS_TIMEOUT_MS });
+      return buildWriteResponse(summarizeBulkStatusResponse(args.taskIds, data, 'taskId'));
+    },
+  );
+
+  server.registerTool(
+    'bulk_update_activity_status',
+    {
+      description: 'Apply one status to many activities of a service in a single call. '
+        + `Collect activity IDs first via list_service_activities, then chunk into calls of at most ${BULK_STATUS_MAX_IDS} IDs. `
+        + 'Resolve valid activity status IDs via get_reference_data with entity "activitystatuses" (activity statuses differ from task statuses), or pass statusName. '
+        + 'Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID containing the activities'),
+        activityIds: z.array(z.number()).min(1).max(BULK_STATUS_MAX_IDS)
+          .describe(`Activity IDs to update (1-${BULK_STATUS_MAX_IDS} per call; chunk larger sets into multiple calls)`),
+        statusId: z.number().optional().describe('Target activity status ID. Either statusId or statusName is required.'),
+        statusName: z.string().optional().describe('Target activity status name, resolved against the activitystatuses reference list when statusId is omitted'),
+        projectMethodTypeId: z.number().optional().describe('Service methodology type ID passed through to the backend'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const validationError = getBulkStatusValidationError(args);
+      if (validationError) return buildValidationErrorResponse(validationError);
+
+      // The backend resolves SelectedStatusName against task statuses even for
+      // activities, silently skipping the update on a mismatch, so resolve the
+      // name against the real activity statuses here instead.
+      let statusId = args.statusId;
+      if (statusId === undefined && args.statusName !== undefined) {
+        statusId = await resolveActivityStatusIdByName(clients, args.statusName);
+        if (statusId === undefined) {
+          return buildValidationErrorResponse(
+            `Unknown activity status name "${args.statusName}". Use get_reference_data with entity "activitystatuses" to list valid values.`,
+          );
+        }
+      }
+
+      const body = buildBulkStatusBody(args.activityIds, { statusId, projectMethodTypeId: args.projectMethodTypeId });
+      const data = await clients.rest.post(`services/${args.serviceId}/UpdateActivityStatuses`, body, { timeoutMs: BULK_STATUS_TIMEOUT_MS });
+      return buildWriteResponse(summarizeBulkStatusResponse(args.activityIds, data, 'activityId'));
     },
   );
 }

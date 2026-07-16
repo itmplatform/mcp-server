@@ -1,3 +1,17 @@
+### v1.0.10
+
+Bulk status tools.
+
+**New tools (2):**
+- `bulk_update_task_status`: apply one status to up to 100 tasks of a project in a single call. Supports Waterfall status IDs, Kanban column IDs, and server-side status name resolution.
+- `bulk_update_activity_status`: apply one status to up to 100 activities of a service in a single call. Status names are resolved against the activity status list.
+
+**Reference data:**
+- New `activitystatuses` entity in get_reference_data to discover valid service activity statuses (these differ from task statuses)
+
+**Client hardening:**
+- Bulk status requests use a 90-second request timeout via AbortController
+
 ### v1.0.9
 
 Task and issue creation contract corrections.
