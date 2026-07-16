@@ -179,10 +179,23 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       ],
     },
   },
+  create_project: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Create a new project for the website redesign," the AI calls this tool with a name and project type. The project starts with the account default status, and the creating user becomes the project manager. The created project is read back from the API to confirm it was saved correctly.',
+    exampleResponse: {
+      Id: 75910,
+      No: 'PR-18137-26070012',
+      Name: 'Website Redesign 2027',
+      MethodTypeId: 1,
+      Status: { Id: 662750, Name: 'Initial' },
+      uiUrl: 'https://app.itmplatform.com/acme/UserPages/ProjectGeneral.aspx?pid=75910',
+    },
+  },
   create_task: {
     category: 'Write Operations',
     narrative:
-      'When you ask "Create a task called X in the Website Redesign project," the AI calls this tool. The created task is read back from the API to confirm it was saved correctly.',
+      'When you ask "Create a task called X in the Website Redesign project," the AI calls this tool. It also creates milestones (KindId 1) and summary tasks (KindId 2), and places tasks under a summary with ParentId to build the Gantt hierarchy. The created task is read back from the API to confirm it was saved correctly.',
     exampleResponse: {
       TaskId: 112235,
       Name: 'Review design mockups',
@@ -193,7 +206,7 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   update_task: {
     category: 'Write Operations',
     narrative:
-      'When you ask "Mark the Design wireframes task as complete" or "Change the priority of task X," the AI calls this tool with only the fields that need to change.',
+      'When you ask "Mark the Design wireframes task as complete" or "Change the priority of task X," the AI calls this tool with only the fields that need to change. It can also move a task under a summary task (ParentId) or convert it to a milestone (KindId) on Waterfall projects.',
     exampleResponse: {
       TaskId: 112233,
       Name: 'Design wireframes',

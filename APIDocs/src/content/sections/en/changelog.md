@@ -1,3 +1,16 @@
+### v1.0.11
+
+Project creation, task hierarchy, and milestones.
+
+**New tools (1):**
+- `create_project`: create a Waterfall or Kanban project. The project starts with the account default status (use update_project to change it) and the creating user becomes the project manager. When the optional `ITM_UI_URL` variable is configured, the response includes a `uiUrl` deep link to open the project in the ITM Platform UI.
+
+**Extended tools (2):**
+- `create_task` and `update_task` accept `KindId` (1=Milestone, 2=Summary task, 3=Task) and `ParentId` to build Gantt hierarchy on Waterfall projects. A regular-task parent is automatically converted to a summary task. Milestones sit on their end date: the tools validate the date rules client-side so a milestone is never silently converted back to a regular task.
+
+**Documentation:**
+- Task kind (`KindId`) is now clearly distinguished from task type (`TypeId`) in the tool descriptions
+
 ### v1.0.10
 
 Bulk status tools.

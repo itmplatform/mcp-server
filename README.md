@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 29 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 30 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -121,8 +121,9 @@ The server exposes 29 MCP tools, 6 resources, and 4 prompt templates.
 
 | Tool | What it does |
 |------|--------------|
-| `create_task` | Add a task; Waterfall projects require status, start date, and end date, while Kanban uses board defaults |
-| `update_task` | Update task fields such as status, dates, and assignee |
+| `create_project` | Create a project (Waterfall or Kanban); the project starts with the account default status and the creating user as project manager |
+| `create_task` | Add a task, milestone (KindId 1), or summary task (KindId 2); ParentId builds Gantt hierarchy on Waterfall projects |
+| `update_task` | Update task fields such as status, dates, kind, and parent |
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `create_risk` | Log a project risk |
@@ -207,6 +208,7 @@ For an HTTP server with OAuth, configure:
 | `MCP_SERVER_URL` | Public MCP server URL used as the OAuth audience |
 | `LOG_LEVEL` | Optional Pino log level: `debug`, `info`, `warn`, or `error` |
 | `ITM_AUDIT_ENABLED` | Enables server-side audit logging when set to `true` |
+| `ITM_UI_URL` | Optional ITM Platform UI base URL (e.g. `https://app.itmplatform.com`); when set, `create_project` returns a `uiUrl` deep link to the created project |
 
 When deployed behind a reverse proxy, `ITM_AUTH_URL` can point to a server-to-server address while `ITM_AUTH_PUBLIC_URL` must be reachable by AI clients.
 

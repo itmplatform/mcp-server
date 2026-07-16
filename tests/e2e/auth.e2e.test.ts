@@ -11,7 +11,7 @@ describe('auth and session', () => {
     expect(result.result.tools.length).toBeGreaterThan(0);
   });
 
-  it('api-key session lists all 29 tools (read + write)', async () => {
+  it('api-key session lists all 30 tools (read + write)', async () => {
     const result = await listTools(3);
     const toolNames = result.result.tools.map((t: { name: string }) => t.name);
 
@@ -27,7 +27,7 @@ describe('auth and session', () => {
       'search_users', 'get_user',
       'get_reference_data',
       'query_datamart',
-      'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
+      'create_project', 'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
       'create_task_progress', 'update_task_progress',
       'bulk_update_task_status', 'bulk_update_activity_status',
     ];
@@ -35,7 +35,7 @@ describe('auth and session', () => {
     for (const name of expectedTools) {
       expect(toolNames).toContain(name);
     }
-    expect(toolNames).toHaveLength(29);
+    expect(toolNames).toHaveLength(30);
   });
 
   // OAuth scope enforcement E2E: verifies that OAuth sessions with mcp:read only

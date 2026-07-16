@@ -100,6 +100,10 @@ function requireSuppliedField(toolName: string, body: JsonRecord, field: string,
   }
 }
 
+export const TASK_KIND_MILESTONE = 1;
+export const TASK_KIND_SUMMARY = 2;
+export const TASK_KIND_TASK = 3;
+
 export function splitCreateTaskArgs(args: { projectId: number; [key: string]: unknown }) {
   const { projectId, ...body } = args;
   normalizeAlias(body, 'Description', 'Details');
@@ -110,25 +114,69 @@ export function splitCreateTaskArgs(args: { projectId: number; [key: string]: un
   return { path: `projects/${projectId}/tasks`, body };
 }
 
-export function getCreateTaskValidationError(body: JsonRecord, project: unknown): string | undefined {
-  if (project === null || typeof project !== 'object') {
-    return 'Could not determine project methodology before creating the task.';
-  }
-
+function resolveMethodTypeId(project: unknown): number | undefined {
+  if (project === null || typeof project !== 'object') return undefined;
   const projectRecord = project as JsonRecord;
-  const methodTypeId = numericValue(
+  return numericValue(
     projectRecord.MethodTypeId
       ?? projectRecord.ProjectMethodTypeId
       ?? (projectRecord.MethodType as JsonRecord | undefined)?.Id,
   );
+}
 
+// The Kanban insert route forces KindId to Task and skips parent validation
+// entirely, so hierarchy/kind fields are rejected here instead of written unvalidated.
+function getKanbanHierarchyRejection(body: JsonRecord): string | undefined {
+  if (hasSuppliedField(body, 'KindId') && numericValue(body.KindId) !== TASK_KIND_TASK) {
+    return 'Kanban projects support only regular tasks; milestones (KindId 1) and summary tasks (KindId 2) require a Waterfall project.';
+  }
+  if (hasSuppliedField(body, 'ParentId')) {
+    return 'Task hierarchy (ParentId) is only supported on Waterfall projects.';
+  }
+  return undefined;
+}
+
+function getKindIdRangeError(body: JsonRecord): string | undefined {
+  if (!hasSuppliedField(body, 'KindId')) return undefined;
+  const kindId = numericValue(body.KindId);
+  if (kindId === TASK_KIND_MILESTONE || kindId === TASK_KIND_SUMMARY || kindId === TASK_KIND_TASK) return undefined;
+  return 'KindId must be 1 (Milestone), 2 (Summary task), or 3 (Task).';
+}
+
+function hasValidStatusId(body: JsonRecord): boolean {
+  return hasSuppliedField(body, 'StatusId') && (numericValue(body.StatusId) ?? 0) > 0;
+}
+
+export function getCreateTaskValidationError(body: JsonRecord, project: unknown): string | undefined {
+  const methodTypeId = resolveMethodTypeId(project);
   if (methodTypeId === undefined) {
     return 'Could not determine project methodology before creating the task.';
   }
 
-  if (methodTypeId === 2) return undefined;
+  if (methodTypeId === 2) return getKanbanHierarchyRejection(body);
   if (methodTypeId !== 1) {
     return `Unsupported project methodology (${methodTypeId}) for task creation.`;
+  }
+
+  const kindError = getKindIdRangeError(body);
+  if (kindError) return kindError;
+
+  const kindId = numericValue(body.KindId) ?? TASK_KIND_TASK;
+
+  if (kindId === TASK_KIND_MILESTONE) {
+    if (!dateOnly(body.EndDate)) {
+      return 'Waterfall Milestone creation (KindId 1) requires EndDate; the milestone sits on that date. StatusId, StartDate, TypeId, and PriorityId are not required.';
+    }
+    if (hasSuppliedField(body, 'StartDate') && dateOnly(body.StartDate) !== dateOnly(body.EndDate)) {
+      return 'Milestone StartDate must be omitted or equal to EndDate; a date span makes the backend silently convert the milestone into a regular task.';
+    }
+    return undefined;
+  }
+
+  if (kindId === TASK_KIND_SUMMARY) {
+    return hasValidStatusId(body)
+      ? undefined
+      : 'Waterfall summary task creation (KindId 2) requires StatusId. Dates are optional and roll up from child tasks.';
   }
 
   const requiredFields = ['StatusId', 'StartDate', 'EndDate'];
@@ -141,6 +189,34 @@ export function getCreateTaskValidationError(body: JsonRecord, project: unknown)
   if (!missingFields.length) return undefined;
 
   return `Waterfall task creation requires StatusId, StartDate, and EndDate. Missing: ${missingFields.join(', ')}.`;
+}
+
+export function getUpdateTaskValidationError(body: JsonRecord, project: unknown): string | undefined {
+  const methodTypeId = resolveMethodTypeId(project);
+  if (methodTypeId === undefined) {
+    return 'Could not determine project methodology before updating the task.';
+  }
+
+  if (methodTypeId === 2) return getKanbanHierarchyRejection(body);
+  if (methodTypeId !== 1) {
+    return `Unsupported project methodology (${methodTypeId}) for task hierarchy updates.`;
+  }
+
+  const kindError = getKindIdRangeError(body);
+  if (kindError) return kindError;
+
+  if (numericValue(body.KindId) === TASK_KIND_MILESTONE) {
+    const startDate = dateOnly(body.StartDate);
+    const endDate = dateOnly(body.EndDate);
+    if (!startDate || !endDate) {
+      return 'Converting a task to a milestone (KindId 1) requires supplying both StartDate and EndDate in the same call; PATCH keeps existing dates otherwise, and a date span makes the backend silently revert the task kind.';
+    }
+    if (startDate !== endDate) {
+      return 'Milestone StartDate and EndDate must be equal; the milestone sits on that single date.';
+    }
+  }
+
+  return undefined;
 }
 
 export function splitUpdateTaskArgs(args: { projectId: number; taskId: number; [key: string]: unknown }) {
@@ -183,6 +259,37 @@ export function splitUpdateProjectArgs(args: { projectId: number; [key: string]:
   const { projectId, ...body } = args;
   normalizeAlias(body, 'StatusId', 'ProjectStatusId');
   return { path: `projects/${projectId}`, body };
+}
+
+export function splitCreateProjectArgs(args: { [key: string]: unknown }) {
+  const body = { ...args };
+  const statusIgnoredReason =
+    'the v2 project create route ignores status and always applies the account default status; use update_project after creation to change it';
+  rejectUnsupportedFields('create_project', body, {
+    StatusId: statusIgnoredReason,
+    ProjectStatusId: statusIgnoredReason,
+  });
+  return { path: 'projects', body };
+}
+
+export function getCreateProjectValidationError(args: JsonRecord): string | undefined {
+  if (hasSuppliedField(args, 'ProjectMethodTypeId')) {
+    const methodTypeId = numericValue(args.ProjectMethodTypeId);
+    // The backend stores any int unvalidated, so constrain it here.
+    if (methodTypeId !== 1 && methodTypeId !== 2) {
+      return 'ProjectMethodTypeId must be 1 (Waterfall) or 2 (Kanban).';
+    }
+  }
+  return undefined;
+}
+
+export function buildProjectUiUrl(
+  uiBaseUrl: string | undefined,
+  company: string | undefined,
+  projectId: number | string,
+): string | undefined {
+  if (!uiBaseUrl || !company) return undefined;
+  return `${uiBaseUrl.replace(/\/+$/, '')}/${company}/UserPages/ProjectGeneral.aspx?pid=${projectId}`;
 }
 
 export const BULK_STATUS_MAX_IDS = 100;
@@ -356,6 +463,30 @@ const TASK_VERIFICATION_FIELDS: VerificationField[] = [
   { requestField: 'PriorityId', readPaths: ['Priority.Id', 'PriorityId'] },
   { requestField: 'StartDate', readPaths: ['StartDate'] },
   { requestField: 'EndDate', readPaths: ['EndDate'] },
+  { requestField: 'KindId', readPaths: ['KindId'] },
+  { requestField: 'ParentId', readPaths: ['ParentTask.Id'] },
+];
+
+// Milestones sit on EndDate; the backend clears StartDate by design, so a
+// supplied StartDate can never match the readback. ParentId 0 detaches the
+// task to root, so the readback has no ParentTask to compare against.
+function taskVerificationFieldsFor(body: JsonRecord): VerificationField[] {
+  return TASK_VERIFICATION_FIELDS.filter(field => {
+    if (field.requestField === 'StartDate') return numericValue(body.KindId) !== TASK_KIND_MILESTONE;
+    if (field.requestField === 'ParentId') return numericValue(body.ParentId) !== 0;
+    return true;
+  });
+}
+
+const CREATE_PROJECT_VERIFICATION_FIELDS: VerificationField[] = [
+  { requestField: 'Name', readPaths: ['Name'] },
+  { requestField: 'Description', readPaths: ['Description'] },
+  { requestField: 'InternalCode', readPaths: ['InternalCode'] },
+  { requestField: 'StartDate', readPaths: ['StartDate'] },
+  { requestField: 'EndDate', readPaths: ['EndDate'] },
+  { requestField: 'TypeId', readPaths: ['Type.Id', 'TypeId'] },
+  { requestField: 'PriorityId', readPaths: ['Priority.Id', 'PriorityId'] },
+  { requestField: 'ProjectMethodTypeId', readPaths: ['MethodTypeId', 'ProjectMethodTypeId'] },
 ];
 
 const RISK_VERIFICATION_FIELDS: VerificationField[] = [
@@ -384,19 +515,66 @@ export function registerWriteTools(
 ): void {
 
   server.registerTool(
+    'create_project',
+    {
+      description: 'Create a new project. Name and TypeId are required; use get_reference_data with entity "getprojecttypes" to discover valid project type IDs. '
+        + 'ProjectMethodTypeId selects the methodology: 1=Waterfall (default when omitted), 2=Kanban (created with default board columns). '
+        + 'The project is always created with the account default status; status cannot be set at creation, call update_project afterwards to change it. '
+        + 'The authenticated user becomes the project manager when their license allows it. '
+        + 'Returns the created project read back from v2 REST (source of truth).',
+      inputSchema: {
+        Name: z.string().describe('Project name (required, must be unique in the account)'),
+        TypeId: z.number().describe('Project type ID (required). Use get_reference_data with entity "getprojecttypes" to discover valid IDs.'),
+        ProjectMethodTypeId: z.number().optional().describe('Project methodology: 1=Waterfall (default when omitted), 2=Kanban'),
+        Description: z.string().optional().describe('Project description'),
+        StartDate: z.string().optional().describe('Start date (ISO 8601)'),
+        EndDate: z.string().optional().describe('End date (ISO 8601)'),
+        PriorityId: z.number().optional().describe('Project priority ID; account default when omitted. Use get_reference_data with entity "projectpriorities".'),
+        InternalCode: z.string().optional().describe('Internal project code'),
+        // Published so the SDK does not silently strip them; the handler rejects
+        // both with a pointer to update_project instead of ignoring the value.
+        StatusId: z.number().optional().describe('NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards.'),
+        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const validationError = getCreateProjectValidationError(args);
+      if (validationError) return buildValidationErrorResponse(validationError);
+      const { path, body } = splitCreateProjectArgs(args);
+      const data = await clients.rest.post(path, body);
+      const projectId = extractResponseId(data, 'created project');
+      const readback = await clients.rest.get(`projects/${projectId}`);
+      verifyRequestedFields(body, readback, CREATE_PROJECT_VERIFICATION_FIELDS, 'create_project');
+      const uiUrl = buildProjectUiUrl(process.env.ITM_UI_URL, effectiveUserContext?.company, projectId);
+      const payload = uiUrl && readback !== null && typeof readback === 'object'
+        ? { ...(readback as JsonRecord), uiUrl }
+        : readback;
+      return buildWriteResponse(payload);
+    },
+  );
+
+  server.registerTool(
     'create_task',
     {
-      description: 'Create a new task in a project. Waterfall projects require StatusId, StartDate, and EndDate; Kanban projects use board defaults and do not require dates. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid Waterfall IDs.',
+      description: 'Create a new task, milestone, or summary task in a project. '
+        + 'KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). '
+        + 'Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). '
+        + 'Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. '
+        + 'Use ParentId to place the task under a summary task (Waterfall only). '
+        + 'Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid Waterfall IDs.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the task in'),
         Name: z.string().describe('Task name (required)'),
         Description: z.string().optional().describe('Task description. Compatibility alias for the v2 REST Details field.'),
         Details: z.string().optional().describe('Task details/description field used by v2 REST'),
-        StatusId: z.number().optional().describe('Task status ID. Required for Waterfall projects; Kanban uses board-specific status defaults.'),
-        TypeId: z.number().optional().describe('Task type ID'),
-        PriorityId: z.number().optional().describe('Task priority ID'),
-        StartDate: z.string().optional().describe('Start date (ISO 8601). Required for Waterfall projects.'),
-        EndDate: z.string().optional().describe('End date (ISO 8601). Required for Waterfall projects.'),
+        StatusId: z.number().optional().describe('Task status ID. Required for Waterfall regular and summary tasks; not required for milestones; Kanban uses board-specific status defaults.'),
+        TypeId: z.number().optional().describe('Task type ID (account default when omitted). Not the same as KindId.'),
+        PriorityId: z.number().optional().describe('Task priority ID (account default when omitted)'),
+        StartDate: z.string().optional().describe('Start date (ISO 8601). Required for Waterfall regular tasks. For milestones omit it or set it equal to EndDate.'),
+        EndDate: z.string().optional().describe('End date (ISO 8601). Required for Waterfall regular tasks and milestones.'),
+        KindId: z.number().optional().describe('Task kind: 1=Milestone, 2=Summary task, 3=Task (default). Milestones and summary tasks require a Waterfall project.'),
+        ParentId: z.number().optional().describe('Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
       },
     },
     async (args) => {
@@ -408,7 +586,7 @@ export function registerWriteTools(
       const data = await clients.rest.post(path, body);
       const taskId = extractResponseId(data, 'created task');
       const readback = await clients.rest.get(`${path}/${taskId}`);
-      verifyRequestedFields(body, readback, TASK_VERIFICATION_FIELDS, 'create_task');
+      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body), 'create_task');
       return buildWriteResponse(readback);
     },
   );
@@ -416,7 +594,9 @@ export function registerWriteTools(
   server.registerTool(
     'update_task',
     {
-      description: 'Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST.',
+      description: 'Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. '
+        + 'KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. '
+        + 'Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to update'),
@@ -428,14 +608,21 @@ export function registerWriteTools(
         PriorityId: z.number().optional().describe('New priority ID'),
         StartDate: z.string().optional().describe('New start date (ISO 8601)'),
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
+        KindId: z.number().optional().describe('New task kind: 1=Milestone, 2=Summary task, 3=Task (Waterfall only). Converting to a milestone requires equal StartDate and EndDate in the same call.'),
+        ParentId: z.number().optional().describe('New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
       },
     },
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateTaskArgs(args);
+      if (hasSuppliedField(body, 'KindId') || hasSuppliedField(body, 'ParentId')) {
+        const project = await clients.rest.get(`projects/${args.projectId}`);
+        const validationError = getUpdateTaskValidationError(body, project);
+        if (validationError) return buildValidationErrorResponse(validationError);
+      }
       await clients.rest.patch(path, body);
       const readback = await clients.rest.get(path);
-      verifyRequestedFields(body, readback, TASK_VERIFICATION_FIELDS, 'update_task');
+      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body), 'update_task');
       return buildWriteResponse(readback);
     },
   );

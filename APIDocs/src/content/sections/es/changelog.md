@@ -1,3 +1,16 @@
+### v1.0.11
+
+Creación de proyectos, jerarquía de tareas e hitos.
+
+**Nuevas herramientas (1):**
+- `create_project`: crea un proyecto Waterfall o Kanban. El proyecto se crea con el estado predeterminado de la cuenta (use update_project para cambiarlo) y el usuario creador se convierte en el jefe de proyecto. Cuando la variable opcional `ITM_UI_URL` está configurada, la respuesta incluye un enlace `uiUrl` para abrir el proyecto en la interfaz de ITM Platform.
+
+**Herramientas ampliadas (2):**
+- `create_task` y `update_task` aceptan `KindId` (1=Hito, 2=Tarea resumen, 3=Tarea) y `ParentId` para construir la jerarquía del Gantt en proyectos Waterfall. Una tarea normal usada como padre se convierte automáticamente en tarea resumen. Los hitos se sitúan en su fecha de fin: las herramientas validan las reglas de fechas en el cliente para que un hito nunca se convierta silenciosamente en una tarea normal.
+
+**Documentación:**
+- El tipo de elemento (`KindId`) se distingue ahora claramente del tipo de tarea (`TypeId`) en las descripciones de las herramientas
+
 ### v1.0.10
 
 Herramientas de cambio de estado masivo.

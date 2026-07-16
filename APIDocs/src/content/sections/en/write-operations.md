@@ -4,8 +4,9 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 
 | Operation | What it does |
 |-----------|-------------|
-| **Create task** | Add a new task to a project |
-| **Update task** | Change task name, status, priority, or dates |
+| **Create project** | Create a Waterfall or Kanban project; it starts with the account default status and the creating user as project manager |
+| **Create task** | Add a task, milestone, or summary task to a project; ParentId builds Gantt hierarchy on Waterfall projects |
+| **Update task** | Change task name, status, priority, dates, kind, or parent |
 | **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress |
 | **Update task progress** | Correct an existing progress entry |
 | **Create risk** | Log a new risk in a project |
