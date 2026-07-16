@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildWriteResponse, buildInsufficientScopeResponse, STALE_AFTER_WRITE_NOTICE,
   splitCreateTaskArgs, splitUpdateTaskArgs, splitCreateRiskArgs,
@@ -6,6 +6,8 @@ import {
   verifyRequestedFields, getCreateTaskValidationError, registerWriteTools,
   getBulkStatusValidationError, buildBulkStatusBody, summarizeBulkStatusResponse,
   BULK_STATUS_MAX_IDS, BULK_STATUS_TIMEOUT_MS,
+  splitCreateProjectArgs, getCreateProjectValidationError,
+  getUpdateTaskValidationError, buildProjectUiUrl,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -116,6 +118,132 @@ describe('getCreateTaskValidationError', () => {
       { Name: 'New Task' },
       { MethodTypeId: 99 },
     )).toContain('Unsupported project methodology');
+  });
+});
+
+describe('getCreateTaskValidationError for milestones and summary tasks', () => {
+  const waterfall = { MethodTypeId: 1 };
+  const kanban = { MethodTypeId: 2 };
+
+  it('accepts a Waterfall milestone with EndDate only', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'Go-Live', KindId: 1, EndDate: '2026-09-30' },
+      waterfall,
+    )).toBeUndefined();
+  });
+
+  it('requires EndDate for a Waterfall milestone', () => {
+    const error = getCreateTaskValidationError({ Name: 'Go-Live', KindId: 1 }, waterfall);
+    expect(error).toContain('Milestone');
+    expect(error).toContain('EndDate');
+  });
+
+  it('does not require StatusId, StartDate, TypeId for a milestone', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'Go-Live', KindId: 1, EndDate: '2026-09-30' },
+      waterfall,
+    )).toBeUndefined();
+  });
+
+  it('accepts a milestone StartDate equal to EndDate', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'Go-Live', KindId: 1, StartDate: '2026-09-30', EndDate: '2026-09-30' },
+      waterfall,
+    )).toBeUndefined();
+  });
+
+  it('rejects a milestone with a date span to prevent silent demotion to a task', () => {
+    const error = getCreateTaskValidationError(
+      { Name: 'Go-Live', KindId: 1, StartDate: '2026-09-01', EndDate: '2026-09-30' },
+      waterfall,
+    );
+    expect(error).toContain('StartDate');
+    expect(error).toContain('EndDate');
+  });
+
+  it('requires StatusId for a Waterfall summary task but no dates', () => {
+    expect(getCreateTaskValidationError(
+      { Name: '1. Discovery', KindId: 2 },
+      waterfall,
+    )).toContain('StatusId');
+    expect(getCreateTaskValidationError(
+      { Name: '1. Discovery', KindId: 2, StatusId: 10 },
+      waterfall,
+    )).toBeUndefined();
+  });
+
+  it('rejects an unknown KindId', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'X', KindId: 7, StatusId: 10, StartDate: '2026-09-01', EndDate: '2026-09-30' },
+      waterfall,
+    )).toContain('KindId');
+  });
+
+  it('treats KindId 3 exactly like the default task rules', () => {
+    const error = getCreateTaskValidationError({ Name: 'X', KindId: 3 }, waterfall);
+    expect(error).toContain('Waterfall');
+    expect(error).toContain('StatusId');
+  });
+
+  it('rejects milestones and summary tasks on Kanban projects', () => {
+    expect(getCreateTaskValidationError({ Name: 'X', KindId: 1, EndDate: '2026-09-30' }, kanban))
+      .toContain('Waterfall');
+    expect(getCreateTaskValidationError({ Name: 'X', KindId: 2 }, kanban))
+      .toContain('Waterfall');
+  });
+
+  it('allows an explicit KindId 3 on Kanban', () => {
+    expect(getCreateTaskValidationError({ Name: 'X', KindId: 3 }, kanban)).toBeUndefined();
+  });
+
+  it('rejects ParentId on Kanban projects', () => {
+    expect(getCreateTaskValidationError({ Name: 'X', ParentId: 42 }, kanban))
+      .toContain('Waterfall');
+  });
+
+  it('accepts ParentId on Waterfall task creation', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'X', ParentId: 42, StatusId: 10, StartDate: '2026-09-01', EndDate: '2026-09-30' },
+      waterfall,
+    )).toBeUndefined();
+  });
+});
+
+describe('getUpdateTaskValidationError', () => {
+  const waterfall = { MethodTypeId: 1 };
+  const kanban = { MethodTypeId: 2 };
+
+  it('rejects KindId and ParentId changes on Kanban projects', () => {
+    expect(getUpdateTaskValidationError({ KindId: 1 }, kanban)).toContain('Waterfall');
+    expect(getUpdateTaskValidationError({ ParentId: 42 }, kanban)).toContain('Waterfall');
+  });
+
+  it('requires equal StartDate and EndDate when converting a task to a milestone', () => {
+    const error = getUpdateTaskValidationError({ KindId: 1 }, waterfall);
+    expect(error).toContain('StartDate');
+    expect(error).toContain('EndDate');
+
+    expect(getUpdateTaskValidationError(
+      { KindId: 1, StartDate: '2026-09-15', EndDate: '2026-09-30' },
+      waterfall,
+    )).toContain('equal');
+
+    expect(getUpdateTaskValidationError(
+      { KindId: 1, StartDate: '2026-09-30', EndDate: '2026-09-30' },
+      waterfall,
+    )).toBeUndefined();
+  });
+
+  it('accepts a ParentId move on Waterfall without extra requirements', () => {
+    expect(getUpdateTaskValidationError({ ParentId: 42 }, waterfall)).toBeUndefined();
+  });
+
+  it('rejects an unknown KindId', () => {
+    expect(getUpdateTaskValidationError({ KindId: 9 }, waterfall)).toContain('KindId');
+  });
+
+  it('fails safely when the project has no methodology', () => {
+    expect(getUpdateTaskValidationError({ ParentId: 42 }, { Id: 1 })).toContain('methodology');
   });
 });
 
@@ -250,6 +378,292 @@ describe('published write tool schemas', () => {
     expect(result.content[0].text).toContain('StatusId');
     expect(result.content[0].text).toContain('StartDate');
     expect(result.content[0].text).toContain('EndDate');
+  });
+});
+
+describe('splitCreateProjectArgs', () => {
+  it('builds the projects path and passes fields through', () => {
+    const { path, body } = splitCreateProjectArgs({
+      Name: 'MCP Playground',
+      TypeId: 5,
+      ProjectMethodTypeId: 1,
+      Description: 'Demo',
+      StartDate: '2026-07-01',
+      EndDate: '2026-12-31',
+    });
+    expect(path).toBe('projects');
+    expect(body).toEqual({
+      Name: 'MCP Playground',
+      TypeId: 5,
+      ProjectMethodTypeId: 1,
+      Description: 'Demo',
+      StartDate: '2026-07-01',
+      EndDate: '2026-12-31',
+    });
+  });
+
+  it('rejects StatusId because the create route silently ignores status', () => {
+    expect(() => splitCreateProjectArgs({ Name: 'P', TypeId: 5, StatusId: 662751 }))
+      .toThrow('StatusId is not supported');
+    expect(() => splitCreateProjectArgs({ Name: 'P', TypeId: 5, StatusId: 662751 }))
+      .toThrow('update_project');
+  });
+
+  it('rejects ProjectStatusId the same way', () => {
+    expect(() => splitCreateProjectArgs({ Name: 'P', TypeId: 5, ProjectStatusId: 662751 }))
+      .toThrow('ProjectStatusId is not supported');
+  });
+});
+
+describe('getCreateProjectValidationError', () => {
+  it('accepts Waterfall and Kanban methodology ids', () => {
+    expect(getCreateProjectValidationError({ Name: 'P', TypeId: 5, ProjectMethodTypeId: 1 })).toBeUndefined();
+    expect(getCreateProjectValidationError({ Name: 'P', TypeId: 5, ProjectMethodTypeId: 2 })).toBeUndefined();
+  });
+
+  it('accepts an omitted methodology (backend defaults to Waterfall)', () => {
+    expect(getCreateProjectValidationError({ Name: 'P', TypeId: 5 })).toBeUndefined();
+  });
+
+  it('rejects any other methodology because the backend stores it unvalidated', () => {
+    const error = getCreateProjectValidationError({ Name: 'P', TypeId: 5, ProjectMethodTypeId: 3 });
+    expect(error).toContain('ProjectMethodTypeId');
+    expect(error).toContain('1');
+    expect(error).toContain('2');
+  });
+});
+
+describe('buildProjectUiUrl', () => {
+  it('builds the ProjectGeneral deep link', () => {
+    expect(buildProjectUiUrl('https://app.itmplatform.com', 'acme', 123))
+      .toBe('https://app.itmplatform.com/acme/UserPages/ProjectGeneral.aspx?pid=123');
+  });
+
+  it('tolerates a trailing slash on the base URL', () => {
+    expect(buildProjectUiUrl('https://app.itmplatform.com/', 'acme', 123))
+      .toBe('https://app.itmplatform.com/acme/UserPages/ProjectGeneral.aspx?pid=123');
+  });
+
+  it('returns undefined without a base URL or company', () => {
+    expect(buildProjectUiUrl(undefined, 'acme', 123)).toBeUndefined();
+    expect(buildProjectUiUrl('', 'acme', 123)).toBeUndefined();
+    expect(buildProjectUiUrl('https://app.itmplatform.com', undefined, 123)).toBeUndefined();
+  });
+});
+
+describe('create_project tool', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function register(rest: any, ctx?: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any, ctx);
+    return registrations;
+  }
+
+  it('publishes Name and TypeId as required inputs', () => {
+    const registrations = register({});
+    const schema = registrations.get('create_project').config.inputSchema;
+    expect(schema.Name.safeParse(undefined).success).toBe(false);
+    expect(schema.TypeId.safeParse(undefined).success).toBe(false);
+    expect(schema.ProjectMethodTypeId.safeParse(undefined).success).toBe(true);
+  });
+
+  it('documents the default-status limitation and TypeId discovery', () => {
+    const description = register({}).get('create_project').config.description;
+    expect(description).toContain('default status');
+    expect(description).toContain('update_project');
+    expect(description).toContain('getprojecttypes');
+  });
+
+  it('refuses the call without the mcp:write scope', async () => {
+    const registrations = register({}, { grantedScopes: ['mcp:read'] });
+    const result = await registrations.get('create_project').handler({ Name: 'P', TypeId: 5 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('insufficient_scope');
+  });
+
+  it('rejects an invalid methodology before POSTing', async () => {
+    const rest = { post: vi.fn() };
+    const result = await register(rest).get('create_project').handler({
+      Name: 'P', TypeId: 5, ProjectMethodTypeId: 7,
+    });
+    expect(rest.post).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+  });
+
+  it('publishes StatusId so the SDK does not strip it, then rejects it with guidance', async () => {
+    const rest = { post: vi.fn() };
+    const registrations = register(rest);
+    const schema = registrations.get('create_project').config.inputSchema;
+    expect(schema.StatusId.safeParse(662751).success).toBe(true);
+
+    await expect(registrations.get('create_project').handler({ Name: 'P', TypeId: 5, StatusId: 662751 }))
+      .rejects.toThrow('update_project');
+    expect(rest.post).not.toHaveBeenCalled();
+  });
+
+  it('POSTs, reads the project back, and verifies the written fields', async () => {
+    const readback = {
+      Id: 900, Name: 'MCP Playground', MethodTypeId: 1,
+      Type: { Id: 5 }, Status: { Id: 100, Name: 'Draft' },
+      StartDate: '2026-07-01T00:00:00', EndDate: '2026-12-31T00:00:00',
+    };
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 900, StatusMessage: 'Project inserted successfully.', StatusCode: 201 }),
+      get: vi.fn().mockResolvedValue(readback),
+    };
+    const result = await register(rest).get('create_project').handler({
+      Name: 'MCP Playground', TypeId: 5, ProjectMethodTypeId: 1,
+      StartDate: '2026-07-01', EndDate: '2026-12-31',
+    });
+
+    expect(rest.post).toHaveBeenCalledWith('projects', {
+      Name: 'MCP Playground', TypeId: 5, ProjectMethodTypeId: 1,
+      StartDate: '2026-07-01', EndDate: '2026-12-31',
+    });
+    expect(rest.get).toHaveBeenCalledWith('projects/900');
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ Id: 900, Name: 'MCP Playground' });
+    expect(result.content[1].text).toBe(STALE_AFTER_WRITE_NOTICE);
+  });
+
+  it('fails when the readback shows a field was not saved', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 900 }),
+      get: vi.fn().mockResolvedValue({ Id: 900, Name: 'Different name' }),
+    };
+    await expect(register(rest).get('create_project').handler({ Name: 'MCP Playground', TypeId: 5 }))
+      .rejects.toThrow('verification failed');
+  });
+
+  it('includes uiUrl when ITM_UI_URL and the company are available', async () => {
+    vi.stubEnv('ITM_UI_URL', 'https://app.itmplatform.com');
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 900 }),
+      get: vi.fn().mockResolvedValue({ Id: 900, Name: 'P', Type: { Id: 5 } }),
+    };
+    const ctx = { grantedScopes: ['mcp:write'], company: 'acme' };
+    const result = await register(rest, ctx).get('create_project').handler({ Name: 'P', TypeId: 5 });
+    expect(JSON.parse(result.content[0].text).uiUrl)
+      .toBe('https://app.itmplatform.com/acme/UserPages/ProjectGeneral.aspx?pid=900');
+  });
+
+  it('omits uiUrl when ITM_UI_URL is not configured', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 900 }),
+      get: vi.fn().mockResolvedValue({ Id: 900, Name: 'P', Type: { Id: 5 } }),
+    };
+    const ctx = { grantedScopes: ['mcp:write'], company: 'acme' };
+    const result = await register(rest, ctx).get('create_project').handler({ Name: 'P', TypeId: 5 });
+    expect(JSON.parse(result.content[0].text)).not.toHaveProperty('uiUrl');
+  });
+});
+
+describe('task hierarchy and milestone handler wiring', () => {
+  function register(rest: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any);
+    return registrations;
+  }
+
+  it('publishes KindId and ParentId on create_task and update_task', () => {
+    const registrations = register({});
+    for (const tool of ['create_task', 'update_task']) {
+      const schema = registrations.get(tool).config.inputSchema;
+      expect(schema.KindId.safeParse(undefined).success).toBe(true);
+      expect(schema.ParentId.safeParse(undefined).success).toBe(true);
+    }
+  });
+
+  it('distinguishes task kind from task type in the create_task description', () => {
+    const description = register({}).get('create_task').config.description;
+    expect(description).toContain('KindId');
+    expect(description).toContain('Milestone');
+    expect(description.toLowerCase()).toContain('not the');
+  });
+
+  it('creates a milestone without verifying StartDate (backend clears it)', async () => {
+    const rest = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ Id: 100, MethodTypeId: 1 })
+        .mockResolvedValueOnce({
+          Id: 7001, Name: 'Go-Live', KindId: 1,
+          StartDate: '0001-01-01T00:00:00', EndDate: '2026-09-30T00:00:00',
+        }),
+      post: vi.fn().mockResolvedValue({ Id: 7001 }),
+    };
+    const result = await register(rest).get('create_task').handler({
+      projectId: 100, Name: 'Go-Live', KindId: 1,
+      StartDate: '2026-09-30', EndDate: '2026-09-30',
+    });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0].text).KindId).toBe(1);
+  });
+
+  it('verifies ParentId against the readback ParentTask.Id', async () => {
+    const rest = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ Id: 100, MethodTypeId: 1 })
+        .mockResolvedValueOnce({
+          Id: 7002, Name: 'Child', KindId: 3, ParentTask: { Id: 7000, Name: 'Parent' },
+          Status: { Id: 10 }, StartDate: '2026-09-01T00:00:00', EndDate: '2026-09-10T00:00:00',
+        }),
+      post: vi.fn().mockResolvedValue({ Id: 7002 }),
+    };
+    const result = await register(rest).get('create_task').handler({
+      projectId: 100, Name: 'Child', ParentId: 7000,
+      StatusId: 10, StartDate: '2026-09-01', EndDate: '2026-09-10',
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('update_task fetches the project only when KindId or ParentId is supplied', async () => {
+    const rest = {
+      get: vi.fn().mockResolvedValue({ Id: 42, Name: 'Renamed', ProjectMethodTypeId: 1 }),
+      patch: vi.fn().mockResolvedValue({}),
+    };
+    await register(rest).get('update_task').handler({ projectId: 100, taskId: 42, Name: 'Renamed' });
+    expect(rest.get).toHaveBeenCalledTimes(1);
+    expect(rest.get).toHaveBeenCalledWith('projects/100/tasks/42');
+  });
+
+  it('update_task with ParentId 0 (detach) does not require ParentTask in the readback', async () => {
+    const rest = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ Id: 100, MethodTypeId: 1 })
+        .mockResolvedValueOnce({ Id: 42, Name: 'Detached', KindId: 3 }),
+      patch: vi.fn().mockResolvedValue({}),
+    };
+    const result = await register(rest).get('update_task').handler({
+      projectId: 100, taskId: 42, ParentId: 0,
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('update_task rejects ParentId on a Kanban project before PATCHing', async () => {
+    const rest = {
+      get: vi.fn().mockResolvedValue({ Id: 100, MethodTypeId: 2 }),
+      patch: vi.fn(),
+    };
+    const result = await register(rest).get('update_task').handler({
+      projectId: 100, taskId: 42, ParentId: 7,
+    });
+    expect(rest.get).toHaveBeenCalledWith('projects/100');
+    expect(rest.patch).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Waterfall');
   });
 });
 

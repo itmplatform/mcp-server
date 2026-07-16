@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.10",
+  "serverVersion": "1.0.11",
   "tools": [
     {
       "name": "search_projects",
@@ -683,8 +683,63 @@
       }
     },
     {
+      "name": "create_project",
+      "description": "Create a new project. Name and TypeId are required; use get_reference_data with entity \"getprojecttypes\" to discover valid project type IDs. ProjectMethodTypeId selects the methodology: 1=Waterfall (default when omitted), 2=Kanban (created with default board columns). The project is always created with the account default status; status cannot be set at creation, call update_project afterwards to change it. The authenticated user becomes the project manager when their license allows it. Returns the created project read back from v2 REST (source of truth).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Project name (required, must be unique in the account)"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Project type ID (required). Use get_reference_data with entity \"getprojecttypes\" to discover valid IDs."
+          },
+          "ProjectMethodTypeId": {
+            "type": "number",
+            "description": "Project methodology: 1=Waterfall (default when omitted), 2=Kanban"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Project description"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "Start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "End date (ISO 8601)"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "Project priority ID; account default when omitted. Use get_reference_data with entity \"projectpriorities\"."
+          },
+          "InternalCode": {
+            "type": "string",
+            "description": "Internal project code"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards."
+          },
+          "ProjectStatusId": {
+            "type": "number",
+            "description": "NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards."
+          }
+        },
+        "required": [
+          "Name",
+          "TypeId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "create_task",
-      "description": "Create a new task in a project. Waterfall projects require StatusId, StartDate, and EndDate; Kanban projects use board defaults and do not require dates. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
+      "description": "Create a new task, milestone, or summary task in a project. KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. Use ParentId to place the task under a summary task (Waterfall only). Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -706,23 +761,31 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Task status ID. Required for Waterfall projects; Kanban uses board-specific status defaults."
+            "description": "Task status ID. Required for Waterfall regular and summary tasks; not required for milestones; Kanban uses board-specific status defaults."
           },
           "TypeId": {
             "type": "number",
-            "description": "Task type ID"
+            "description": "Task type ID (account default when omitted). Not the same as KindId."
           },
           "PriorityId": {
             "type": "number",
-            "description": "Task priority ID"
+            "description": "Task priority ID (account default when omitted)"
           },
           "StartDate": {
             "type": "string",
-            "description": "Start date (ISO 8601). Required for Waterfall projects."
+            "description": "Start date (ISO 8601). Required for Waterfall regular tasks. For milestones omit it or set it equal to EndDate."
           },
           "EndDate": {
             "type": "string",
-            "description": "End date (ISO 8601). Required for Waterfall projects."
+            "description": "End date (ISO 8601). Required for Waterfall regular tasks and milestones."
+          },
+          "KindId": {
+            "type": "number",
+            "description": "Task kind: 1=Milestone, 2=Summary task, 3=Task (default). Milestones and summary tasks require a Waterfall project."
+          },
+          "ParentId": {
+            "type": "number",
+            "description": "Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
           }
         },
         "required": [
@@ -735,7 +798,7 @@
     },
     {
       "name": "update_task",
-      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST.",
+      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -778,6 +841,14 @@
           "EndDate": {
             "type": "string",
             "description": "New end date (ISO 8601)"
+          },
+          "KindId": {
+            "type": "number",
+            "description": "New task kind: 1=Milestone, 2=Summary task, 3=Task (Waterfall only). Converting to a milestone requires equal StartDate and EndDate in the same call."
+          },
+          "ParentId": {
+            "type": "number",
+            "description": "New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
           }
         },
         "required": [

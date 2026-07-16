@@ -4,8 +4,9 @@ La IA puede modificar sus datos de ITM Platform, no solo leerlos. Las operacione
 
 | Operación | Qué hace |
 |-----------|---------|
-| **Crear tarea** | Agrega una nueva tarea a un proyecto |
-| **Actualizar tarea** | Cambia nombre, estado, prioridad o fechas de una tarea |
+| **Crear proyecto** | Crea un proyecto Waterfall o Kanban; se crea con el estado predeterminado de la cuenta y el usuario creador como jefe de proyecto |
+| **Crear tarea** | Agrega una tarea, hito o tarea resumen a un proyecto; ParentId construye la jerarquía del Gantt en proyectos Waterfall |
+| **Actualizar tarea** | Cambia nombre, estado, prioridad, fechas, tipo de elemento o tarea padre |
 | **Crear seguimiento de tarea** | Reporta el avance de una tarea (porcentaje, valoración, notas). Dispara los mismos efectos que reportar avance en la aplicación: transiciones de estado, propagación a tareas resumen y avance automático del proyecto |
 | **Actualizar seguimiento de tarea** | Corrige una entrada de seguimiento existente |
 | **Crear riesgo** | Registra un nuevo riesgo en un proyecto |
