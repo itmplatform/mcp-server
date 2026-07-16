@@ -984,7 +984,7 @@ Steps 15--16 and 19 follow a four-phase cross-repo implementation sequence defin
 | # | Step | Repo | Status |
 |---|------|------|--------|
 | 22 | `generate_insights` (AiGenerator integration) | ITM.MCP | ⬜ To do |
-| 23 | `bulk_update_tasks` (batch operations) | ITM.MCP | ⬜ To do |
+| 23 | `bulk_update_tasks` (batch operations) | ITM.MCP | 🟨 Partially delivered -- status subset shipped as `bulk_update_task_status` / `bulk_update_activity_status` (v1.0.10, [SPEC_MCP_BULK_STATUS_TOOLS.md](SPEC_MCP_BULK_STATUS_TOOLS.md)); general-field remainder is Phase 2 of `ITM.Web/zz_Specifications/SPEC_MCP_BULK_OPERATIONS.md` |
 | 24 | Extension management tools | ITM.MCP | ⬜ To do |
 | 25 | E2E tests -- verify AiGenerator integration, bulk operations (Section 15) | ITM.MCP | ⬜ To do |
 

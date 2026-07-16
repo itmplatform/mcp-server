@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.9",
+  "serverVersion": "1.0.10",
   "tools": [
     {
       "name": "search_projects",
@@ -647,7 +647,7 @@
     },
     {
       "name": "get_reference_data",
-      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -669,7 +669,8 @@
               "purchasestatuses",
               "purchasetypes",
               "revenuestatuses",
-              "assessments"
+              "assessments",
+              "activitystatuses"
             ],
             "description": "The reference data entity to retrieve"
           }
@@ -921,6 +922,86 @@
         },
         "required": [
           "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "bulk_update_task_status",
+      "description": "Apply one status to many tasks of a project in a single call (much faster than looping update_task). Collect task IDs first via list_project_tasks or search, then chunk into calls of at most 100 IDs. Resolve valid status IDs via get_reference_data (entity \"gettaskstatuses\"): statuses differ between Waterfall and Kanban projects, and Kanban projects interpret statusId as the Kanban column ID, so pass projectMethodTypeId (1=Waterfall, 2=Kanban) or use statusName instead. Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the tasks"
+          },
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Task IDs to update (1-100 per call; chunk larger sets into multiple calls)"
+          },
+          "statusId": {
+            "type": "number",
+            "description": "Target status ID (Kanban column ID for Kanban projects). Either statusId or statusName is required."
+          },
+          "statusName": {
+            "type": "string",
+            "description": "Target status name, resolved server-side when statusId is omitted"
+          },
+          "projectMethodTypeId": {
+            "type": "number",
+            "description": "Project methodology: 1=Waterfall, 2=Kanban. Needed for Kanban status resolution and name lookup."
+          }
+        },
+        "required": [
+          "projectId",
+          "taskIds"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "bulk_update_activity_status",
+      "description": "Apply one status to many activities of a service in a single call. Collect activity IDs first via list_service_activities, then chunk into calls of at most 100 IDs. Resolve valid activity status IDs via get_reference_data with entity \"activitystatuses\" (activity statuses differ from task statuses), or pass statusName. Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID containing the activities"
+          },
+          "activityIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Activity IDs to update (1-100 per call; chunk larger sets into multiple calls)"
+          },
+          "statusId": {
+            "type": "number",
+            "description": "Target activity status ID. Either statusId or statusName is required."
+          },
+          "statusName": {
+            "type": "string",
+            "description": "Target activity status name, resolved against the activitystatuses reference list when statusId is omitted"
+          },
+          "projectMethodTypeId": {
+            "type": "number",
+            "description": "Service methodology type ID passed through to the backend"
+          }
+        },
+        "required": [
+          "serviceId",
+          "activityIds"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"

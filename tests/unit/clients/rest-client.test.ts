@@ -299,6 +299,50 @@ describe('RestClient', () => {
     });
   });
 
+  describe('request timeout', () => {
+    function neverResolvingFetch() {
+      return vi.fn().mockImplementation((_url: string, opts: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          opts.signal?.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+        }));
+    }
+
+    it('aborts a POST that exceeds timeoutMs', async () => {
+      vi.useFakeTimers();
+      try {
+        globalThis.fetch = neverResolvingFetch();
+        const client = createRestClient(config);
+        const promise = client.post('projects/100/UpdateTaskStatuses', { TaskIds: '1' }, { timeoutMs: 90_000 });
+        const assertion = expect(promise).rejects.toThrow('timed out after 90000ms');
+        await vi.advanceTimersByTimeAsync(90_001);
+        await assertion;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('resolves normally within the timeout and clears the timer', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{ Id: 1, StatusCode: 200 }]),
+      });
+      const client = createRestClient(config);
+      const result = await client.post('projects/100/UpdateTaskStatuses', { TaskIds: '1' }, { timeoutMs: 90_000 });
+      expect(result).toEqual([{ Id: 1, StatusCode: 200 }]);
+    });
+
+    it('does not set an abort signal when no timeout is requested', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      });
+      globalThis.fetch = mockFetch;
+      const client = createRestClient(config);
+      await client.get('projects');
+      expect(mockFetch.mock.calls[0][1].signal).toBeUndefined();
+    });
+  });
+
   it('picks up mutated authHeaders on subsequent calls', async () => {
     const mutableHeaders: Record<string, string> = { Token: 'old-token' };
     const mockFetch = vi.fn().mockResolvedValue({

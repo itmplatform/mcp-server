@@ -11,6 +11,12 @@ La IA puede modificar sus datos de ITM Platform, no solo leerlos. Las operacione
 | **Crear riesgo** | Registra un nuevo riesgo en un proyecto |
 | **Crear incidencia** | Registra una nueva incidencia en un proyecto |
 | **Actualizar proyecto** | Cambia nombre, estado, prioridad o fechas del proyecto |
+| **Cambio masivo de estado de tareas** | Aplica un estado a hasta 100 tareas de un proyecto en una sola llamada |
+| **Cambio masivo de estado de actividades** | Aplica un estado a hasta 100 actividades de un servicio en una sola llamada |
+
+### Cambios de estado masivos
+
+Las herramientas masivas devuelven un resumen compacto por lote (`requested`, `succeeded`, `failed`) en lugar de la relectura completa de cada registro. El lote completo se ejecuta en una única transacción de base de datos en el servidor: un error inesperado revierte todo el lote, mientras que los fallos de validación por elemento se reportan en el array `failed` sin bloquear al resto. Reaplicar el mismo estado es inocuo, por lo que reintentar un lote fallido es seguro.
 
 ### Diseño de seguridad
 

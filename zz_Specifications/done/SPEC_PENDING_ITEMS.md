@@ -13,7 +13,7 @@ Phase 1 (Read-Only) and Phase 2 (Writes + HTTP + OAuth) are fully implemented. P
 | # | Step | Description | Status |
 |---|------|-------------|--------|
 | 22 | `generate_insights` | AiGenerator integration (`POST /v2/{co}/entityInsights`) | To do |
-| 23 | `bulk_update_tasks` | Batch task operations (`POST /v2/{co}/projects/{pid}/tasks/batch`) | To do |
+| 23 | `bulk_update_tasks` | Batch task operations. Status subset shipped as `bulk_update_task_status` / `bulk_update_activity_status` (v1.0.10, [SPEC_MCP_BULK_STATUS_TOOLS.md](SPEC_MCP_BULK_STATUS_TOOLS.md)); general-field remainder is Phase 2 of `ITM.Web/zz_Specifications/SPEC_MCP_BULK_OPERATIONS.md` | Partially delivered |
 | 24 | Extension management tools | Create/configure connector extensions | To do |
 | 25 | E2E tests for Phase 3 | Verify AiGenerator integration, bulk operations | To do |
 

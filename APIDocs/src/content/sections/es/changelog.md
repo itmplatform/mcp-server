@@ -1,3 +1,17 @@
+### v1.0.10
+
+Herramientas de cambio de estado masivo.
+
+**Nuevas herramientas (2):**
+- `bulk_update_task_status`: aplica un estado a hasta 100 tareas de un proyecto en una sola llamada. Admite IDs de estado Waterfall, IDs de columna Kanban y resolución de nombres de estado en el servidor.
+- `bulk_update_activity_status`: aplica un estado a hasta 100 actividades de un servicio en una sola llamada. Los nombres de estado se resuelven contra la lista de estados de actividad.
+
+**Datos de referencia:**
+- Nueva entidad `activitystatuses` en get_reference_data para descubrir los estados válidos de actividades de servicio (son distintos de los estados de tarea)
+
+**Robustez del cliente:**
+- Las peticiones de estado masivo usan un tiempo límite de 90 segundos mediante AbortController
+
 ### v1.0.9
 
 Correcciones del contrato de creación de tareas e incidencias.

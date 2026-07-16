@@ -303,4 +303,24 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       ShortDescription: 'Backend migration complete',
     },
   },
+  bulk_update_task_status: {
+    category: 'Write Operations',
+    narrative:
+      'When you say "Close all the remaining tasks of this project," the AI collects the task IDs, then applies the status in chunks of up to 100 tasks per call instead of updating them one by one. The response is a compact summary; the AI checks the failed array of every chunk.',
+    exampleResponse: {
+      requested: 100,
+      succeeded: 98,
+      failed: [{ taskId: 1859304, message: 'Task does not exist.' }],
+    },
+  },
+  bulk_update_activity_status: {
+    category: 'Write Operations',
+    narrative:
+      'Same as bulk_update_task_status but for the activities of a service. Activity statuses differ from task statuses; the AI discovers them with get_reference_data using the activitystatuses entity.',
+    exampleResponse: {
+      requested: 2,
+      succeeded: 2,
+      failed: [],
+    },
+  },
 }

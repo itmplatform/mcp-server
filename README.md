@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 27 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 29 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -128,6 +128,8 @@ The server exposes 27 MCP tools, 6 resources, and 4 prompt templates.
 | `create_risk` | Log a project risk |
 | `create_issue` | Log a project issue with a required issue type and status |
 | `update_project` | Update project fields such as name, status, dates, and priority |
+| `bulk_update_task_status` | Apply one status to up to 100 tasks of a project in a single call |
+| `bulk_update_activity_status` | Apply one status to up to 100 activities of a service in a single call |
 
 Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
 Validation failures include the actionable message returned by REST instead of only the HTTP status.
