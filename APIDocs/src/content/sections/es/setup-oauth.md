@@ -31,4 +31,4 @@ Su token OAuth determina qué puede hacer la IA:
 | Alcance | Qué permite |
 |---------|-------------|
 | `mcp:read` | Buscar proyectos, ver presupuestos, listar tareas, consultar el portafolio |
-| `mcp:write` | Todo lo anterior, más crear tareas, registrar riesgos/incidencias, actualizar proyectos |
+| `mcp:write` | Todo lo anterior, más crear proyectos y tareas, registrar riesgos/incidencias, actualizar proyectos |
