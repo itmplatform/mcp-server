@@ -1,3 +1,18 @@
+### v1.0.13
+
+CRUD básico P1: lecturas de entidad individual, búsqueda de tareas en toda la cuenta y la superficie de escritura de riesgos, incidencias, servicios y actividades.
+
+**Nuevas herramientas (10):**
+- 4 de lectura: `get_task`, `get_risk` y `get_issue` recuperan el detalle completo de una entidad desde REST v2 (fuente de verdad, sin retraso de DataMart); `search_tasks` busca tareas en todos los proyectos por nombre, estado, persona asignada, tipo de elemento o rango de fechas, devolviendo cada tarea con su proyecto.
+- 6 de escritura: `update_risk` (incluidos los planes de mitigación y contingencia), `update_issue` (incluida la resolución final), `create_service`, `update_service`, `create_activity` y `update_activity`. Todas siguen el patrón de escritura estándar: normalización de IDs de referencia, relectura desde REST v2 y verificación en origen.
+
+**Datos de referencia:**
+- Nueva entidad `servicetypes` en get_reference_data para descubrir los tipos de servicio que exige create_service.
+
+**Notas:**
+- Las actividades de un servicio forman una lista plana: las herramientas de actividades rechazan `KindId` y `ParentId` (los hitos, tareas resumen y jerarquía solo existen en tareas de proyecto).
+- `update_risk` acepta `ContingencyPlan` y lo asigna al nombre de campo del backend (`ContigencyPlan`).
+
 ### v1.0.12
 
 Correcciones del contrato de creación de riesgos y de la verificación de tareas resumen.

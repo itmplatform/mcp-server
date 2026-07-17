@@ -74,6 +74,31 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       ],
     },
   },
+  get_task: {
+    category: 'Tasks',
+    narrative:
+      'When the AI needs the confirmed detail of one task (after a search, or right after a write), it calls this tool. The response comes from the v2 REST API, so it is never affected by the DataMart sync delay.',
+    exampleResponse: {
+      Id: 112234,
+      Name: 'Develop homepage',
+      KindId: 3,
+      StartDate: '2026-02-01',
+      EndDate: '2026-03-15',
+      Status: { Id: 2, Name: 'In Progress' },
+    },
+  },
+  search_tasks: {
+    category: 'Tasks',
+    narrative:
+      'When you ask "What is assigned to Daniel across all projects?" or "Which milestones land this month?", the AI searches tasks account-wide by name, status, assignee, kind, or date range, without walking projects one by one. Each result carries the project it belongs to.',
+    exampleResponse: {
+      items: [
+        { projectId: 75868, projectName: 'Website Redesign', task: { id: 112234, name: 'Develop homepage', statusLabel: 'In Progress' } },
+      ],
+      total: 1,
+      hasMore: false,
+    },
+  },
   get_project_budget: {
     category: 'Financials',
     narrative:
@@ -122,6 +147,32 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       issues: [
         { id: 8001, name: 'API integration delay', statusLabel: 'Open', severityLabel: 'High' },
       ],
+    },
+  },
+  get_risk: {
+    category: 'Risks & Issues',
+    narrative:
+      'Retrieves the full detail of a single risk, including the mitigation and contingency plans, probability, impact, level, and manager. The AI uses it after get_project_risks or before updating a risk.',
+    exampleResponse: {
+      Id: 7001,
+      Name: 'Resource shortage',
+      Status: { BaseId: 1, Name: 'Open' },
+      Probability: { BaseId: 20, Name: 'Medium' },
+      Impact: { BaseId: 10, Name: 'High' },
+      MitigationPlan: 'Cross-train two developers',
+      ContigencyPlan: 'Contract agency support',
+    },
+  },
+  get_issue: {
+    category: 'Risks & Issues',
+    narrative:
+      'Retrieves the full detail of a single issue, including type, status, manager, cost and schedule impact, and the final resolution. The AI uses it after get_project_issues or before updating an issue.',
+    exampleResponse: {
+      Id: 8001,
+      Name: 'API integration delay',
+      Type: { BaseId: 3, Name: 'Technical' },
+      Status: { BaseId: 1, Name: 'Open' },
+      FinalResolution: null,
     },
   },
   aggregate_portfolio: {
@@ -334,6 +385,70 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       requested: 2,
       succeeded: 2,
       failed: [],
+    },
+  },
+  update_risk: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Close the resource shortage risk" or "Update its mitigation plan," the AI sends only the fields that change. Status, type, impact, probability, and level IDs are normalized against reference data, and the updated risk is read back to confirm the save.',
+    exampleResponse: {
+      Id: 7001,
+      Name: 'Resource shortage',
+      Status: { BaseId: 2, Name: 'Closed' },
+      MitigationPlan: 'Cross-train two developers',
+      ContigencyPlan: 'Contract agency support',
+    },
+  },
+  update_issue: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Mark the API integration issue as resolved," the AI updates the issue with only the fields that change, including the final resolution text, and reads the issue back to confirm the save.',
+    exampleResponse: {
+      Id: 8001,
+      Name: 'API integration delay',
+      Status: { BaseId: 2, Name: 'Closed' },
+      FinalResolution: 'Vendor delivered the fix in v2.1',
+    },
+  },
+  create_service: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Create an IT Support service," the AI creates a service with a name and service type (discovered through the servicetypes reference entity). The service starts with the account default status; update_service changes it afterwards.',
+    exampleResponse: {
+      Id: 80215,
+      Name: 'IT Support',
+      Status: { Id: 662750, Name: 'Initial' },
+    },
+  },
+  update_service: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Set the IT Support service to Active" or "Extend its end date," the AI updates only the fields that change and reads the service back to confirm the save.',
+    exampleResponse: {
+      Id: 80215,
+      Name: 'IT Support',
+      Status: { Id: 662751, Name: 'Active' },
+    },
+  },
+  create_activity: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Add a ticket triage activity to the IT Support service," the AI creates an activity with a name, activity status, and dates. Activities are the service counterpart of project tasks and form a flat list: no milestones, summary tasks, or hierarchy.',
+    exampleResponse: {
+      Id: 91002,
+      Name: 'Ticket triage',
+      StartDate: '2026-07-01',
+      EndDate: '2026-12-31',
+    },
+  },
+  update_activity: {
+    category: 'Write Operations',
+    narrative:
+      'When you ask "Mark the ticket triage activity as in progress," the AI updates only the fields that change. Activity statuses differ from task statuses and are discovered with the activitystatuses reference entity.',
+    exampleResponse: {
+      Id: 91002,
+      Name: 'Ticket triage',
+      Status: { Id: 544590, Name: 'In Progress' },
     },
   },
 }

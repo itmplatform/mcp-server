@@ -1,3 +1,18 @@
+### v1.0.13
+
+P1 core CRUD: single-entity reads, account-wide task search, and the risk, issue, service, and activity write surface.
+
+**New tools (10):**
+- 4 read tools: `get_task`, `get_risk`, and `get_issue` retrieve one entity's full detail from v2 REST (source of truth, no DataMart delay); `search_tasks` searches tasks across all projects by name, status, assignee, kind, or date range, returning each task with its project context.
+- 6 write tools: `update_risk` (including mitigation and contingency plans), `update_issue` (including final resolution), `create_service`, `update_service`, `create_activity`, and `update_activity`. All follow the standard write pattern: reference-ID normalization, readback from v2 REST, and source-of-truth verification.
+
+**Reference data:**
+- New `servicetypes` entity in get_reference_data to discover the service type IDs required by create_service.
+
+**Notes:**
+- Service activities form a flat list: the activity tools reject `KindId` and `ParentId` (milestones, summary tasks, and hierarchy exist only on project tasks).
+- `update_risk` accepts `ContingencyPlan` and maps it to the backend field spelling (`ContigencyPlan`).
+
 ### v1.0.12
 
 Risk creation contract corrections and summary task verification fix.
