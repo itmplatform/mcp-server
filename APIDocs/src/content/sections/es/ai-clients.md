@@ -229,7 +229,7 @@ La primera vez que se conecte vía OAuth, abra MCP en su cliente y seleccione `i
 | Alcance | Qué permite |
 |---------|-------------|
 | `mcp:read` | Buscar proyectos, ver presupuestos, listar tareas, consultar el portafolio |
-| `mcp:write` | Todo lo anterior, más crear proyectos y tareas, registrar riesgos/incidencias, actualizar proyectos |
+| `mcp:write` | Todo lo anterior, más crear y actualizar proyectos, servicios, tareas, actividades, riesgos e incidencias |
 
 OAuth permite a la IA actuar en su nombre sin ver nunca su contraseña.
 

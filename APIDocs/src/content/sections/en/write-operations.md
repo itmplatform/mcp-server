@@ -1,4 +1,4 @@
-The AI can modify your ITM Platform data, not just read it. Write operations include creating tasks, updating projects, and logging risks or issues.
+The AI can modify your ITM Platform data, not just read it. Write operations cover projects, services, tasks, activities, risks, and issues.
 
 ### Available write operations
 
@@ -10,8 +10,14 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 | **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress |
 | **Update task progress** | Correct an existing progress entry |
 | **Create risk** | Log a new risk in a project. Type, status, impact, probability, and level are required; valid IDs are discovered through the reference data tool (including the `risklevels` entity) |
+| **Update risk** | Change risk status, type, probability, impact, level, or the mitigation and contingency plans |
 | **Create issue** | Log a new issue in a project |
+| **Update issue** | Change issue name, status, type, or final resolution |
 | **Update project** | Change project name, status, priority, or dates |
+| **Create service** | Create a service; it starts with the account default status. Service types are discovered through the `servicetypes` reference entity |
+| **Update service** | Change service name, status, priority, or dates |
+| **Create activity** | Add an activity to a service (activities form a flat list: no milestones, summary tasks, or hierarchy) |
+| **Update activity** | Change activity name, status, description, or dates |
 | **Bulk update task status** | Apply one status to up to 100 tasks of a project in a single call |
 | **Bulk update activity status** | Apply one status to up to 100 activities of a service in a single call |
 
