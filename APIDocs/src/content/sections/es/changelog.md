@@ -1,3 +1,17 @@
+### v1.0.12
+
+Correcciones del contrato de creación de riesgos y de la verificación de tareas resumen.
+
+**Validación de escritura:**
+- `create_risk` publica ahora `TypeId`, `StatusId`, `ImpactId`, `ProbabilityId` y `LevelId` como entradas MCP obligatorias (la ruta v2 de creación de riesgos siempre las exigió) y rechaza los campos ausentes en el cliente con una referencia a la entidad de datos correspondiente, en lugar de reenviar un 400 de REST.
+- `create_task` y `update_task` rechazan `TypeId` en tareas resumen (KindId 2). El backend lo ignora y omite el tipo en la relectura, lo que antes producía un falso error de verificación de escritura tras una creación correcta.
+
+**Datos de referencia:**
+- Nueva entidad `risklevels` en get_reference_data para descubrir los valores de `LevelId` que exige create_risk. `LevelId` acepta valores Id localizados y los normaliza al BaseId que requiere REST v2, igual que el resto de campos de referencia de riesgos. Requiere la ruta `v2/{company}/risklevels` del API Gateway publicada junto con esta versión.
+
+**Documentación:**
+- `create_task` y `update_task` documentan el efecto secundario de progreso automático: los estados con AutomaticProgress (como Completada) crean una entrada de progreso del 100%, y percentComplete sigue la entrada más reciente por ReportDate.
+
 ### v1.0.11
 
 Creación de proyectos, jerarquía de tareas e hitos.

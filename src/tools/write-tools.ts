@@ -104,6 +104,11 @@ export const TASK_KIND_MILESTONE = 1;
 export const TASK_KIND_SUMMARY = 2;
 export const TASK_KIND_TASK = 3;
 
+// The backend silently ignores TypeId on summary tasks and omits Type from the
+// readback, so a supplied TypeId can never verify; reject it up front instead.
+const SUMMARY_TASK_TYPE_ID_ERROR =
+  'Summary tasks (KindId 2) do not use TypeId; omit it. Use TypeId only on regular tasks and milestones.';
+
 export function splitCreateTaskArgs(args: { projectId: number; [key: string]: unknown }) {
   const { projectId, ...body } = args;
   normalizeAlias(body, 'Description', 'Details');
@@ -174,6 +179,7 @@ export function getCreateTaskValidationError(body: JsonRecord, project: unknown)
   }
 
   if (kindId === TASK_KIND_SUMMARY) {
+    if (hasSuppliedField(body, 'TypeId')) return SUMMARY_TASK_TYPE_ID_ERROR;
     return hasValidStatusId(body)
       ? undefined
       : 'Waterfall summary task creation (KindId 2) requires StatusId. Dates are optional and roll up from child tasks.';
@@ -205,6 +211,10 @@ export function getUpdateTaskValidationError(body: JsonRecord, project: unknown)
   const kindError = getKindIdRangeError(body);
   if (kindError) return kindError;
 
+  if (numericValue(body.KindId) === TASK_KIND_SUMMARY && hasSuppliedField(body, 'TypeId')) {
+    return SUMMARY_TASK_TYPE_ID_ERROR;
+  }
+
   if (numericValue(body.KindId) === TASK_KIND_MILESTONE) {
     const startDate = dateOnly(body.StartDate);
     const endDate = dateOnly(body.EndDate);
@@ -233,12 +243,21 @@ export function splitCreateRiskArgs(args: { projectId: number; [key: string]: un
   const { projectId, ...body } = args;
   normalizeAlias(body, 'Impact', 'ImpactId');
   normalizeAlias(body, 'Probability', 'ProbabilityId');
-  requireSuppliedField(
-    'create_risk',
-    body,
-    'LevelId',
-    'the v2 risk create route validates risk level, and there is not currently a v2 risklevels reference endpoint',
-  );
+  const requiredReferenceFields: Array<{ field: string; label: string; entity: string }> = [
+    { field: 'TypeId', label: 'risk type', entity: 'risktypes' },
+    { field: 'StatusId', label: 'risk status', entity: 'riskstatuses' },
+    { field: 'ImpactId', label: 'risk impact', entity: 'riskimpacts' },
+    { field: 'ProbabilityId', label: 'risk probability', entity: 'riskprobabilities' },
+    { field: 'LevelId', label: 'risk level', entity: 'risklevels' },
+  ];
+  for (const { field, label, entity } of requiredReferenceFields) {
+    requireSuppliedField(
+      'create_risk',
+      body,
+      field,
+      `the v2 risk create route requires a valid ${label}; use get_reference_data with entity "${entity}" to discover IDs`,
+    );
+  }
   return { path: `projects/${projectId}/risks`, body };
 }
 
@@ -470,10 +489,14 @@ const TASK_VERIFICATION_FIELDS: VerificationField[] = [
 // Milestones sit on EndDate; the backend clears StartDate by design, so a
 // supplied StartDate can never match the readback. ParentId 0 detaches the
 // task to root, so the readback has no ParentTask to compare against.
-function taskVerificationFieldsFor(body: JsonRecord): VerificationField[] {
+// Summary tasks have no TypeId (the backend ignores it and omits Type from
+// the readback); the readback KindId covers updates that do not resend KindId.
+export function taskVerificationFieldsFor(body: JsonRecord, readback?: unknown): VerificationField[] {
+  const kindId = numericValue(body.KindId) ?? numericValue(getPathValue(readback, 'KindId'));
   return TASK_VERIFICATION_FIELDS.filter(field => {
     if (field.requestField === 'StartDate') return numericValue(body.KindId) !== TASK_KIND_MILESTONE;
     if (field.requestField === 'ParentId') return numericValue(body.ParentId) !== 0;
+    if (field.requestField === 'TypeId') return kindId !== TASK_KIND_SUMMARY;
     return true;
   });
 }
@@ -562,6 +585,8 @@ export function registerWriteTools(
         + 'Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). '
         + 'Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. '
         + 'Use ParentId to place the task under a summary task (Waterfall only). '
+        + 'Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; '
+        + 'a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate. '
         + 'Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid Waterfall IDs.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the task in'),
@@ -586,7 +611,7 @@ export function registerWriteTools(
       const data = await clients.rest.post(path, body);
       const taskId = extractResponseId(data, 'created task');
       const readback = await clients.rest.get(`${path}/${taskId}`);
-      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body), 'create_task');
+      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'create_task');
       return buildWriteResponse(readback);
     },
   );
@@ -596,7 +621,9 @@ export function registerWriteTools(
     {
       description: 'Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. '
         + 'KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. '
-        + 'Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call.',
+        + 'Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. '
+        + 'Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; '
+        + 'a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to update'),
@@ -622,7 +649,7 @@ export function registerWriteTools(
       }
       await clients.rest.patch(path, body);
       const readback = await clients.rest.get(path);
-      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body), 'update_task');
+      verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'update_task');
       return buildWriteResponse(readback);
     },
   );
@@ -630,16 +657,16 @@ export function registerWriteTools(
   server.registerTool(
     'create_risk',
     {
-      description: 'Log a new risk in a project. Returns the created risk read back from v2 REST. Use get_reference_data with entity "riskstatuses", "risktypes", "riskimpacts", or "riskprobabilities" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      description: 'Log a new risk in a project. Returns the created risk read back from v2 REST. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required by the v2 risk create route. Use get_reference_data with entity "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", or "risklevels" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the risk in'),
         Name: z.string().describe('Risk name (required)'),
         Description: z.string().optional().describe('Risk description'),
-        StatusId: z.number().optional().describe('Risk status ID'),
-        TypeId: z.number().optional().describe('Risk type ID'),
-        ProbabilityId: z.number().optional().describe('Risk probability ID'),
-        ImpactId: z.number().optional().describe('Risk impact ID'),
-        LevelId: z.number().describe('Risk level base ID required by v2 REST. No v2 risklevels reference endpoint currently exists.'),
+        StatusId: z.number().describe('Risk status ID (required). Use get_reference_data with entity "riskstatuses" to discover valid IDs.'),
+        TypeId: z.number().describe('Risk type ID (required). Use get_reference_data with entity "risktypes" to discover valid IDs.'),
+        ProbabilityId: z.number().describe('Risk probability ID (required). Use get_reference_data with entity "riskprobabilities" to discover valid IDs.'),
+        ImpactId: z.number().describe('Risk impact ID (required). Use get_reference_data with entity "riskimpacts" to discover valid IDs.'),
+        LevelId: z.number().describe('Risk level ID (required). Use get_reference_data with entity "risklevels" to discover valid IDs.'),
         MitigationPlan: z.string().optional().describe('Mitigation plan description'),
       },
     },
@@ -651,6 +678,7 @@ export function registerWriteTools(
         { field: 'StatusId', entity: 'riskstatuses' },
         { field: 'ImpactId', entity: 'riskimpacts' },
         { field: 'ProbabilityId', entity: 'riskprobabilities' },
+        { field: 'LevelId', entity: 'risklevels' },
       ]);
       const data = await clients.rest.post(path, body);
       const riskId = extractResponseId(data, 'created risk');

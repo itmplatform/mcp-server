@@ -9,7 +9,7 @@ The AI can modify your ITM Platform data, not just read it. Write operations inc
 | **Update task** | Change task name, status, priority, dates, kind, or parent |
 | **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress |
 | **Update task progress** | Correct an existing progress entry |
-| **Create risk** | Log a new risk in a project |
+| **Create risk** | Log a new risk in a project. Type, status, impact, probability, and level are required; valid IDs are discovered through the reference data tool (including the `risklevels` entity) |
 | **Create issue** | Log a new issue in a project |
 | **Update project** | Change project name, status, priority, or dates |
 | **Bulk update task status** | Apply one status to up to 100 tasks of a project in a single call |

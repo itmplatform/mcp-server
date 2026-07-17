@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.11",
+  "serverVersion": "1.0.12",
   "tools": [
     {
       "name": "search_projects",
@@ -647,7 +647,7 @@
     },
     {
       "name": "get_reference_data",
-      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability/level, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, risklevels, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Use \"risklevels\" to discover valid LevelId values for create_risk. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -664,6 +664,7 @@
               "risktypes",
               "riskimpacts",
               "riskprobabilities",
+              "risklevels",
               "issuestatuses",
               "issuetypes",
               "purchasestatuses",
@@ -739,7 +740,7 @@
     },
     {
       "name": "create_task",
-      "description": "Create a new task, milestone, or summary task in a project. KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. Use ParentId to place the task under a summary task (Waterfall only). Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
+      "description": "Create a new task, milestone, or summary task in a project. KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. Use ParentId to place the task under a summary task (Waterfall only). Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -798,7 +799,7 @@
     },
     {
       "name": "update_task",
-      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call.",
+      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -861,7 +862,7 @@
     },
     {
       "name": "create_risk",
-      "description": "Log a new risk in a project. Returns the created risk read back from v2 REST. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", or \"riskprobabilities\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "description": "Log a new risk in a project. Returns the created risk read back from v2 REST. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required by the v2 risk create route. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", or \"risklevels\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -879,23 +880,23 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Risk status ID"
+            "description": "Risk status ID (required). Use get_reference_data with entity \"riskstatuses\" to discover valid IDs."
           },
           "TypeId": {
             "type": "number",
-            "description": "Risk type ID"
+            "description": "Risk type ID (required). Use get_reference_data with entity \"risktypes\" to discover valid IDs."
           },
           "ProbabilityId": {
             "type": "number",
-            "description": "Risk probability ID"
+            "description": "Risk probability ID (required). Use get_reference_data with entity \"riskprobabilities\" to discover valid IDs."
           },
           "ImpactId": {
             "type": "number",
-            "description": "Risk impact ID"
+            "description": "Risk impact ID (required). Use get_reference_data with entity \"riskimpacts\" to discover valid IDs."
           },
           "LevelId": {
             "type": "number",
-            "description": "Risk level base ID required by v2 REST. No v2 risklevels reference endpoint currently exists."
+            "description": "Risk level ID (required). Use get_reference_data with entity \"risklevels\" to discover valid IDs."
           },
           "MitigationPlan": {
             "type": "string",
@@ -905,6 +906,10 @@
         "required": [
           "projectId",
           "Name",
+          "StatusId",
+          "TypeId",
+          "ProbabilityId",
+          "ImpactId",
           "LevelId"
         ],
         "additionalProperties": false,

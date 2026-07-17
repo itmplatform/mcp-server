@@ -217,7 +217,7 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   create_risk: {
     category: 'Write Operations',
     narrative:
-      'When you ask "Log a risk about resource shortage in the Website Redesign project," the AI creates a risk entry with the details you provide.',
+      'When you ask "Log a risk about resource shortage in the Website Redesign project," the AI creates a risk entry with the details you provide. Risk type, status, impact, probability, and level are all required; the AI discovers valid IDs through get_reference_data (risktypes, riskstatuses, riskimpacts, riskprobabilities, and risklevels) before creating the risk.',
     exampleResponse: {
       RiskId: 7002,
       Name: 'Key developer unavailable',
