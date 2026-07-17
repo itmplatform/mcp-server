@@ -20,7 +20,11 @@ describe('reference-data entity validation', () => {
   });
 
   it('covers all reference data endpoints exposed by the tool', () => {
-    expect(ALLOWED_ENTITIES).toHaveLength(18);
+    expect(ALLOWED_ENTITIES).toHaveLength(19);
+  });
+
+  it('includes servicetypes for create_service TypeId discovery', () => {
+    expect(ALLOWED_ENTITIES).toContain('servicetypes');
   });
 
   it('includes assessments for task progress ratings', () => {
@@ -53,6 +57,12 @@ describe('reference-data entity path mapping', () => {
     const { handler, rest } = registerAndGetHandler();
     await handler({ entity: 'activitystatuses' });
     expect(rest.get).toHaveBeenCalledWith('gettaskstatuses?IsService=true');
+  });
+
+  it('maps servicetypes to the IsService project types endpoint', async () => {
+    const { handler, rest } = registerAndGetHandler();
+    await handler({ entity: 'servicetypes' });
+    expect(rest.get).toHaveBeenCalledWith('getprojecttypes?IsService=true');
   });
 
   it('passes plain entities through as the REST path', async () => {

@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 30 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 40 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -101,11 +101,15 @@ The server exposes 30 MCP tools, 6 resources, and 4 prompt templates.
 | `search_services` | Find services by name, status, type, or date range |
 | `get_service` | Retrieve service details with subcomponent counts and optional budget |
 | `list_project_tasks` | List tasks for a project with pagination |
+| `get_task` | Retrieve full detail of a single task |
+| `search_tasks` | Search tasks across all projects by name, status, assignee, kind, or date range |
 | `get_project_budget` | Get budget, actuals, revenue, cost, and margin information |
 | `get_project_purchases` | List purchase orders for a project with pagination |
 | `get_project_revenues` | List revenue items for a project with pagination |
 | `get_project_risks` | List project risks with pagination |
 | `get_project_issues` | List project issues with pagination |
+| `get_risk` | Retrieve full detail of a single risk, including mitigation and contingency plans |
+| `get_issue` | Retrieve full detail of a single issue, including resolution and impact fields |
 | `list_task_progress` | List the progress (follow-up) history for a task |
 | `get_project_progress` | Get project progress report: expected, baseline, and actual curves |
 | `list_service_activities` | List activities for a service with pagination |
@@ -127,8 +131,14 @@ The server exposes 30 MCP tools, 6 resources, and 4 prompt templates.
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `create_risk` | Log a project risk |
+| `update_risk` | Update risk fields such as status, probability, impact, level, and mitigation or contingency plans |
 | `create_issue` | Log a project issue with a required issue type and status |
+| `update_issue` | Update issue fields such as status, type, and resolution |
 | `update_project` | Update project fields such as name, status, dates, and priority |
+| `create_service` | Create a service; it starts with the account default status |
+| `update_service` | Update service fields such as name, status, dates, and priority |
+| `create_activity` | Add an activity to a service (activities form a flat list) |
+| `update_activity` | Update activity fields such as status and dates |
 | `bulk_update_task_status` | Apply one status to up to 100 tasks of a project in a single call |
 | `bulk_update_activity_status` | Apply one status to up to 100 activities of a service in a single call |
 

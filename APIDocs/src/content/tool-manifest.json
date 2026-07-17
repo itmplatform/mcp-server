@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.12",
+  "serverVersion": "1.0.13",
   "tools": [
     {
       "name": "search_projects",
@@ -248,6 +248,81 @@
       }
     },
     {
+      "name": "get_task",
+      "description": "Get full detail of a single task from v2 REST (source of truth, not affected by DataMart sync delay). Returns dates, status, type, priority, kind, parent task, sprint, and has-subcomponent flags. Use list_project_tasks or search_tasks first to discover task IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search_tasks",
+      "description": "Search tasks across all projects in the account (DataMart). Filters combine with AND. Returns { items, total, limit, skip, hasMore } where each item is { projectId, projectName, task }. Results may lag writes by up to 60 seconds (DataMart eventual consistency); use get_task for the confirmed state of one task. Default limit: 50, max: 200.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Case-insensitive task name filter"
+          },
+          "status": {
+            "type": "string",
+            "description": "Case-insensitive status label filter (e.g. \"In progress\")"
+          },
+          "assignee": {
+            "type": "string",
+            "description": "Case-insensitive team member display name filter"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Task",
+              "Milestone",
+              "Summary"
+            ],
+            "description": "Task kind filter"
+          },
+          "projectId": {
+            "type": "number",
+            "description": "Narrow the search to a single project"
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Only tasks starting on or after this date (YYYY-MM-DD)"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Only tasks ending on or before this date (YYYY-MM-DD)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max tasks to return (default 50, max 200)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Number of tasks to skip (for pagination)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_project_budget",
       "description": "Get budget summary for a project. Returns four budget objects: budgetTopDown (planned), budgetBottomUp (estimated), budgetPeriodEndClose (forecast), budgetActual (spent).",
       "inputSchema": {
@@ -338,6 +413,52 @@
         },
         "required": [
           "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_risk",
+      "description": "Get full detail of a single risk from v2 REST (source of truth). Includes mitigation and contingency plans, probability, impact, level, occurrence cost, and manager. Use get_project_risks first to discover risk IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the risk"
+          },
+          "riskId": {
+            "type": "number",
+            "description": "The risk ID"
+          }
+        },
+        "required": [
+          "projectId",
+          "riskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Get full detail of a single issue from v2 REST (source of truth). Includes type, status, manager, management cost/hours, project impact, final resolution, and custom fields. Use get_project_issues first to discover issue IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the issue"
+          },
+          "issueId": {
+            "type": "number",
+            "description": "The issue ID"
+          }
+        },
+        "required": [
+          "projectId",
+          "issueId"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -647,7 +768,7 @@
     },
     {
       "name": "get_reference_data",
-      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability/level, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, risklevels, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Use \"risklevels\" to discover valid LevelId values for create_risk. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability/level, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, risklevels, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses, servicetypes. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Use \"servicetypes\" for service type IDs required by create_service. Use \"risklevels\" to discover valid LevelId values for create_risk. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -671,7 +792,8 @@
               "purchasetypes",
               "revenuestatuses",
               "assessments",
-              "activitystatuses"
+              "activitystatuses",
+              "servicetypes"
             ],
             "description": "The reference data entity to retrieve"
           }
@@ -998,6 +1120,330 @@
         },
         "required": [
           "projectId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_risk",
+      "description": "Update risk fields (partial update; only send the fields you want to change). Returns the updated risk read back from v2 REST. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", or \"risklevels\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the risk"
+          },
+          "riskId": {
+            "type": "number",
+            "description": "The risk ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New risk name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New risk description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New risk status ID"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "New risk type ID"
+          },
+          "ProbabilityId": {
+            "type": "number",
+            "description": "New risk probability ID"
+          },
+          "ImpactId": {
+            "type": "number",
+            "description": "New risk impact ID"
+          },
+          "LevelId": {
+            "type": "number",
+            "description": "New risk level ID"
+          },
+          "MitigationPlan": {
+            "type": "string",
+            "description": "New mitigation plan description"
+          },
+          "ContingencyPlan": {
+            "type": "string",
+            "description": "New contingency plan description"
+          }
+        },
+        "required": [
+          "projectId",
+          "riskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_issue",
+      "description": "Update issue fields via PATCH (only send the fields you want to change). Returns the updated issue read back from v2 REST. Use get_reference_data with entity \"issuestatuses\" or \"issuetypes\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the issue"
+          },
+          "issueId": {
+            "type": "number",
+            "description": "The issue ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New issue name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New issue description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New issue status ID. Mapped to the v2 REST Status field."
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "New issue type ID. Mapped to the v2 REST Type field."
+          },
+          "Resolution": {
+            "type": "string",
+            "description": "New resolution description. Mapped to the v2 REST FinalResolution field."
+          }
+        },
+        "required": [
+          "projectId",
+          "issueId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_service",
+      "description": "Create a new service. Name and TypeId are required; use get_reference_data with entity \"servicetypes\" to discover valid service type IDs. The service is always created with the account default status; call update_service afterwards to change it. Returns the created service read back from v2 REST (source of truth).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Service name (required, must be unique among services in the account)"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Service type ID (required). Use get_reference_data with entity \"servicetypes\" to discover valid IDs."
+          },
+          "Description": {
+            "type": "string",
+            "description": "Service description"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "Start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "End date (ISO 8601)"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "Service priority ID; account default when omitted. Use get_reference_data with entity \"projectpriorities\"."
+          },
+          "InternalCode": {
+            "type": "string",
+            "description": "Internal service code"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards."
+          },
+          "ProjectStatusId": {
+            "type": "number",
+            "description": "NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards."
+          }
+        },
+        "required": [
+          "Name",
+          "TypeId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_service",
+      "description": "Update service fields via PATCH. Only send the fields you want to change. Returns the updated service read back from v2 REST. Use get_reference_data with entity \"projectstatuses\" to discover status IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New service name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New service description"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New service status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST."
+          },
+          "ProjectStatusId": {
+            "type": "number",
+            "description": "New service status ID field used by v2 REST"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "New priority ID"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "New start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "New end date (ISO 8601)"
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_activity",
+      "description": "Create a new activity in a service. Activities are the service counterpart of project tasks and form a flat list (no milestones, summary tasks, or hierarchy). Name, StatusId, StartDate, and EndDate are required. Activity statuses differ from task statuses; use get_reference_data with entity \"activitystatuses\" to discover valid IDs. Returns the created activity read back from v2 REST (source of truth).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID to create the activity in"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Activity name (required)"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Activity description. Compatibility alias for the v2 REST Details field."
+          },
+          "Details": {
+            "type": "string",
+            "description": "Activity details/description field used by v2 REST"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "Activity status ID (required). Use get_reference_data with entity \"activitystatuses\" to discover valid IDs."
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "Activity type ID (account default when omitted)"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "Activity priority ID (account default when omitted)"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "Start date (ISO 8601, required)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "End date (ISO 8601, required)"
+          },
+          "KindId": {
+            "type": "number",
+            "description": "NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks."
+          },
+          "ParentId": {
+            "type": "number",
+            "description": "NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks."
+          }
+        },
+        "required": [
+          "serviceId",
+          "Name",
+          "StatusId",
+          "StartDate",
+          "EndDate"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_activity",
+      "description": "Update activity fields via PATCH. Only send the fields you want to change. Returns the updated activity read back from v2 REST. Activity statuses differ from task statuses; use get_reference_data with entity \"activitystatuses\" to discover valid IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "The service ID containing the activity"
+          },
+          "activityId": {
+            "type": "number",
+            "description": "The activity ID to update"
+          },
+          "Name": {
+            "type": "string",
+            "description": "New activity name"
+          },
+          "Description": {
+            "type": "string",
+            "description": "New description. Compatibility alias for the v2 REST Details field."
+          },
+          "Details": {
+            "type": "string",
+            "description": "New activity details/description field used by v2 REST"
+          },
+          "StatusId": {
+            "type": "number",
+            "description": "New activity status ID"
+          },
+          "TypeId": {
+            "type": "number",
+            "description": "New activity type ID"
+          },
+          "PriorityId": {
+            "type": "number",
+            "description": "New activity priority ID"
+          },
+          "StartDate": {
+            "type": "string",
+            "description": "New start date (ISO 8601)"
+          },
+          "EndDate": {
+            "type": "string",
+            "description": "New end date (ISO 8601)"
+          },
+          "KindId": {
+            "type": "number",
+            "description": "NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks."
+          },
+          "ParentId": {
+            "type": "number",
+            "description": "NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks."
+          }
+        },
+        "required": [
+          "serviceId",
+          "activityId"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"

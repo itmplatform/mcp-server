@@ -280,6 +280,71 @@ export function splitUpdateProjectArgs(args: { projectId: number; [key: string]:
   return { path: `projects/${projectId}`, body };
 }
 
+export function splitUpdateRiskArgs(args: { projectId: number; riskId: number; [key: string]: unknown }) {
+  const { projectId, riskId, ...body } = args;
+  normalizeAlias(body, 'Impact', 'ImpactId');
+  normalizeAlias(body, 'Probability', 'ProbabilityId');
+  // The backend field is misspelled "ContigencyPlan"; accept the correct spelling.
+  normalizeAlias(body, 'ContingencyPlan', 'ContigencyPlan');
+  return { path: `projects/${projectId}/risks/${riskId}`, body };
+}
+
+export function splitUpdateIssueArgs(args: { projectId: number; issueId: number; [key: string]: unknown }) {
+  const { projectId, issueId, ...body } = args;
+  normalizeAlias(body, 'TypeId', 'Type');
+  normalizeAlias(body, 'StatusId', 'Status');
+  normalizeAlias(body, 'Resolution', 'FinalResolution');
+  return { path: `projects/${projectId}/issues/${issueId}`, body };
+}
+
+export function splitCreateServiceArgs(args: { [key: string]: unknown }) {
+  const body = { ...args };
+  requireSuppliedField(
+    'create_service',
+    body,
+    'TypeId',
+    'the v2 service create route requires a valid service type; use get_reference_data with entity "servicetypes" to discover IDs',
+  );
+  const statusIgnoredReason =
+    'the v2 service create route ignores status and always applies the account default status; use update_service after creation to change it';
+  rejectUnsupportedFields('create_service', body, {
+    StatusId: statusIgnoredReason,
+    ProjectStatusId: statusIgnoredReason,
+  });
+  return { path: 'services', body };
+}
+
+export function splitUpdateServiceArgs(args: { serviceId: number; [key: string]: unknown }) {
+  const { serviceId, ...body } = args;
+  normalizeAlias(body, 'StatusId', 'ProjectStatusId');
+  return { path: `services/${serviceId}`, body };
+}
+
+const ACTIVITY_UNSUPPORTED_FIELDS: Record<string, string> = {
+  KindId: 'service activities are a flat list; milestones and summary tasks are project-task concepts',
+  ParentId: 'service activities are a flat list; hierarchy is a project-task concept',
+  AssignedToUserId: 'activity assignment is managed by team endpoints, not the activity routes',
+  PercentComplete: 'activity progress is managed through follow-up/progress APIs, not the activity routes',
+};
+
+export function splitCreateActivityArgs(args: { serviceId: number; [key: string]: unknown }) {
+  const { serviceId, ...body } = args;
+  normalizeAlias(body, 'Description', 'Details');
+  rejectUnsupportedFields('create_activity', body, ACTIVITY_UNSUPPORTED_FIELDS);
+  requireSuppliedField('create_activity', body, 'StatusId',
+    'activity creation requires an activity status; use get_reference_data with entity "activitystatuses" to discover IDs');
+  requireSuppliedField('create_activity', body, 'StartDate', 'activity creation requires StartDate (ISO 8601)');
+  requireSuppliedField('create_activity', body, 'EndDate', 'activity creation requires EndDate (ISO 8601)');
+  return { path: `services/${serviceId}/activities`, body };
+}
+
+export function splitUpdateActivityArgs(args: { serviceId: number; activityId: number; [key: string]: unknown }) {
+  const { serviceId, activityId, ...body } = args;
+  normalizeAlias(body, 'Description', 'Details');
+  rejectUnsupportedFields('update_activity', body, ACTIVITY_UNSUPPORTED_FIELDS);
+  return { path: `services/${serviceId}/activities/${activityId}`, body };
+}
+
 export function splitCreateProjectArgs(args: { [key: string]: unknown }) {
   const body = { ...args };
   const statusIgnoredReason =
@@ -521,6 +586,41 @@ const RISK_VERIFICATION_FIELDS: VerificationField[] = [
   { requestField: 'ProbabilityId', readPaths: ['Probability.BaseId', 'Probability.Id', 'ProbabilityId'] },
   { requestField: 'LevelId', readPaths: ['Level.BaseId', 'Level.Id', 'LevelId'] },
   { requestField: 'MitigationPlan', readPaths: ['MitigationPlan'] },
+  { requestField: 'ContigencyPlan', readPaths: ['ContigencyPlan'], label: 'ContingencyPlan' },
+];
+
+const RISK_REFERENCE_MAPPINGS = [
+  { field: 'TypeId', entity: 'risktypes' },
+  { field: 'StatusId', entity: 'riskstatuses' },
+  { field: 'ImpactId', entity: 'riskimpacts' },
+  { field: 'ProbabilityId', entity: 'riskprobabilities' },
+  { field: 'LevelId', entity: 'risklevels' },
+];
+
+const ISSUE_REFERENCE_MAPPINGS = [
+  { field: 'Type', entity: 'issuetypes' },
+  { field: 'Status', entity: 'issuestatuses' },
+];
+
+const SERVICE_VERIFICATION_FIELDS: VerificationField[] = [
+  { requestField: 'Name', readPaths: ['Name'] },
+  { requestField: 'Description', readPaths: ['Description'] },
+  { requestField: 'InternalCode', readPaths: ['InternalCode'] },
+  { requestField: 'StartDate', readPaths: ['StartDate'] },
+  { requestField: 'EndDate', readPaths: ['EndDate'] },
+  { requestField: 'TypeId', readPaths: ['Type.Id', 'TypeId'] },
+  { requestField: 'PriorityId', readPaths: ['Priority.Id', 'PriorityId'] },
+  { requestField: 'ProjectStatusId', readPaths: ['Status.Id', 'ProjectStatusId', 'StatusId'], label: 'StatusId' },
+];
+
+const ACTIVITY_VERIFICATION_FIELDS: VerificationField[] = [
+  { requestField: 'Name', readPaths: ['Name'] },
+  { requestField: 'Details', readPaths: ['Details', 'Description'], label: 'Description' },
+  { requestField: 'StatusId', readPaths: ['Status.Id', 'StatusId'] },
+  { requestField: 'TypeId', readPaths: ['Type.Id', 'TypeId'] },
+  { requestField: 'PriorityId', readPaths: ['Priority.Id', 'PriorityId'] },
+  { requestField: 'StartDate', readPaths: ['StartDate'] },
+  { requestField: 'EndDate', readPaths: ['EndDate'] },
 ];
 
 const ISSUE_VERIFICATION_FIELDS: VerificationField[] = [
@@ -673,13 +773,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateRiskArgs(args);
-      await normalizeReferenceIds(clients, body, [
-        { field: 'TypeId', entity: 'risktypes' },
-        { field: 'StatusId', entity: 'riskstatuses' },
-        { field: 'ImpactId', entity: 'riskimpacts' },
-        { field: 'ProbabilityId', entity: 'riskprobabilities' },
-        { field: 'LevelId', entity: 'risklevels' },
-      ]);
+      await normalizeReferenceIds(clients, body, RISK_REFERENCE_MAPPINGS);
       const data = await clients.rest.post(path, body);
       const riskId = extractResponseId(data, 'created risk');
       const readback = await clients.rest.get(`${path}/${riskId}`);
@@ -704,10 +798,7 @@ export function registerWriteTools(
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitCreateIssueArgs(args);
-      await normalizeReferenceIds(clients, body, [
-        { field: 'Type', entity: 'issuetypes' },
-        { field: 'Status', entity: 'issuestatuses' },
-      ]);
+      await normalizeReferenceIds(clients, body, ISSUE_REFERENCE_MAPPINGS);
       const data = await clients.rest.post(path, body);
       const issueId = extractResponseId(data, 'created issue');
       const readback = await clients.rest.get(`${path}/${issueId}`);
@@ -737,6 +828,187 @@ export function registerWriteTools(
       await clients.rest.patch(path, body);
       const readback = await clients.rest.get(path);
       verifyRequestedFields(body, readback, PROJECT_VERIFICATION_FIELDS, 'update_project');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'update_risk',
+    {
+      description: 'Update risk fields (partial update; only send the fields you want to change). Returns the updated risk read back from v2 REST. '
+        + 'Use get_reference_data with entity "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", or "risklevels" to discover IDs; '
+        + 'the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      inputSchema: {
+        projectId: z.number().describe('The project ID containing the risk'),
+        riskId: z.number().describe('The risk ID to update'),
+        Name: z.string().optional().describe('New risk name'),
+        Description: z.string().optional().describe('New risk description'),
+        StatusId: z.number().optional().describe('New risk status ID'),
+        TypeId: z.number().optional().describe('New risk type ID'),
+        ProbabilityId: z.number().optional().describe('New risk probability ID'),
+        ImpactId: z.number().optional().describe('New risk impact ID'),
+        LevelId: z.number().optional().describe('New risk level ID'),
+        MitigationPlan: z.string().optional().describe('New mitigation plan description'),
+        ContingencyPlan: z.string().optional().describe('New contingency plan description'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitUpdateRiskArgs(args);
+      await normalizeReferenceIds(clients, body, RISK_REFERENCE_MAPPINGS);
+      await clients.rest.put(path, body);
+      const readback = await clients.rest.get(path);
+      verifyRequestedFields(body, readback, RISK_VERIFICATION_FIELDS, 'update_risk');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'update_issue',
+    {
+      description: 'Update issue fields via PATCH (only send the fields you want to change). Returns the updated issue read back from v2 REST. '
+        + 'Use get_reference_data with entity "issuestatuses" or "issuetypes" to discover IDs; '
+        + 'the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      inputSchema: {
+        projectId: z.number().describe('The project ID containing the issue'),
+        issueId: z.number().describe('The issue ID to update'),
+        Name: z.string().optional().describe('New issue name'),
+        Description: z.string().optional().describe('New issue description'),
+        StatusId: z.number().optional().describe('New issue status ID. Mapped to the v2 REST Status field.'),
+        TypeId: z.number().optional().describe('New issue type ID. Mapped to the v2 REST Type field.'),
+        Resolution: z.string().optional().describe('New resolution description. Mapped to the v2 REST FinalResolution field.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitUpdateIssueArgs(args);
+      await normalizeReferenceIds(clients, body, ISSUE_REFERENCE_MAPPINGS);
+      await clients.rest.patch(path, body);
+      const readback = await clients.rest.get(path);
+      verifyRequestedFields(body, readback, ISSUE_VERIFICATION_FIELDS, 'update_issue');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'create_service',
+    {
+      description: 'Create a new service. Name and TypeId are required; use get_reference_data with entity "servicetypes" to discover valid service type IDs. '
+        + 'The service is always created with the account default status; call update_service afterwards to change it. '
+        + 'Returns the created service read back from v2 REST (source of truth).',
+      inputSchema: {
+        Name: z.string().describe('Service name (required, must be unique among services in the account)'),
+        TypeId: z.number().describe('Service type ID (required). Use get_reference_data with entity "servicetypes" to discover valid IDs.'),
+        Description: z.string().optional().describe('Service description'),
+        StartDate: z.string().optional().describe('Start date (ISO 8601)'),
+        EndDate: z.string().optional().describe('End date (ISO 8601)'),
+        PriorityId: z.number().optional().describe('Service priority ID; account default when omitted. Use get_reference_data with entity "projectpriorities".'),
+        InternalCode: z.string().optional().describe('Internal service code'),
+        // Published so the SDK does not silently strip them; the handler rejects
+        // both with a pointer to update_service instead of ignoring the value.
+        StatusId: z.number().optional().describe('NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards.'),
+        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitCreateServiceArgs(args);
+      const data = await clients.rest.post(path, body);
+      const serviceId = extractResponseId(data, 'created service');
+      const readback = await clients.rest.get(`services/${serviceId}`);
+      verifyRequestedFields(body, readback, SERVICE_VERIFICATION_FIELDS, 'create_service');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'update_service',
+    {
+      description: 'Update service fields via PATCH. Only send the fields you want to change. Returns the updated service read back from v2 REST. '
+        + 'Use get_reference_data with entity "projectstatuses" to discover status IDs.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID to update'),
+        Name: z.string().optional().describe('New service name'),
+        Description: z.string().optional().describe('New service description'),
+        StatusId: z.number().optional().describe('New service status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST.'),
+        ProjectStatusId: z.number().optional().describe('New service status ID field used by v2 REST'),
+        PriorityId: z.number().optional().describe('New priority ID'),
+        StartDate: z.string().optional().describe('New start date (ISO 8601)'),
+        EndDate: z.string().optional().describe('New end date (ISO 8601)'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitUpdateServiceArgs(args);
+      await clients.rest.patch(path, body);
+      const readback = await clients.rest.get(path);
+      verifyRequestedFields(body, readback, SERVICE_VERIFICATION_FIELDS, 'update_service');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'create_activity',
+    {
+      description: 'Create a new activity in a service. Activities are the service counterpart of project tasks and form a flat list (no milestones, summary tasks, or hierarchy). '
+        + 'Name, StatusId, StartDate, and EndDate are required. Activity statuses differ from task statuses; '
+        + 'use get_reference_data with entity "activitystatuses" to discover valid IDs. '
+        + 'Returns the created activity read back from v2 REST (source of truth).',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID to create the activity in'),
+        Name: z.string().describe('Activity name (required)'),
+        Description: z.string().optional().describe('Activity description. Compatibility alias for the v2 REST Details field.'),
+        Details: z.string().optional().describe('Activity details/description field used by v2 REST'),
+        StatusId: z.number().describe('Activity status ID (required). Use get_reference_data with entity "activitystatuses" to discover valid IDs.'),
+        TypeId: z.number().optional().describe('Activity type ID (account default when omitted)'),
+        PriorityId: z.number().optional().describe('Activity priority ID (account default when omitted)'),
+        StartDate: z.string().describe('Start date (ISO 8601, required)'),
+        EndDate: z.string().describe('End date (ISO 8601, required)'),
+        // Published so the SDK does not silently strip them; the handler rejects
+        // both because service activities form a flat list.
+        KindId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks.'),
+        ParentId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitCreateActivityArgs(args);
+      const data = await clients.rest.post(path, body);
+      const activityId = extractResponseId(data, 'created activity');
+      const readback = await clients.rest.get(`${path}/${activityId}`);
+      verifyRequestedFields(body, readback, ACTIVITY_VERIFICATION_FIELDS, 'create_activity');
+      return buildWriteResponse(readback);
+    },
+  );
+
+  server.registerTool(
+    'update_activity',
+    {
+      description: 'Update activity fields via PATCH. Only send the fields you want to change. Returns the updated activity read back from v2 REST. '
+        + 'Activity statuses differ from task statuses; use get_reference_data with entity "activitystatuses" to discover valid IDs.',
+      inputSchema: {
+        serviceId: z.number().describe('The service ID containing the activity'),
+        activityId: z.number().describe('The activity ID to update'),
+        Name: z.string().optional().describe('New activity name'),
+        Description: z.string().optional().describe('New description. Compatibility alias for the v2 REST Details field.'),
+        Details: z.string().optional().describe('New activity details/description field used by v2 REST'),
+        StatusId: z.number().optional().describe('New activity status ID'),
+        TypeId: z.number().optional().describe('New activity type ID'),
+        PriorityId: z.number().optional().describe('New activity priority ID'),
+        StartDate: z.string().optional().describe('New start date (ISO 8601)'),
+        EndDate: z.string().optional().describe('New end date (ISO 8601)'),
+        // Published so the SDK does not silently strip them; the handler rejects
+        // both because service activities form a flat list.
+        KindId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks.'),
+        ParentId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks.'),
+      },
+    },
+    async (args) => {
+      if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
+      const { path, body } = splitUpdateActivityArgs(args);
+      await clients.rest.patch(path, body);
+      const readback = await clients.rest.get(path);
+      verifyRequestedFields(body, readback, ACTIVITY_VERIFICATION_FIELDS, 'update_activity');
       return buildWriteResponse(readback);
     },
   );

@@ -11,7 +11,7 @@ describe('auth and session', () => {
     expect(result.result.tools.length).toBeGreaterThan(0);
   });
 
-  it('api-key session lists all 30 tools (read + write)', async () => {
+  it('api-key session lists all 40 tools (read + write)', async () => {
     const result = await listTools(3);
     const toolNames = result.result.tools.map((t: { name: string }) => t.name);
 
@@ -19,9 +19,9 @@ describe('auth and session', () => {
       'search_projects', 'get_project',
       'search_services', 'get_service', 'list_service_activities',
       'get_service_purchases', 'get_service_revenues',
-      'list_project_tasks',
+      'list_project_tasks', 'get_task', 'search_tasks',
       'get_project_budget', 'get_project_purchases', 'get_project_revenues',
-      'get_project_risks', 'get_project_issues',
+      'get_project_risks', 'get_project_issues', 'get_risk', 'get_issue',
       'list_task_progress', 'get_project_progress',
       'aggregate_portfolio',
       'search_users', 'get_user',
@@ -30,12 +30,14 @@ describe('auth and session', () => {
       'create_project', 'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
       'create_task_progress', 'update_task_progress',
       'bulk_update_task_status', 'bulk_update_activity_status',
+      'update_risk', 'update_issue',
+      'create_service', 'update_service', 'create_activity', 'update_activity',
     ];
 
     for (const name of expectedTools) {
       expect(toolNames).toContain(name);
     }
-    expect(toolNames).toHaveLength(30);
+    expect(toolNames).toHaveLength(40);
   });
 
   // OAuth scope enforcement E2E: verifies that OAuth sessions with mcp:read only
