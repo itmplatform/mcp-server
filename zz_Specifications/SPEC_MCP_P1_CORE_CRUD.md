@@ -3,7 +3,7 @@
 > **Date:** 2026-07-17
 > **Backlog source:** [INDEX.md](INDEX.md) section "P1 -- High-impact gaps that block common workflows"
 > **Scope:** 10 new tools (4 read, 6 write) closing the fundamental CRUD gaps
-> **Status:** Implemented (v1.0.13). Unit and local E2E green. Stage verification pending.
+> **Status:** Done (v1.0.13, 2026-07-17). Unit, local E2E, and stage E2E green (23/23 checks against the deployed stage MCP). Prod deploy pending.
 
 ---
 

@@ -220,7 +220,7 @@ Summary of backend endpoint coverage by the MCP server.
 | File | Summary | Status |
 |------|---------|--------|
 | [INDEX.md](INDEX.md) | This document: tool roadmap, backlog, and spec index | Active |
-| [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md) | P1: 10 core CRUD tools (get_task, get_risk, get_issue, search_tasks, update_risk, update_issue, service and activity writes) | In progress |
+| [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md) | P1: 10 core CRUD tools (get_task, get_risk, get_issue, search_tasks, update_risk, update_issue, service and activity writes) | Done (v1.0.13, stage verified; prod deploy pending) |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
 | [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md) | OAuth consent page per-scope checkboxes (impl in ITM.Account) | Pending |
