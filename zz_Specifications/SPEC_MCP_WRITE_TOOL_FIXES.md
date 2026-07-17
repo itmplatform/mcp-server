@@ -1,6 +1,6 @@
 # MCP Write Tool Fixes: Summary Task Verification, Risk Schema, and Auto-Progress Warning
 
-> **Status:** Implemented and verified on stage 2026-07-17 (MCP v1.0.12); prod deployment pending
+> **Status:** Done. Implemented, stage-verified, and prod-deployed 2026-07-17 (MCP v1.0.12); prod verified via scripted OAuth session
 > **Date:** 2026-07-17
 > **Origin:** Claude Desktop prod session on project 81412 (testsmarter account, 2026-07-17 18:03-18:11 UTC). Prod logs confirmed all three issues; the ticket is at `zz_Tickets/Claude-desktop-project-creation.md`.
 
@@ -196,4 +196,4 @@ No new tools, so `WRITE_TOOL_NAMES` count stays at 10 and total tool count stays
 7. **Prod:**
    a. ~~Deploy ITM.Tasks to prod~~ Done 2026-07-17: develop merged to main (2e7a1984), ITM.Tasks-Prod pipeline deployed.
    b. ~~Add the `risklevels` route manually to the prod `APIGateway.json`~~ Done 2026-07-17: route inserted on `app2-api.itmplatform.com` (backup `APIGateway.json.bak-20260717`), app domain recycled, endpoint verified returning the three levels. Note: the route only reaches ITM.Web `main` with the next regular ITM.Web promotion; until then, an ITM.Web prod deployment from `main` would overwrite the manual edit.
-   c. Deploy ITM.MCP to prod (`merge-develop-into.bat main`); the prod pipeline publishes npm. **This is the only remaining step.**
+   c. ~~Deploy ITM.MCP to prod~~ Done 2026-07-17: ITM.MCP-Prod pipeline run 7265 succeeded. Verified on prod via scripted OAuth session: 30 tools, create_risk publishes the 5 required fields, risklevels discoverable, create_risk succeeded with a discovered LevelId, summary task with and without TypeId behaves correctly. Verification fixtures deleted.
