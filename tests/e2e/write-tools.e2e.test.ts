@@ -20,6 +20,7 @@ describe('write tools', () => {
   let waterfallProjectId: number;
   let kanbanProjectId: number;
   let createdWaterfallTaskId: number | undefined;
+  let createdSummaryTaskId: number | undefined;
   let createdKanbanTaskId: number | undefined;
   let createdRiskId: number | undefined;
   let createdIssueId: number | undefined;
@@ -99,6 +100,8 @@ describe('write tools', () => {
     await waitForRateLimitWindow();
     if (createdWaterfallTaskId) await deleteTasksViaRest(waterfallProjectId, [createdWaterfallTaskId]);
     await waitForRateLimitWindow();
+    if (createdSummaryTaskId) await deleteTasksViaRest(waterfallProjectId, [createdSummaryTaskId]);
+    await waitForRateLimitWindow();
     if (createdKanbanTaskId) await deleteTasksViaRest(kanbanProjectId, [createdKanbanTaskId]);
     await waitForRateLimitWindow();
     const projectIds = [waterfallProjectId, kanbanProjectId].filter((id): id is number => Boolean(id));
@@ -111,6 +114,27 @@ describe('write tools', () => {
 
     expect(issueTool.inputSchema.required).toContain('TypeId');
     expect(issueTool.inputSchema.required).toContain('StatusId');
+  });
+
+  it('publishes all risk reference fields as required MCP inputs', async () => {
+    const result = await listTools();
+    const riskTool = result.result.tools.find((tool: any) => tool.name === 'create_risk');
+
+    for (const field of ['TypeId', 'StatusId', 'ImpactId', 'ProbabilityId', 'LevelId']) {
+      expect(riskTool.inputSchema.required, `${field} should be required`).toContain(field);
+    }
+  });
+
+  it('serves risklevels through get_reference_data with usable BaseIds', async () => {
+    const result = await callTool('get_reference_data', { entity: 'risklevels' });
+
+    expect(result.error).toBeUndefined();
+    expect(result.result.isError).toBeFalsy();
+    const levels = JSON.parse(result.result.content[0].text);
+    expect(Array.isArray(levels)).toBe(true);
+    expect(levels.length).toBeGreaterThan(0);
+    expect(levels[0]).toHaveProperty('BaseId');
+    expect(levels.map((level: any) => level.BaseId)).toContain(riskLevelId);
   });
 
   it('create_task rejects missing Waterfall fields before POST', async () => {
@@ -177,6 +201,36 @@ describe('write tools', () => {
     expect(JSON.stringify(result)).toContain('Task start date should be less than or equal to task end date');
   });
 
+  it('create_task creates a summary task without TypeId and verifies cleanly', async () => {
+    expect(taskStatusId).toBeDefined();
+    const result = await callTool('create_task', {
+      projectId: waterfallProjectId,
+      Name: `E2E Summary ${Date.now()}`,
+      KindId: 2,
+      StatusId: taskStatusId,
+    });
+    const data = parseToolSuccess(result);
+    expect(data.KindId).toBe(2);
+    createdSummaryTaskId = data.Id ?? data.id ?? data.TaskId;
+  });
+
+  it('create_task rejects TypeId on a summary task before POST', async () => {
+    expect(taskStatusId).toBeDefined();
+    expect(taskTypeId).toBeDefined();
+    const result = await callTool('create_task', {
+      projectId: waterfallProjectId,
+      Name: `E2E Summary With Type ${Date.now()}`,
+      KindId: 2,
+      StatusId: taskStatusId,
+      TypeId: taskTypeId,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.result.isError).toBe(true);
+    expect(result.result.content[0].text).toContain('TypeId');
+    expect(result.result.content[0].text).toContain('Summary');
+  });
+
   it('update_task updates the created task', async () => {
     expect(createdWaterfallTaskId).toBeDefined();
     const result = await callTool('update_task', {
@@ -208,6 +262,29 @@ describe('write tools', () => {
     createdRiskId = data.Id ?? data.id;
     expect(data.MitigationPlan).toBe('E2E mitigation plan');
     expect(data.Level.BaseId).toBe(riskLevelId);
+  });
+
+  it('create_risk rejects a missing TypeId client-side instead of forwarding a 400', async () => {
+    expect(riskStatusId).toBeDefined();
+    expect(riskImpactId).toBeDefined();
+    expect(riskProbabilityId).toBeDefined();
+    expect(riskLevelId).toBeDefined();
+    const result = await callTool('create_risk', {
+      projectId: waterfallProjectId,
+      Name: `E2E Risk Missing Type ${Date.now()}`,
+      StatusId: riskStatusId,
+      ImpactId: riskImpactId,
+      ProbabilityId: riskProbabilityId,
+      LevelId: riskLevelId,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.result.isError).toBe(true);
+    // The SDK schema layer rejects the missing field before any REST call;
+    // the REST 400 would say "Please enter valid Risk Type ID" instead.
+    expect(result.result.content[0].text).toContain('TypeId');
+    expect(result.result.content[0].text).toContain('Input validation error');
+    expect(result.result.content[0].text).not.toContain('Please enter valid');
   });
 
   it('create_issue creates an issue in the test project using issue aliases', async () => {

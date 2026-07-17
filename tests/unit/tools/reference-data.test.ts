@@ -20,11 +20,15 @@ describe('reference-data entity validation', () => {
   });
 
   it('covers all reference data endpoints exposed by the tool', () => {
-    expect(ALLOWED_ENTITIES).toHaveLength(17);
+    expect(ALLOWED_ENTITIES).toHaveLength(18);
   });
 
   it('includes assessments for task progress ratings', () => {
     expect(ALLOWED_ENTITIES).toContain('assessments');
+  });
+
+  it('includes risklevels for create_risk LevelId discovery', () => {
+    expect(ALLOWED_ENTITIES).toContain('risklevels');
   });
 
   it('includes activitystatuses for service activity writes', () => {
@@ -55,5 +59,20 @@ describe('reference-data entity path mapping', () => {
     const { handler, rest } = registerAndGetHandler();
     await handler({ entity: 'gettaskstatuses' });
     expect(rest.get).toHaveBeenCalledWith('gettaskstatuses');
+  });
+
+  it('lists every allowed entity in the tool description', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerReferenceDataTools(server as any, { rest: { get: vi.fn() } } as any);
+
+    const description = registrations.get('get_reference_data').config.description;
+    for (const entity of ALLOWED_ENTITIES) {
+      expect(description).toContain(entity);
+    }
   });
 });

@@ -7,7 +7,7 @@ import {
   getBulkStatusValidationError, buildBulkStatusBody, summarizeBulkStatusResponse,
   BULK_STATUS_MAX_IDS, BULK_STATUS_TIMEOUT_MS,
   splitCreateProjectArgs, getCreateProjectValidationError,
-  getUpdateTaskValidationError, buildProjectUiUrl,
+  getUpdateTaskValidationError, buildProjectUiUrl, taskVerificationFieldsFor,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -172,6 +172,22 @@ describe('getCreateTaskValidationError for milestones and summary tasks', () => 
     )).toBeUndefined();
   });
 
+  it('rejects TypeId on a Waterfall summary task instead of letting the backend silently ignore it', () => {
+    const error = getCreateTaskValidationError(
+      { Name: '1. Discovery', KindId: 2, StatusId: 10, TypeId: 612756 },
+      waterfall,
+    );
+    expect(error).toContain('TypeId');
+    expect(error).toContain('Summary');
+  });
+
+  it('accepts TypeId on a milestone', () => {
+    expect(getCreateTaskValidationError(
+      { Name: 'Go-Live', KindId: 1, EndDate: '2026-09-30', TypeId: 612756 },
+      waterfall,
+    )).toBeUndefined();
+  });
+
   it('rejects an unknown KindId', () => {
     expect(getCreateTaskValidationError(
       { Name: 'X', KindId: 7, StatusId: 10, StartDate: '2026-09-01', EndDate: '2026-09-30' },
@@ -242,8 +258,47 @@ describe('getUpdateTaskValidationError', () => {
     expect(getUpdateTaskValidationError({ KindId: 9 }, waterfall)).toContain('KindId');
   });
 
+  it('rejects TypeId when converting a task to a summary', () => {
+    const error = getUpdateTaskValidationError({ KindId: 2, TypeId: 612756 }, waterfall);
+    expect(error).toContain('TypeId');
+    expect(error).toContain('Summary');
+  });
+
+  it('accepts a summary conversion without TypeId', () => {
+    expect(getUpdateTaskValidationError({ KindId: 2 }, waterfall)).toBeUndefined();
+  });
+
+  it('accepts TypeId alongside a ParentId move when the kind is not summary', () => {
+    expect(getUpdateTaskValidationError({ ParentId: 42, TypeId: 612756 }, waterfall)).toBeUndefined();
+  });
+
   it('fails safely when the project has no methodology', () => {
     expect(getUpdateTaskValidationError({ ParentId: 42 }, { Id: 1 })).toContain('methodology');
+  });
+});
+
+describe('taskVerificationFieldsFor', () => {
+  const fieldNames = (fields: Array<{ requestField: string }>) => fields.map(field => field.requestField);
+
+  it('excludes TypeId from verification for summary tasks', () => {
+    expect(fieldNames(taskVerificationFieldsFor({ KindId: 2, TypeId: 612756, StatusId: 10 })))
+      .not.toContain('TypeId');
+  });
+
+  it('keeps TypeId for regular tasks and milestones', () => {
+    expect(fieldNames(taskVerificationFieldsFor({ KindId: 3, TypeId: 612756 }))).toContain('TypeId');
+    expect(fieldNames(taskVerificationFieldsFor({ KindId: 1, TypeId: 612756 }))).toContain('TypeId');
+    expect(fieldNames(taskVerificationFieldsFor({ TypeId: 612756 }))).toContain('TypeId');
+  });
+
+  it('excludes TypeId when the readback shows a summary task even without KindId in the payload', () => {
+    expect(fieldNames(taskVerificationFieldsFor({ TypeId: 612756 }, { Id: 42, KindId: 2 })))
+      .not.toContain('TypeId');
+  });
+
+  it('keeps the milestone StartDate and detach ParentId exclusions', () => {
+    expect(fieldNames(taskVerificationFieldsFor({ KindId: 1, StartDate: '2026-09-30' }))).not.toContain('StartDate');
+    expect(fieldNames(taskVerificationFieldsFor({ ParentId: 0 }))).not.toContain('ParentId');
   });
 });
 
@@ -266,20 +321,44 @@ describe('splitUpdateTaskArgs', () => {
 });
 
 describe('splitCreateRiskArgs', () => {
-  it('builds path, maps Impact/Probability aliases, and requires LevelId', () => {
+  const completeRiskArgs = {
+    projectId: 100,
+    Name: 'Risk A',
+    TypeId: 1,
+    StatusId: 2,
+    ImpactId: 10,
+    ProbabilityId: 20,
+    LevelId: 30,
+  };
+
+  it('builds path and maps Impact/Probability aliases', () => {
     const { path, body } = splitCreateRiskArgs({
       projectId: 100,
       Name: 'Risk A',
+      TypeId: 1,
+      StatusId: 2,
       Impact: 10,
       Probability: 20,
       LevelId: 30,
     });
     expect(path).toBe('projects/100/risks');
-    expect(body).toEqual({ Name: 'Risk A', ImpactId: 10, ProbabilityId: 20, LevelId: 30 });
+    expect(body).toEqual({ Name: 'Risk A', TypeId: 1, StatusId: 2, ImpactId: 10, ProbabilityId: 20, LevelId: 30 });
   });
 
-  it('rejects missing LevelId', () => {
-    expect(() => splitCreateRiskArgs({ projectId: 100, Name: 'Risk A' })).toThrow('LevelId is required');
+  it('rejects each missing required reference field with a pointer to its reference entity', () => {
+    const expectedEntities: Record<string, string> = {
+      TypeId: 'risktypes',
+      StatusId: 'riskstatuses',
+      ImpactId: 'riskimpacts',
+      ProbabilityId: 'riskprobabilities',
+      LevelId: 'risklevels',
+    };
+    for (const [field, entity] of Object.entries(expectedEntities)) {
+      const args: Record<string, unknown> = { ...completeRiskArgs };
+      delete args[field];
+      expect(() => splitCreateRiskArgs(args as { projectId: number }))
+        .toThrow(new RegExp(`${field} is required.*${entity}`));
+    }
   });
 });
 
@@ -337,6 +416,63 @@ describe('published write tool schemas', () => {
     const schema = registrations.get('create_issue').config.inputSchema;
     expect(schema.TypeId.safeParse(undefined).success).toBe(false);
     expect(schema.StatusId.safeParse(undefined).success).toBe(false);
+  });
+
+  it('publishes risk type, status, impact, probability, and level as required inputs', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+
+    registerWriteTools(server as any, {} as any);
+
+    const schema = registrations.get('create_risk').config.inputSchema;
+    for (const field of ['TypeId', 'StatusId', 'ImpactId', 'ProbabilityId', 'LevelId']) {
+      expect(schema[field].safeParse(undefined).success, `${field} should be required`).toBe(false);
+    }
+  });
+
+  it('points each create_risk reference field at its get_reference_data entity', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+
+    registerWriteTools(server as any, {} as any);
+
+    const config = registrations.get('create_risk').config;
+    const expectedEntities: Record<string, string> = {
+      TypeId: 'risktypes',
+      StatusId: 'riskstatuses',
+      ImpactId: 'riskimpacts',
+      ProbabilityId: 'riskprobabilities',
+      LevelId: 'risklevels',
+    };
+    for (const [field, entity] of Object.entries(expectedEntities)) {
+      expect(config.inputSchema[field].description, `${field} description`).toContain(entity);
+    }
+    expect(config.description).toContain('risklevels');
+  });
+
+  it('warns about automatic progress side effects in the task tool descriptions', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+
+    registerWriteTools(server as any, {} as any);
+
+    for (const tool of ['create_task', 'update_task']) {
+      const description = registrations.get(tool).config.description;
+      expect(description, `${tool} description`).toContain('AutomaticProgress');
+      expect(description, `${tool} description`).toContain('ReportDate');
+    }
   });
 
   it('documents the methodology-dependent Waterfall task requirements', () => {
@@ -664,6 +800,44 @@ describe('task hierarchy and milestone handler wiring', () => {
     expect(rest.patch).not.toHaveBeenCalled();
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Waterfall');
+  });
+});
+
+describe('create_risk handler wiring', () => {
+  function register(rest: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any);
+    return registrations;
+  }
+
+  it('normalizes LevelId against the risklevels reference before POSTing', async () => {
+    const rest = {
+      get: vi.fn(async (path: string) => {
+        if (path === 'risklevels') return [{ Id: 900, BaseId: 30, Level: 'High' }];
+        if (path.startsWith('projects/100/risks/')) {
+          return {
+            Id: 55, Name: 'Risk A',
+            Type: { BaseId: 1 }, Status: { BaseId: 2 },
+            Impact: { BaseId: 10 }, Probability: { BaseId: 20 }, Level: { BaseId: 30 },
+          };
+        }
+        return [];
+      }),
+      post: vi.fn().mockResolvedValue({ Id: 55 }),
+    };
+
+    const result = await register(rest).get('create_risk').handler({
+      projectId: 100, Name: 'Risk A', TypeId: 1, StatusId: 2, ImpactId: 10, ProbabilityId: 20, LevelId: 900,
+    });
+
+    expect(rest.get).toHaveBeenCalledWith('risklevels');
+    expect(rest.post).toHaveBeenCalledWith('projects/100/risks', expect.objectContaining({ LevelId: 30 }));
+    expect(result.isError).toBeFalsy();
   });
 });
 
