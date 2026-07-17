@@ -1,6 +1,6 @@
 # MCP Write Tool Fixes: Summary Task Verification, Risk Schema, and Auto-Progress Warning
 
-> **Status:** Pending
+> **Status:** Implemented and verified on stage 2026-07-17 (MCP v1.0.12); prod deployment pending
 > **Date:** 2026-07-17
 > **Origin:** Claude Desktop prod session on project 81412 (testsmarter account, 2026-07-17 18:03-18:11 UTC). Prod logs confirmed all three issues; the ticket is at `zz_Tickets/Claude-desktop-project-creation.md`.
 
@@ -96,7 +96,9 @@ Also add `requireSuppliedField` calls in `splitCreateRiskArgs` (write-tools.ts:2
 
 ### Fix (b): Make `LevelId` discoverable
 
-The backend endpoint already exists (`RiskLevelController.cs` in ITM.Tasks); the only gap is the missing API Gateway route. No ITM.Tasks code change is needed.
+The backend endpoint already exists (`RiskLevelController.cs` in ITM.Tasks); the main gap is the missing API Gateway route.
+
+**Found during implementation (2026-07-17):** one ITM.Tasks code fix was needed after all. `RiskLevelMapper.Map` passed its own never-assigned null `Impact`/`Probability` properties into the `RiskLevel` constructor, so serializing the `Value` getter threw a NullReferenceException and the endpoint returned 500 on its first-ever real call. Fixed in ITM.Tasks commit b734858c (mapper now uses the default constructor; regression test in `ITM.Tasks.Test2/TestRiskLevel.cs` asserts the mapped object serializes). The bug was invisible until now precisely because the route had never been exposed.
 
 1. Add the `risklevels` route to `APIGateway.json` in ITM.Web/ITM.API, mirroring the four sibling risk reference routes:
 
@@ -186,10 +188,13 @@ No new tools, so `WRITE_TOOL_NAMES` count stays at 10 and total tool count stays
 ## 7. Rollout
 
 1. ~~Verify ITM.Tasks `RiskManager.cs` to determine if `LevelId` is derived~~ Done 2026-07-17: `LevelId` is required, not derived; the endpoint exists but is not gateway-routed (see Section 2, Fix b).
-2. Add the `risklevels` route to `APIGateway.json` in ITM.Web/ITM.API and apply the same edit manually on the local, stage, and prod gateways (avoids an unnecessary full deployment). Push the repo change to the develop branch.
-3. Implement fixes 1, 2a, and 3 in ITM.MCP; TDD per Section 5.
-4. Once the gateway route is live, complete fix 2b in ITM.MCP (`ALLOWED_ENTITIES` + `LevelId` description).
-5. `npm test` + `npm run build` green.
-6. E2E against local API.
-7. Deploy to stage, re-run e2e.
-8. Publish npm, prod pipeline. Push ITM.MCP changes to the develop branch.
+2. ~~Add the `risklevels` route to `APIGateway.json`~~ Done: ITM.Web develop commit a8312579; applied manually on the local and stage gateways (backup `APIGateway.json.bak-20260717` on stage).
+3. ~~Fix `RiskLevelMapper` NRE in ITM.Tasks~~ Done: develop commit b734858c, deployed to stage via the ITM.Tasks-Stage pipeline.
+4. ~~Implement fixes 1, 2a, 2b, and 3 in ITM.MCP; TDD per Section 5~~ Done: develop commit de0b41c (v1.0.12), 372 unit tests green, build green.
+5. ~~E2E against local API~~ Done: 70/70 green (14 write-tools tests, including the new summary task, risklevels, and create_risk rejection cases).
+6. ~~Deploy to stage~~ Done: ITM.MCP-Stage and ITM.Tasks-Stage pipelines succeeded; verified on stage via scripted OAuth session (risklevels discovery, create_risk with discovered LevelId, summary task with and without TypeId).
+7. **Prod (pending):**
+   a. Deploy ITM.Tasks to prod (mapper fix must be live before the gateway route is added).
+   b. Add the `risklevels` route manually to the prod `APIGateway.json` and recycle the app domain (or wait for the next regular ITM.Web deployment).
+   c. Deploy ITM.MCP to prod (`merge-develop-into.bat main`); the prod pipeline publishes npm.
+   d. Order matters: a → b → c. The new MCP fetches `risklevels` inside create_risk, so deploying the MCP before the route is live would break create_risk on prod.
