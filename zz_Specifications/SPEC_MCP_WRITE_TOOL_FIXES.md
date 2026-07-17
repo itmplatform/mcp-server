@@ -193,8 +193,7 @@ No new tools, so `WRITE_TOOL_NAMES` count stays at 10 and total tool count stays
 4. ~~Implement fixes 1, 2a, 2b, and 3 in ITM.MCP; TDD per Section 5~~ Done: develop commit de0b41c (v1.0.12), 372 unit tests green, build green.
 5. ~~E2E against local API~~ Done: 70/70 green (14 write-tools tests, including the new summary task, risklevels, and create_risk rejection cases).
 6. ~~Deploy to stage~~ Done: ITM.MCP-Stage and ITM.Tasks-Stage pipelines succeeded; verified on stage via scripted OAuth session (risklevels discovery, create_risk with discovered LevelId, summary task with and without TypeId).
-7. **Prod (pending):**
-   a. Deploy ITM.Tasks to prod (mapper fix must be live before the gateway route is added).
-   b. Add the `risklevels` route manually to the prod `APIGateway.json` and recycle the app domain (or wait for the next regular ITM.Web deployment).
-   c. Deploy ITM.MCP to prod (`merge-develop-into.bat main`); the prod pipeline publishes npm.
-   d. Order matters: a → b → c. The new MCP fetches `risklevels` inside create_risk, so deploying the MCP before the route is live would break create_risk on prod.
+7. **Prod:**
+   a. ~~Deploy ITM.Tasks to prod~~ Done 2026-07-17: develop merged to main (2e7a1984), ITM.Tasks-Prod pipeline deployed.
+   b. ~~Add the `risklevels` route manually to the prod `APIGateway.json`~~ Done 2026-07-17: route inserted on `app2-api.itmplatform.com` (backup `APIGateway.json.bak-20260717`), app domain recycled, endpoint verified returning the three levels. Note: the route only reaches ITM.Web `main` with the next regular ITM.Web promotion; until then, an ITM.Web prod deployment from `main` would overwrite the manual edit.
+   c. Deploy ITM.MCP to prod (`merge-develop-into.bat main`); the prod pipeline publishes npm. **This is the only remaining step.**
