@@ -31,4 +31,4 @@ Your OAuth token determines what the AI can do:
 | Scope | What it allows |
 |-------|----------------|
 | `mcp:read` | Search projects, view budgets, list tasks, query the portfolio |
-| `mcp:write` | Everything above, plus create tasks, log risks/issues, update projects |
+| `mcp:write` | Everything above, plus create projects and tasks, log risks/issues, update projects |

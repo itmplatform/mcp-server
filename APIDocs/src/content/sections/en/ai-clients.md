@@ -229,7 +229,7 @@ The first time you connect via OAuth, open MCP in your client and select `itm-pl
 | Scope | What it allows |
 |-------|----------------|
 | `mcp:read` | Search projects, view budgets, list tasks, query the portfolio |
-| `mcp:write` | Everything above, plus create tasks, log risks/issues, update projects |
+| `mcp:write` | Everything above, plus create projects and tasks, log risks/issues, update projects |
 
 OAuth lets the AI act on your behalf without ever seeing your password.
 
