@@ -2,10 +2,12 @@ import { ChildProcess, spawn } from 'node:child_process';
 import { beforeAll, afterAll } from 'vitest';
 import {
   createProjectViaRest,
+  deleteActivitiesViaRest,
   deleteIssueViaRest,
   deleteProjectViaRest,
   deleteProjectsViaRest,
   deleteRiskViaRest,
+  deleteServicesViaRest,
   deleteTasksViaRest,
   fetchJson,
   getReferenceBaseIds,
@@ -104,10 +106,12 @@ export async function listTools(id = 2) {
 
 export {
   createProjectViaRest,
+  deleteActivitiesViaRest,
   deleteIssueViaRest,
   deleteProjectViaRest,
   deleteProjectsViaRest,
   deleteRiskViaRest,
+  deleteServicesViaRest,
   deleteTasksViaRest,
   fetchJson,
   getReferenceBaseIds,

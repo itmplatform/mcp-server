@@ -16,6 +16,7 @@ export interface RestClient {
   get(path: string, opts?: RequestOptions): Promise<unknown>;
   post(path: string, body: unknown, opts?: RequestOptions): Promise<unknown>;
   patch(path: string, body: unknown, opts?: RequestOptions): Promise<unknown>;
+  put(path: string, body: unknown, opts?: RequestOptions): Promise<unknown>;
 }
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
@@ -118,5 +119,6 @@ export function createRestClient(config: RestClientConfig): RestClient {
     get: (path: string, opts?: RequestOptions) => request('GET', path, undefined, opts),
     post: (path: string, body: unknown, opts?: RequestOptions) => request('POST', path, body, opts),
     patch: (path: string, body: unknown, opts?: RequestOptions) => request('PATCH', path, body, opts),
+    put: (path: string, body: unknown, opts?: RequestOptions) => request('PUT', path, body, opts),
   };
 }

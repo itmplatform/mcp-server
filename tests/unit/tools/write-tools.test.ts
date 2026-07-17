@@ -8,6 +8,9 @@ import {
   BULK_STATUS_MAX_IDS, BULK_STATUS_TIMEOUT_MS,
   splitCreateProjectArgs, getCreateProjectValidationError,
   getUpdateTaskValidationError, buildProjectUiUrl, taskVerificationFieldsFor,
+  splitUpdateRiskArgs, splitUpdateIssueArgs,
+  splitCreateServiceArgs, splitUpdateServiceArgs,
+  splitCreateActivityArgs, splitUpdateActivityArgs,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -1134,5 +1137,235 @@ describe('verifyRequestedFields', () => {
       fields,
       'update_project',
     )).toThrow('expected 662751 but read back 662750');
+  });
+});
+
+describe('splitUpdateRiskArgs', () => {
+  it('builds the risk path and keeps update fields', () => {
+    const { path, body } = splitUpdateRiskArgs({ projectId: 100, riskId: 7, Name: 'Risk B', MitigationPlan: 'Plan' });
+    expect(path).toBe('projects/100/risks/7');
+    expect(body).toEqual({ Name: 'Risk B', MitigationPlan: 'Plan' });
+  });
+
+  it('aliases ContingencyPlan to the backend ContigencyPlan spelling', () => {
+    const { body } = splitUpdateRiskArgs({ projectId: 100, riskId: 7, ContingencyPlan: 'Fallback' });
+    expect(body).toEqual({ ContigencyPlan: 'Fallback' });
+  });
+
+  it('aliases Impact and Probability to their Id fields like create_risk', () => {
+    const { body } = splitUpdateRiskArgs({ projectId: 100, riskId: 7, Impact: 10, Probability: 20 });
+    expect(body).toEqual({ ImpactId: 10, ProbabilityId: 20 });
+  });
+});
+
+describe('splitUpdateIssueArgs', () => {
+  it('builds the issue path and maps TypeId/StatusId/Resolution to backend keys', () => {
+    const { path, body } = splitUpdateIssueArgs({
+      projectId: 100, issueId: 9, TypeId: 3, StatusId: 4, Resolution: 'Done', Name: 'Issue B',
+    });
+    expect(path).toBe('projects/100/issues/9');
+    expect(body).toEqual({ Type: 3, Status: 4, FinalResolution: 'Done', Name: 'Issue B' });
+  });
+});
+
+describe('splitCreateServiceArgs', () => {
+  it('builds the services path and requires TypeId', () => {
+    const { path, body } = splitCreateServiceArgs({ Name: 'Support', TypeId: 5 });
+    expect(path).toBe('services');
+    expect(body).toEqual({ Name: 'Support', TypeId: 5 });
+  });
+
+  it('throws when TypeId is missing, pointing at servicetypes', () => {
+    expect(() => splitCreateServiceArgs({ Name: 'Support' })).toThrow('servicetypes');
+  });
+
+  it('rejects StatusId at creation like create_project', () => {
+    expect(() => splitCreateServiceArgs({ Name: 'Support', TypeId: 5, StatusId: 1 }))
+      .toThrow('update_service');
+  });
+});
+
+describe('splitUpdateServiceArgs', () => {
+  it('builds the service path and aliases StatusId to ProjectStatusId', () => {
+    const { path, body } = splitUpdateServiceArgs({ serviceId: 77, StatusId: 4, Name: 'Support 2' });
+    expect(path).toBe('services/77');
+    expect(body).toEqual({ ProjectStatusId: 4, Name: 'Support 2' });
+  });
+});
+
+describe('splitCreateActivityArgs', () => {
+  it('builds the activities path and maps Description to Details', () => {
+    const { path, body } = splitCreateActivityArgs({
+      serviceId: 77, Name: 'Act', Description: 'Desc', StatusId: 1, StartDate: '2026-01-01', EndDate: '2026-02-01',
+    });
+    expect(path).toBe('services/77/activities');
+    expect(body).toEqual({ Name: 'Act', Details: 'Desc', StatusId: 1, StartDate: '2026-01-01', EndDate: '2026-02-01' });
+  });
+
+  it('requires StatusId, StartDate, and EndDate', () => {
+    expect(() => splitCreateActivityArgs({ serviceId: 77, Name: 'Act' })).toThrow('StatusId');
+    expect(() => splitCreateActivityArgs({ serviceId: 77, Name: 'Act', StatusId: 1 })).toThrow('StartDate');
+    expect(() => splitCreateActivityArgs({ serviceId: 77, Name: 'Act', StatusId: 1, StartDate: '2026-01-01' })).toThrow('EndDate');
+  });
+
+  it('rejects hierarchy and assignment fields', () => {
+    const base = { serviceId: 77, Name: 'Act', StatusId: 1, StartDate: '2026-01-01', EndDate: '2026-02-01' };
+    expect(() => splitCreateActivityArgs({ ...base, KindId: 1 })).toThrow('KindId is not supported');
+    expect(() => splitCreateActivityArgs({ ...base, ParentId: 5 })).toThrow('ParentId is not supported');
+    expect(() => splitCreateActivityArgs({ ...base, AssignedToUserId: 3 })).toThrow('AssignedToUserId is not supported');
+  });
+});
+
+describe('splitUpdateActivityArgs', () => {
+  it('builds the single-activity path and maps Description to Details', () => {
+    const { path, body } = splitUpdateActivityArgs({ serviceId: 77, activityId: 55, Description: 'New' });
+    expect(path).toBe('services/77/activities/55');
+    expect(body).toEqual({ Details: 'New' });
+  });
+
+  it('rejects hierarchy fields', () => {
+    expect(() => splitUpdateActivityArgs({ serviceId: 77, activityId: 55, ParentId: 5 }))
+      .toThrow('ParentId is not supported');
+  });
+});
+
+describe('P1 write tool handlers', () => {
+  function register(rest: any, ctx?: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any, ctx);
+    return registrations;
+  }
+
+  it('registers the six new write tools', () => {
+    const registrations = register({});
+    for (const name of ['update_risk', 'update_issue', 'create_service', 'update_service', 'create_activity', 'update_activity']) {
+      expect(registrations.has(name)).toBe(true);
+    }
+  });
+
+  it.each(['update_risk', 'update_issue', 'create_service', 'update_service', 'create_activity', 'update_activity'])(
+    '%s refuses the call without the mcp:write scope',
+    async (toolName) => {
+      const result = await register({}, { grantedScopes: ['mcp:read'] }).get(toolName).handler({});
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('insufficient_scope');
+    },
+  );
+
+  it('update_risk PUTs normalized reference IDs and verifies the readback', async () => {
+    const rest = {
+      get: vi.fn(async (path: string) => {
+        if (path === 'risklevels') return [{ Id: 900, BaseId: 30, Level: 'High' }];
+        if (path === 'projects/100/risks/7') {
+          return { Id: 7, Name: 'Risk B', Level: { BaseId: 30 }, MitigationPlan: 'Plan', ContigencyPlan: 'Fallback' };
+        }
+        return [];
+      }),
+      put: vi.fn().mockResolvedValue({ Id: 7, StatusCode: 201 }),
+    };
+    const result = await register(rest).get('update_risk').handler({
+      projectId: 100, riskId: 7, Name: 'Risk B', LevelId: 900, MitigationPlan: 'Plan', ContingencyPlan: 'Fallback',
+    });
+
+    expect(rest.put).toHaveBeenCalledWith('projects/100/risks/7', {
+      Name: 'Risk B', LevelId: 30, MitigationPlan: 'Plan', ContigencyPlan: 'Fallback',
+    });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0].text).Id).toBe(7);
+    expect(result.content[1].text).toBe(STALE_AFTER_WRITE_NOTICE);
+  });
+
+  it('update_risk fails verification when the readback ignores a field', async () => {
+    const rest = {
+      get: vi.fn(async (path: string) => {
+        if (path === 'projects/100/risks/7') return { Id: 7, Name: 'Old Name' };
+        return [];
+      }),
+      put: vi.fn().mockResolvedValue({ Id: 7 }),
+    };
+    await expect(register(rest).get('update_risk').handler({
+      projectId: 100, riskId: 7, Name: 'New Name',
+    })).rejects.toThrow('verification failed');
+  });
+
+  it('update_issue PATCHes bare Type/Status BaseId keys and verifies the readback', async () => {
+    const rest = {
+      get: vi.fn(async (path: string) => {
+        if (path === 'issuetypes') return [{ Id: 800, BaseId: 3, Name: 'Bug' }];
+        if (path === 'issuestatuses') return [{ Id: 810, BaseId: 4, Name: 'Closed' }];
+        if (path === 'projects/100/issues/9') {
+          return { Id: 9, Name: 'Issue B', Type: { BaseId: 3 }, Status: { BaseId: 4 }, FinalResolution: 'Done' };
+        }
+        return [];
+      }),
+      patch: vi.fn().mockResolvedValue({ Id: 9 }),
+    };
+    const result = await register(rest).get('update_issue').handler({
+      projectId: 100, issueId: 9, Name: 'Issue B', TypeId: 800, StatusId: 810, Resolution: 'Done',
+    });
+
+    expect(rest.patch).toHaveBeenCalledWith('projects/100/issues/9', {
+      Name: 'Issue B', Type: 3, Status: 4, FinalResolution: 'Done',
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('create_service POSTs to services and reads back the created service', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 501, StatusCode: 201 }),
+      get: vi.fn().mockResolvedValue({ Id: 501, Name: 'Support', Type: { Id: 5 } }),
+    };
+    const result = await register(rest).get('create_service').handler({ Name: 'Support', TypeId: 5 });
+
+    expect(rest.post).toHaveBeenCalledWith('services', { Name: 'Support', TypeId: 5 });
+    expect(rest.get).toHaveBeenCalledWith('services/501');
+    expect(JSON.parse(result.content[0].text).Id).toBe(501);
+  });
+
+  it('update_service PATCHes the service and verifies the readback', async () => {
+    const rest = {
+      patch: vi.fn().mockResolvedValue({ Id: 501 }),
+      get: vi.fn().mockResolvedValue({ Id: 501, Name: 'Support 2', Status: { Id: 4 } }),
+    };
+    const result = await register(rest).get('update_service').handler({ serviceId: 501, Name: 'Support 2', StatusId: 4 });
+
+    expect(rest.patch).toHaveBeenCalledWith('services/501', { Name: 'Support 2', ProjectStatusId: 4 });
+    expect(rest.get).toHaveBeenCalledWith('services/501');
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('create_activity POSTs to the service activities route and reads back', async () => {
+    const rest = {
+      post: vi.fn().mockResolvedValue({ Id: 601 }),
+      get: vi.fn().mockResolvedValue({ Id: 601, Name: 'Act', StartDate: '2026-01-01', EndDate: '2026-02-01', Status: { Id: 1 } }),
+    };
+    const result = await register(rest).get('create_activity').handler({
+      serviceId: 77, Name: 'Act', StatusId: 1, StartDate: '2026-01-01', EndDate: '2026-02-01',
+    });
+
+    expect(rest.post).toHaveBeenCalledWith('services/77/activities', {
+      Name: 'Act', StatusId: 1, StartDate: '2026-01-01', EndDate: '2026-02-01',
+    });
+    expect(rest.get).toHaveBeenCalledWith('services/77/activities/601');
+    expect(JSON.parse(result.content[0].text).Id).toBe(601);
+  });
+
+  it('update_activity PATCHes the activity and verifies the readback', async () => {
+    const rest = {
+      patch: vi.fn().mockResolvedValue({ Id: 601 }),
+      get: vi.fn().mockResolvedValue({ Id: 601, Name: 'Act 2', Status: { Id: 2 } }),
+    };
+    const result = await register(rest).get('update_activity').handler({
+      serviceId: 77, activityId: 601, Name: 'Act 2', StatusId: 2,
+    });
+
+    expect(rest.patch).toHaveBeenCalledWith('services/77/activities/601', { Name: 'Act 2', StatusId: 2 });
+    expect(rest.get).toHaveBeenCalledWith('services/77/activities/601');
+    expect(result.isError).toBeFalsy();
   });
 });

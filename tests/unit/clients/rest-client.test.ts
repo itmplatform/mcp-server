@@ -177,6 +177,41 @@ describe('RestClient', () => {
     expect(result).toEqual({ id: 42, Name: 'Updated Task' });
   });
 
+  it('PUT sends body as JSON with PUT method', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ Id: 7, StatusCode: 201 }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = createRestClient(config);
+    const body = { Name: 'Updated Risk', MitigationPlan: 'Plan' };
+    const result = await client.put('projects/100/risks/7', body);
+
+    const call = mockFetch.mock.calls[0];
+    expect(call[0]).toBe('http://localhost/ITM.API/v2/acme/projects/100/risks/7');
+    expect(call[1].method).toBe('PUT');
+    expect(JSON.parse(call[1].body)).toEqual(body);
+    expect(result).toEqual({ Id: 7, StatusCode: 201 });
+  });
+
+  it('PUT retries on 401 via onUnauthorized', async () => {
+    const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ Id: 7 }),
+      });
+    globalThis.fetch = mockFetch;
+
+    const client = createRestClient({ ...config, onUnauthorized });
+    const result = await client.put('projects/100/risks/7', { Name: 'x' });
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ Id: 7 });
+  });
+
   it('PATCH throws on non-200 response', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,

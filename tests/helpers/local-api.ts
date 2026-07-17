@@ -109,6 +109,16 @@ export async function deleteTasksViaRest(projectId: number, taskIds: number[]): 
   await cleanupDelete(`projects/${projectId}/tasks`, { Ids: taskIds.join(',') });
 }
 
+export async function deleteServicesViaRest(serviceIds: number[]): Promise<void> {
+  if (!serviceIds.length) return;
+  await cleanupDelete('services', { ServiceIds: serviceIds.join(',') });
+}
+
+export async function deleteActivitiesViaRest(serviceId: number, activityIds: number[]): Promise<void> {
+  if (!activityIds.length) return;
+  await cleanupDelete(`services/${serviceId}/activities`, { Ids: activityIds.join(',') });
+}
+
 export async function deleteRiskViaRest(projectId: number, riskId: number): Promise<void> {
   await cleanupDelete(`projects/${projectId}/risks/${riskId}`);
 }

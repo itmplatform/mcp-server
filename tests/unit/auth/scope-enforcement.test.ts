@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { WRITE_TOOL_NAMES, hasScope, type EffectiveUserContext } from '../../../src/auth/effective-user-context.js';
 
 describe('WRITE_TOOL_NAMES', () => {
-  it('contains exactly the 10 write tool names', () => {
+  it('contains exactly the 16 write tool names', () => {
     expect(WRITE_TOOL_NAMES).toEqual(new Set([
       'create_project', 'create_task', 'update_task', 'create_risk', 'create_issue', 'update_project',
       'create_task_progress', 'update_task_progress',
       'bulk_update_task_status', 'bulk_update_activity_status',
+      'update_risk', 'update_issue',
+      'create_service', 'update_service', 'create_activity', 'update_activity',
     ]));
   });
 });
