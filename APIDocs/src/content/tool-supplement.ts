@@ -99,6 +99,19 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       hasMore: false,
     },
   },
+  get_task_effort: {
+    category: 'Tasks',
+    narrative:
+      'When you ask "Who is assigned to this task and how many hours are planned per person?", the AI reads the task\'s effort breakdown: per team member (estimated, accepted, and time-entry hours) and per professional category. The teamMembers list doubles as the task team.',
+    exampleResponse: {
+      teamMembers: [
+        { TaskUserId: 1040189, UserId: 33989, DisplayName: 'Daniel Piret', EstimatedEffortHours: 5, EstimatedEffortMins: 15, ActualEffortByTimeEntryHours: 0 },
+      ],
+      categories: [
+        { CategoryName: 'Tester (Internal)', TotalEstimatedEffortHours: 5, TotalEstimatedEffortMins: 15 },
+      ],
+    },
+  },
   get_project_budget: {
     category: 'Financials',
     narrative:
@@ -383,6 +396,16 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       TaskId: 1859241,
       Percentage: 75,
       ShortDescription: 'Backend migration complete',
+    },
+  },
+  update_task_effort: {
+    category: 'Write Operations',
+    narrative:
+      'When you say "Plan 8 hours for Ana on the homepage task," the AI sets the ESTIMATED effort per assigned user. This is planning data, not time logging: accepted effort, billing categories, and unlisted users are read first and preserved. The target user must already be assigned to the task.',
+    exampleResponse: {
+      teamMembers: [
+        { UserId: 33989, DisplayName: 'Daniel Piret', EstimatedEffortHours: 8, EstimatedEffortMins: 0 },
+      ],
     },
   },
   bulk_update_task_status: {
