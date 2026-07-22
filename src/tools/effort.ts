@@ -95,12 +95,12 @@ export function buildEffortUpdatePayload(
   if (taskTotal) {
     totalHours = taskTotal.hours;
     totalMins = taskTotal.minutes;
-  } else if (categoryRows.length) {
-    totalHours = asNumber(categoryRows[0].TotalEstimatedEffortHours, 0);
-    totalMins = asNumber(categoryRows[0].TotalEstimatedEffortMins, 0);
   } else {
-    // No category rows to read the current total from: derive it from the
-    // post-change per-user estimates (the same rule the Kanban UI applies).
+    // The web UI recomputes the task total on every save as the sum of the
+    // effort grid (per-user estimates plus unassigned category effort);
+    // mirror that. EffortByCategory's TotalEstimatedEffort fields are
+    // per-category totals, NOT tblTask's headline estimate, so they cannot
+    // be used as a preservation source.
     const changed = new Map(changes.map(change => [change.userId, change]));
     let minutes = 0;
     for (const row of teamRows) {
@@ -108,6 +108,9 @@ export function buildEffortUpdatePayload(
       minutes += change
         ? change.estimatedHours * 60 + change.estimatedMinutes
         : asNumber(row.EstimatedEffortHours, 0) * 60 + asNumber(row.EstimatedEffortMins, 0);
+    }
+    for (const cat of categoryEfforts) {
+      minutes += cat.NonAssignedEffortHours * 60 + cat.NonAssignedEffortMins;
     }
     totalHours = Math.floor(minutes / 60);
     totalMins = minutes % 60;
@@ -183,7 +186,7 @@ export function registerEffortTools(
       description: 'Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: '
         + 'it never writes worked hours, accepted effort, or billing categories (those are read and preserved). '
         + 'Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). '
-        + 'Users not listed keep their current estimates. The task total estimate is preserved unless taskTotalEstimate is provided. '
+        + 'Users not listed keep their current estimates. The task total estimate is recomputed as the sum of per-user and unassigned category estimates (matching the web UI) unless taskTotalEstimate is provided. '
         + 'Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
@@ -196,7 +199,7 @@ export function registerEffortTools(
         taskTotalEstimate: z.object({
           hours: z.number().int().min(0).describe('Task total estimate, hours part'),
           minutes: z.number().int().min(0).max(59).describe('Task total estimate, minutes part, 0-59'),
-        }).optional().describe('Optional new task-level total estimate; when omitted the current total is preserved'),
+        }).optional().describe('Optional explicit task-level total estimate; when omitted the total is recomputed from the per-user and unassigned category estimates, as the web UI does'),
       },
     },
     async (args) => {

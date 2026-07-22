@@ -4,7 +4,7 @@ Esfuerzo por usuario en tareas: consultar el desglose de esfuerzo y definir las 
 
 **Nuevas herramientas (2):**
 - `get_task_effort`: el desglose de esfuerzo de una tarea por miembro del equipo (horas estimadas, aceptadas y de imputación, más la categoría de facturación) y por categoría profesional. La lista `teamMembers` sirve también como equipo de la tarea, así que responde a "¿quién está asignado a esta tarea?".
-- `update_task_effort`: define el esfuerzo ESTIMADO (planificado) por usuario asignado, opcionalmente junto con la estimación total de la tarea. Solo datos de planificación: nunca escribe horas trabajadas ni esfuerzo aceptado, y lee el estado actual primero para preservar exactamente el esfuerzo aceptado, los indicadores de aceptación automática, las categorías de facturación, los esfuerzos por categoría y los usuarios no incluidos.
+- `update_task_effort`: define el esfuerzo ESTIMADO (planificado) por usuario asignado, opcionalmente junto con una estimación total explícita de la tarea (si no se indica, el total se recalcula a partir de las estimaciones, como hace la interfaz web). Solo datos de planificación: nunca escribe horas trabajadas ni esfuerzo aceptado, y lee el estado actual primero para preservar exactamente el esfuerzo aceptado, los indicadores de aceptación automática, las categorías de facturación, los esfuerzos por categoría y los usuarios no incluidos.
 
 **Notas:**
 - El usuario debe estar ya asignado a la tarea; asigne con `update_task` (`TaskMembers`/`TaskManagers` con nombres de usuario) y descubra los asignados con `get_task_effort` o `search_users`.

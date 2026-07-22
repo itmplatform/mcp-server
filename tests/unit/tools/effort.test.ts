@@ -158,14 +158,15 @@ describe('buildEffortUpdatePayload', () => {
     expect((payload.CategoryEfforts as unknown[]).length).toBe(1);
   });
 
-  it('preserves the current task total estimate when no explicit total is given', () => {
+  it('recomputes the task total as user estimates plus unassigned category effort (UI behavior)', () => {
     const payload = buildEffortUpdatePayload(
       [{ userId: 501, estimatedHours: 1, estimatedMinutes: 0 }],
       [TEAM_ROW],
       [CATEGORY_ROW],
     );
-    expect(payload.TaskTotalEstimateHours).toBe(12);
-    expect(payload.TaskTotalEstimateMins).toBe(15);
+    // 1:00 (changed user) + 4:45 (unassigned category effort) = 5:45
+    expect(payload.TaskTotalEstimateHours).toBe(5);
+    expect(payload.TaskTotalEstimateMins).toBe(45);
   });
 
   it('uses the explicit task total when provided', () => {
@@ -179,7 +180,7 @@ describe('buildEffortUpdatePayload', () => {
     expect(payload.TaskTotalEstimateMins).toBe(0);
   });
 
-  it('falls back to the post-change sum of user estimates when there are no category rows', () => {
+  it('sums post-change user estimates when there are no category rows', () => {
     const payload = buildEffortUpdatePayload(
       [{ userId: 501, estimatedHours: 8, estimatedMinutes: 45 }],
       [TEAM_ROW, OTHER_TEAM_ROW],
@@ -298,8 +299,9 @@ describe('registerEffortTools', () => {
       ActualEffortAcceptedHours: 1, ActualEffortAcceptedMins: 15,
       IsAutomaticActualEffortAccepted: true, BillingCategoryId: 7,
     }]);
-    expect(putBody.TaskTotalEstimateHours).toBe(12);
-    expect(putBody.TaskTotalEstimateMins).toBe(15);
+    // 8:45 (changed) + 5:30 (other user) + 4:45 (unassigned category) = 19:00
+    expect(putBody.TaskTotalEstimateHours).toBe(19);
+    expect(putBody.TaskTotalEstimateMins).toBe(0);
     expect(result.isError).toBeUndefined();
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.teamMembers[0].EstimatedEffortHours).toBe(8);

@@ -128,9 +128,9 @@ write only with `mcp:write` plus the per-handler `hasScope` guard
      `CategoryTypeId -> CategoryType` mapping must be verified empirically during
      implementation (E2E acceptance criterion below asserts zero net change to
      `tblTaskWorkTime` on an estimate-only update).
-  6. `TaskTotalEstimateHours/Mins`: from input if provided, else echo the current total.
-     Source for the current total (`EffortByCategory.TotalEstimatedEffortHours/Mins` vs task
-     detail) is an implementation verification item; assert against `tblTask` in E2E.
+  6. `TaskTotalEstimateHours/Mins`: from input if provided, else recomputed as the sum of the
+     post-change per-user estimates plus the echoed unassigned category effort. This mirrors
+     the web UI, which recomputes the task total from the effort grid on every save.
   7. `PUT .../Effort`, then re-`GET EffortByTeamMember` and verify the written estimates with
      `verifyRequestedFields`-style comparison; return via `buildWriteResponse` (stale-DataMart
      notice included, `write-tools.ts:9-28`).
@@ -238,9 +238,13 @@ Implemented as specced with three deltas found during TDD/E2E:
    milestones, so the handler fetches the task detail first (pairing + kind checks), then the
    effort state. The task readback carries top-level `ProjectId` and `KindId` (verified
    empirically), so both checks work as designed.
-3. **Task-total echo source confirmed.** `EffortByCategory[0].TotalEstimatedEffortHours/Mins`
-   reflects `tblTask.intTaskEstHour/intTaskEstmin`; preservation and explicit-total writes are
-   both SQL-asserted in E2E.
+3. **Task-total semantics corrected on stage (v1.0.16).** `EffortByCategory`'s
+   `TotalEstimatedEffort*` fields are per-category totals, NOT `tblTask`'s headline estimate
+   (invisible locally where everything was zero; caught by the stage run). Since the web UI
+   recomputes the task total from the effort grid on every save, "preserving" an independent
+   total is not a real UI state; the tool now recomputes it (user estimates + unassigned
+   category effort) unless `taskTotalEstimate` is given. Explicit-total writes remain
+   SQL-asserted in E2E.
 
 Verification: 467 unit tests green (21 new in `tests/unit/tools/effort.test.ts`); full local
 E2E suite 94/94 (7 new in `tests/e2e/effort.e2e.test.ts` incl. SQL preservation asserts);

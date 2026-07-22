@@ -655,7 +655,7 @@
     },
     {
       "name": "update_task_effort",
-      "description": "Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: it never writes worked hours, accepted effort, or billing categories (those are read and preserved). Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). Users not listed keep their current estimates. The task total estimate is preserved unless taskTotalEstimate is provided. Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.",
+      "description": "Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: it never writes worked hours, accepted effort, or billing categories (those are read and preserved). Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). Users not listed keep their current estimates. The task total estimate is recomputed as the sum of per-user and unassigned category estimates (matching the web UI) unless taskTotalEstimate is provided. Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -718,7 +718,7 @@
               "minutes"
             ],
             "additionalProperties": false,
-            "description": "Optional new task-level total estimate; when omitted the current total is preserved"
+            "description": "Optional explicit task-level total estimate; when omitted the total is recomputed from the per-user and unassigned category estimates, as the web UI does"
           }
         },
         "required": [
