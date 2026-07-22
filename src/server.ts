@@ -12,6 +12,7 @@ import { registerTaskTools } from './tools/tasks.js';
 import { registerFinancialTools } from './tools/financials.js';
 import { registerRisksIssuesTools } from './tools/risks-issues.js';
 import { registerProgressTools } from './tools/progress.js';
+import { registerEffortTools } from './tools/effort.js';
 import { registerPortfolioTools } from './tools/portfolio.js';
 import { registerDataMartTool } from './tools/datamart.js';
 import { registerUserTools } from './tools/users.js';
@@ -66,6 +67,7 @@ function createMcpServer(
   registerFinancialTools(server, clients);
   registerRisksIssuesTools(server, clients);
   registerProgressTools(server, clients, userContext);
+  registerEffortTools(server, clients, userContext);
   registerPortfolioTools(server, clients);
   registerDataMartTool(server, clients, customFieldContext);
   registerUserTools(server, clients);

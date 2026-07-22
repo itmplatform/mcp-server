@@ -1,3 +1,16 @@
+### v1.0.15
+
+Esfuerzo por usuario en tareas: consultar el desglose de esfuerzo y definir las horas estimadas por usuario asignado.
+
+**Nuevas herramientas (2):**
+- `get_task_effort`: el desglose de esfuerzo de una tarea por miembro del equipo (horas estimadas, aceptadas y de imputación, más la categoría de facturación) y por categoría profesional. La lista `teamMembers` sirve también como equipo de la tarea, así que responde a "¿quién está asignado a esta tarea?".
+- `update_task_effort`: define el esfuerzo ESTIMADO (planificado) por usuario asignado, opcionalmente junto con la estimación total de la tarea. Solo datos de planificación: nunca escribe horas trabajadas ni esfuerzo aceptado, y lee el estado actual primero para preservar exactamente el esfuerzo aceptado, los indicadores de aceptación automática, las categorías de facturación, los esfuerzos por categoría y los usuarios no incluidos.
+
+**Notas:**
+- El usuario debe estar ya asignado a la tarea; asigne con `update_task` (`TaskMembers`/`TaskManagers` con nombres de usuario) y descubra los asignados con `get_task_effort` o `search_users`.
+- Se rechazan hitos y tareas resumen: el esfuerzo pertenece a las tareas normales.
+- El registro de horas trabajadas sigue fuera del alcance de MCP; use el endpoint REST documentado `timehours` para imputaciones programáticas.
+
 ### v1.0.14
 
 Descubrimiento de campos personalizados: definiciones, opciones de lista y contexto de sesión por cuenta.

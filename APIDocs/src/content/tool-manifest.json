@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.14",
+  "serverVersion": "1.0.15",
   "tools": [
     {
       "name": "search_projects",
@@ -625,6 +625,106 @@
           "projectId",
           "taskId",
           "progressId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_task_effort",
+      "description": "Get the effort breakdown of a task: per team member (teamMembers) and per professional category (categories). Distinguishes three concepts: ESTIMATED effort (planned hours), ACCEPTED actual effort (a derived aggregate), and actual effort from TIME ENTRIES (worked hours logged). teamMembers doubles as the task team list: each row has UserId, DisplayName, EmailAddress, plus TaskUserId (the assignment id used by effort updates). Use update_task_effort to change per-user estimated hours.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_task_effort",
+      "description": "Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: it never writes worked hours, accepted effort, or billing categories (those are read and preserved). Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). Users not listed keep their current estimates. The task total estimate is preserved unless taskTotalEstimate is provided. Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "The task ID (a regular task, not a milestone or summary)"
+          },
+          "userEstimates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "number",
+                  "description": "The assigned user's ID (see get_task_effort teamMembers or search_users)"
+                },
+                "estimatedHours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Estimated hours (whole hours part)"
+                },
+                "estimatedMinutes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 59,
+                  "description": "Estimated minutes part, 0-59"
+                }
+              },
+              "required": [
+                "userId",
+                "estimatedHours",
+                "estimatedMinutes"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "description": "New estimated effort per user; each user at most once"
+          },
+          "taskTotalEstimate": {
+            "type": "object",
+            "properties": {
+              "hours": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Task total estimate, hours part"
+              },
+              "minutes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 59,
+                "description": "Task total estimate, minutes part, 0-59"
+              }
+            },
+            "required": [
+              "hours",
+              "minutes"
+            ],
+            "additionalProperties": false,
+            "description": "Optional new task-level total estimate; when omitted the current total is preserved"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId",
+          "userEstimates"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
