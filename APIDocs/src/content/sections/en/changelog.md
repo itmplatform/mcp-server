@@ -1,3 +1,17 @@
+### v1.0.14
+
+Custom fields discovery: definitions, dropdown options, and per-account session context.
+
+**New tools (2):**
+- `get_custom_fields`: the account's custom field definitions (name, type, required, BaseId) for projects, tasks, risks, issues, services, activities, purchases, or revenues. Definitions are per-language (1=English, 2=Spanish, 3=Portuguese); the tool defaults to your user language.
+- `get_custom_field_options`: the selectable options of a dropdown custom field (RYGList, DropDownList, List), by BaseId.
+
+**Session context:**
+- When the account defines custom fields, the server now lists the DataMart `customFields` keys actually in use (with component counts) in the MCP initialize instructions and at the end of the `query_datamart` description. Agents can answer questions about custom fields without any prior discovery step, including warnings for keys that contain dots (not addressable with dot notation) and hints about per-language key variants on multilingual accounts.
+
+**Notes:**
+- Custom field values were already queryable through `query_datamart` (`customFields` object on every component document, keyed by the field's display name, case- and accent-sensitive); this release makes them discoverable.
+
 ### v1.0.13
 
 P1 core CRUD: single-entity reads, account-wide task search, and the risk, issue, service, and activity write surface.

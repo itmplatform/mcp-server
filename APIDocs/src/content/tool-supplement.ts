@@ -218,6 +218,24 @@ export const toolSupplement: Record<string, ToolEditorial> = {
       role: 'Full User',
     },
   },
+  get_custom_fields: {
+    category: 'Users & Reference',
+    narrative:
+      'When you ask about account-specific fields like "Cost Center" or "HubSpot Link", the AI calls this tool to learn which custom fields the account defines for an entity type, their data types, and their exact names. It then reads or filters the values through query_datamart, where each component carries a customFields object keyed by those names.',
+    exampleResponse: [
+      { Id: 8591, BaseId: 8590, Name: 'Funding Type', TypeId: 7, TypeName: 'DropDownList', Description: '', Display: true, Required: false },
+      { Id: 8743, BaseId: 8742, Name: 'FINANCE_CODE', TypeId: 1, TypeName: 'Text', Description: '', Display: true, Required: false },
+    ],
+  },
+  get_custom_field_options: {
+    category: 'Users & Reference',
+    narrative:
+      'For dropdown custom fields (List, DropDownList, or red-yellow-green status lists), the AI calls this tool with the field BaseId to learn the valid option values before filtering or interpreting them.',
+    exampleResponse: [
+      { Id: 10419, BaseId: 10419, CustomFieldId: 8590, Text: 'Client funds', SortOrder: 1, IsDefault: false },
+      { Id: 10422, BaseId: 10422, CustomFieldId: 8590, Text: 'Internal', SortOrder: 2, IsDefault: false },
+    ],
+  },
   get_reference_data: {
     category: 'Users & Reference',
     narrative:

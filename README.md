@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 40 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 42 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -120,6 +120,8 @@ The server exposes 40 MCP tools, 6 resources, and 4 prompt templates.
 | `search_users` | Find users and team members |
 | `get_user` | Retrieve user details |
 | `get_reference_data` | Retrieve statuses, types, priorities, and other reference lists |
+| `get_custom_fields` | Retrieve the account's custom field definitions for projects, tasks, risks, issues, services, activities, purchases, or revenues |
+| `get_custom_field_options` | Retrieve the selectable options of a dropdown custom field |
 
 ### Write Tools
 
@@ -144,6 +146,8 @@ The server exposes 40 MCP tools, 6 resources, and 4 prompt templates.
 
 Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
 Validation failures include the actionable message returned by REST instead of only the HTTP status.
+
+When the account defines custom fields, each session is enriched with per-account context: the server lists the DataMart `customFields` keys actually in use in the MCP initialize instructions and in the `query_datamart` tool description, so agents can read and filter custom field values without prior discovery.
 
 ### Resources and Prompts
 

@@ -16,6 +16,7 @@ import { registerPortfolioTools } from './tools/portfolio.js';
 import { registerDataMartTool } from './tools/datamart.js';
 import { registerUserTools } from './tools/users.js';
 import { registerReferenceDataTools } from './tools/reference-data.js';
+import { registerCustomFieldTools } from './tools/custom-fields.js';
 import { registerWriteTools } from './tools/write-tools.js';
 import { registerSchemaResources } from './resources/schemas.js';
 import { registerCalendarResources } from './resources/calendars.js';
@@ -33,6 +34,7 @@ import { hasScope, type EffectiveUserContext } from './auth/effective-user-conte
 import { isAuditEnabled } from './audit-config.js';
 import { instrumentServer } from './instrument-server.js';
 import { resolveStartupMode } from './startup-mode.js';
+import { getCustomFieldContext, buildServerInstructions } from './custom-field-context.js';
 
 const log = createLogger('mcp');
 
@@ -42,10 +44,18 @@ interface WriteUserContext {
   aiClientId: string;
 }
 
-function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userContext: EffectiveUserContext): McpServer {
+function createMcpServer(
+  clients: Clients,
+  writeCtx: WriteUserContext,
+  userContext: EffectiveUserContext,
+  customFieldContext?: string,
+): McpServer {
   const server = new McpServer(
     { name: 'itm-platform', version: '1.0.0' },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
+    {
+      capabilities: { tools: {}, resources: {}, prompts: {} },
+      ...(customFieldContext ? { instructions: buildServerInstructions(customFieldContext) } : {}),
+    },
   );
 
   instrumentServer(server, log, writeCtx, clients.audit);
@@ -57,9 +67,10 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userConte
   registerRisksIssuesTools(server, clients);
   registerProgressTools(server, clients, userContext);
   registerPortfolioTools(server, clients);
-  registerDataMartTool(server, clients);
+  registerDataMartTool(server, clients, customFieldContext);
   registerUserTools(server, clients);
   registerReferenceDataTools(server, clients);
+  registerCustomFieldTools(server, clients, userContext);
   if (hasScope(userContext, 'mcp:write')) {
     registerWriteTools(server, clients, userContext);
   }
@@ -73,6 +84,11 @@ function createMcpServer(clients: Clients, writeCtx: WriteUserContext, userConte
   registerRiskAnalysisPrompt(server);
 
   return server;
+}
+
+async function resolveCustomFieldContext(userContext: EffectiveUserContext, clients: Clients): Promise<string | undefined> {
+  if (userContext.dataMartAccess === 'none') return undefined;
+  return getCustomFieldContext(userContext.company, clients, log);
 }
 
 function buildClientsForUser(userContext: EffectiveUserContext, onUnauthorized?: () => Promise<void>): Clients {
@@ -116,7 +132,8 @@ async function main() {
       accountId: userContext.accountId,
       aiClientId: 'stdio',
     };
-    const server = createMcpServer(clients, writeCtx, userContext);
+    const customFieldContext = await resolveCustomFieldContext(userContext, clients);
+    const server = createMcpServer(clients, writeCtx, userContext, customFieldContext);
     const transport = new StdioServerTransport();
     await server.connect(transport);
     log.info({ transport: 'stdio' }, 'MCP server connected via stdio');
@@ -263,7 +280,8 @@ async function main() {
             aiClientId,
           };
 
-          const server = createMcpServer(sessionClients, writeCtx, sessionUserContext);
+          const customFieldContext = await resolveCustomFieldContext(sessionUserContext, sessionClients);
+          const server = createMcpServer(sessionClients, writeCtx, sessionUserContext, customFieldContext);
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             enableJsonResponse: true,

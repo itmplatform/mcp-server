@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.13",
+  "serverVersion": "1.0.14",
   "tools": [
     {
       "name": "search_projects",
@@ -673,7 +673,7 @@
     },
     {
       "name": "query_datamart",
-      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual.\n\nImportant: Projecting full embedded arrays (tasks: 1, risks: 1, issues: 1, purchases: 1, revenues: 1, activities: 1) is rejected because they can be too large. Use dot notation (e.g. \"tasks.name\": 1) or the dedicated subcomponent tools with limit/skip.",
+      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual, customFields (account-defined custom fields: an object keyed by the field's display name; see get_custom_fields).\n\nImportant: Projecting full embedded arrays (tasks: 1, risks: 1, issues: 1, purchases: 1, revenues: 1, activities: 1) is rejected because they can be too large. Use dot notation (e.g. \"tasks.name\": 1) or the dedicated subcomponent tools with limit/skip.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -800,6 +800,60 @@
         },
         "required": [
           "entity"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_custom_fields",
+      "description": "Get the account's custom field definitions for an entity type: project, task, risk, issue, service, activity, purchase, or revenue. Returns Id, BaseId, Name, TypeId, TypeName (Text, Number, Percentage, Date, HTML, RYGList, DropDownList, List), Description, Required.\n\nCustom field VALUES live in DataMart documents under \"customFields\", an object keyed by the field's display Name exactly as returned here (keys are case- and accent-sensitive and may contain trailing spaces). Query them with query_datamart, e.g. project: {\"customFields\": 1} or where: {\"customFields.<Name>\": {\"$eq\": ...}}. On accounts that work in several languages the key follows each component's language; definitions can be fetched per language (languageId 1=English, 2=Spanish, 3=Portuguese) to learn the variant names of the same BaseId. For RYGList, DropDownList, and List fields, get valid values with get_custom_field_options.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "project",
+              "task",
+              "risk",
+              "issue",
+              "service",
+              "activity",
+              "purchase",
+              "revenue"
+            ],
+            "description": "The entity type whose custom field definitions to retrieve"
+          },
+          "languageId": {
+            "type": "number",
+            "description": "Definition language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language."
+          }
+        },
+        "required": [
+          "entity"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_custom_field_options",
+      "description": "Get the selectable options of a dropdown custom field (RYGList, DropDownList, or List types), using the BaseId returned by get_custom_fields. Returns Id, BaseId, Text, Color (RYG lists), SortOrder, IsDefault. The option Text is the value stored in DataMart \"customFields\" for the component.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customFieldBaseId": {
+            "type": "number",
+            "description": "The custom field BaseId from get_custom_fields"
+          },
+          "languageId": {
+            "type": "number",
+            "description": "Option language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language."
+          }
+        },
+        "required": [
+          "customFieldBaseId"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
