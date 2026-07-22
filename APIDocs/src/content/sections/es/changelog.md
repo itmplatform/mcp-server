@@ -1,3 +1,17 @@
+### v1.0.14
+
+Descubrimiento de campos personalizados: definiciones, opciones de lista y contexto de sesión por cuenta.
+
+**Nuevas herramientas (2):**
+- `get_custom_fields`: las definiciones de campos personalizados de la cuenta (nombre, tipo, obligatorio, BaseId) para proyectos, tareas, riesgos, incidencias, servicios, actividades, compras o ingresos. Las definiciones son por idioma (1=inglés, 2=español, 3=portugués); la herramienta usa por defecto el idioma del usuario.
+- `get_custom_field_options`: las opciones seleccionables de un campo personalizado de lista (RYGList, DropDownList, List), por BaseId.
+
+**Contexto de sesión:**
+- Cuando la cuenta define campos personalizados, el servidor ahora enumera las claves de `customFields` realmente en uso en DataMart (con recuento de componentes) en las instrucciones del initialize de MCP y al final de la descripción de `query_datamart`. Los agentes pueden responder preguntas sobre campos personalizados sin ningún paso previo de descubrimiento, con avisos para claves que contienen puntos (no direccionables con notación de punto) y pistas sobre variantes de clave por idioma en cuentas multilingües.
+
+**Notas:**
+- Los valores de campos personalizados ya se podían consultar con `query_datamart` (objeto `customFields` en cada documento de componente, indexado por el nombre visible del campo, sensible a mayúsculas y acentos); esta versión los hace descubribles.
+
 ### v1.0.13
 
 CRUD básico P1: lecturas de entidad individual, búsqueda de tareas en toda la cuenta y la superficie de escritura de riesgos, incidencias, servicios y actividades.

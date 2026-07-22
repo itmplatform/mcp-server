@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildDataMartQueryBody } from '../../../src/tools/datamart.js';
+import { buildDataMartQueryBody, registerDataMartTool } from '../../../src/tools/datamart.js';
 import { validateDataMartQuery } from '../../../src/validation/query-validator.js';
 
 describe('buildDataMartQueryBody', () => {
@@ -75,5 +75,32 @@ describe('query_datamart validation integration', () => {
       variables: { w: { name: { $regex: 'test', $options: 'i' } } },
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('query_datamart description', () => {
+  function register(customFieldContext?: string) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerDataMartTool(server as any, { datamart: { query: vi.fn() } } as any, customFieldContext);
+    return registrations.get('query_datamart').config.description as string;
+  }
+
+  it('always mentions customFields among the key fields', () => {
+    expect(register()).toContain('customFields');
+  });
+
+  it('appends the per-account custom field context when provided', () => {
+    const description = register('ACCOUNT-CF-BLOCK');
+    expect(description).toContain('ACCOUNT-CF-BLOCK');
+    expect(description.indexOf('ACCOUNT-CF-BLOCK')).toBeGreaterThan(description.indexOf('Key fields'));
+  });
+
+  it('omits the account block when no context is available', () => {
+    expect(register()).not.toContain('ACCOUNT-CF-BLOCK');
   });
 });

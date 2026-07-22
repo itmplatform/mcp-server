@@ -63,6 +63,8 @@ New exported helper `buildServerInstructions(whatsNew)` in `src/whats-new.ts` re
 
 `createMcpServer` passes it as the third constructor option: `new McpServer({ name, version }, { capabilities: {...}, instructions: buildServerInstructions(WHATS_NEW) })`.
 
+**Compatibility note (2026-07-22):** since v1.0.14 the `instructions` field already carries the per-account custom field context (`src/custom-field-context.ts`, `buildServerInstructions(contextText)`). Implementing this spec means composing one instructions string from both sources (intro + what's-new banner + custom field context) in a single builder; refactor the custom-field one rather than concatenating two competing intros.
+
 Implementation note: confirm the installed `@modelcontextprotocol/sdk` (^1.12.0) `ServerOptions.instructions` passthrough with a quick type check before coding; it has been supported since well before 1.12.
 
 ## 3. Changelog Resource

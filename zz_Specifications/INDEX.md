@@ -148,11 +148,15 @@ Improvements to tools that already exist, making them more useful without adding
 
 ### P8 -- Custom fields and advanced reads
 
+Custom field discovery (#37, #38) fact-checked and implemented in [SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) (v1.0.14), including per-account session context (DataMart `customFields` keys injected into MCP `instructions` and the `query_datamart` description).
+
 | # | Tool / Enrichment | Type | Backend | Notes |
 |---|-------------------|------|---------|-------|
-| 37 | `get_custom_fields` | New read | `GET v2/.../{EntityName}/CustomFields` | Read custom field definitions for an entity type. |
-| 38 | `get_custom_field_options` | New read | `GET v2/.../CustomFieldOptions/{CustomFieldBaseId}` | Dropdown options for a custom field. |
+| 37 | `get_custom_fields` | New read | `GET v2/.../{EntityName}/CustomFields?LanguageId=` | Done (v1.0.14). 8 entities; definitions are per-language rows sharing a BaseId (1=EN default, 2=ES, 3=PT); tool defaults to the session user's language. |
+| 38 | `get_custom_field_options` | New read | `GET v2/.../CustomFieldOptions/{CustomFieldBaseId}?LanguageId=` | Done (v1.0.14). Options exist for RYGList/DropDownList/List types. |
 | 39 | `get_project_change_history` | New read | `GET v2/.../Projects/{id}/changeHistory` | Audit trail of project changes. |
+
+Values in typed reads (get_project/search) are specced separately in [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) (proposed).
 
 ### P9 -- Documents, baselines, earned value (v1-dependent)
 
@@ -198,7 +202,7 @@ Summary of backend endpoint coverage by the MCP server.
 | Service revenues | 7 | -- | 1 | Read-only |
 | Programs | 4 | -- | 0 | None |
 | Sprints | 7 | -- | 0 | None |
-| Custom fields | 4 | 1 | 0 | None |
+| Custom fields | 4 | 1 | 2 | Good (definitions + options tools; values via query_datamart `customFields` with per-account session context; writes pending) |
 | Documents | -- | 6 | 0 | None (v1-only) |
 | Baselines | -- | 8 | 0 | None (v1-only) |
 | Earned value | -- | 2 | 0 | None (v1-only) |
@@ -221,6 +225,8 @@ Summary of backend endpoint coverage by the MCP server.
 |------|---------|--------|
 | [INDEX.md](INDEX.md) | This document: tool roadmap, backlog, and spec index | Active |
 | [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md) | P1: 10 core CRUD tools (get_task, get_risk, get_issue, search_tasks, update_risk, update_issue, service and activity writes) | Done (v1.0.13, stage verified; prod deploy pending) |
+| [done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) | P8 #37/#38 (get_custom_fields, get_custom_field_options) + per-account customFields session context (Ucloud request) | Done (v1.0.14) |
+| [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
 | [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md) | OAuth consent page per-scope checkboxes (impl in ITM.Account) | Pending |
@@ -258,3 +264,5 @@ Decisions that affect the backlog or overall direction.
 | 2026-07-17 | Delete operations intentionally excluded from initial MCP surface. | Revisit if agents need delete capabilities. Destructive operations require extra confirmation UX. |
 | 2026-07-17 | `search_tasks` implemented on DataMart (`$unwind` over components) instead of the REST `Tasks/Search` endpoint. | Consistent with search_projects; avoids the ITM.Framework FilterExpression payload and grid-column coupling. Eventual-consistency caveat documented in the tool description. |
 | 2026-07-17 | P1 implemented entirely inside ITM.MCP (v1.0.13). All backend endpoints and gateway routes already existed. | No ITM.Tasks or ITM.Web changes required. See [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md). |
+| 2026-07-22 | Per-account custom field session context is sourced from a DataMart key-usage aggregate ($objectToArray over customFields), not from REST definitions. | Reflects the keys actually queryable in DataMart, including per-language variants and dotted-name traps that REST definitions cannot reveal. See [SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md). |
+| 2026-07-22 | The published APIDocs tool manifest is generated with `ITM_CUSTOM_FIELD_CONTEXT=off`. | Keeps the public query_datamart description account-neutral; the per-account block exists only in live sessions. |

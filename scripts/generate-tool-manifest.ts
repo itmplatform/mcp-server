@@ -27,7 +27,9 @@ async function main() {
   const child = spawn('node', ['--env-file=.env', serverPath], {
     cwd: ROOT,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, MCP_TRANSPORT: 'stdio' },
+    // ITM_CUSTOM_FIELD_CONTEXT=off keeps the published manifest account-neutral
+    // (no per-account custom field keys in the query_datamart description).
+    env: { ...process.env, MCP_TRANSPORT: 'stdio', ITM_CUSTOM_FIELD_CONTEXT: 'off' },
   })
 
   let stdout = ''
