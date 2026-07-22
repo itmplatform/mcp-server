@@ -1,7 +1,7 @@
 # MCP Tool Roadmap and Specification Index
 
 > **Created:** 2026-07-17
-> **Current version:** v1.0.13 (40 tools: 24 read, 16 write)
+> **Current version:** v1.0.15 (44 tools: 27 read, 17 write)
 
 This document is the central index for MCP server tool development. It catalogs the current tool surface, the prioritized backlog of new tools and enrichments, and links to all specification documents.
 
@@ -32,6 +32,7 @@ This document is the central index for MCP server tool development. It catalogs 
 | `get_issue` | Single issue detail with resolution and impact fields (REST) |
 | `list_task_progress` | Progress/follow-up history for a task (no pagination) |
 | `get_project_progress` | Project progress curves: expected, baseline, actual |
+| `get_task_effort` | Task effort breakdown per team member and per category (doubles as task team read) |
 | `aggregate_portfolio` | Group projects by field with count/avg/sum metrics |
 | `query_datamart` | Custom DataMart queries (escape hatch) |
 | `search_users` | Find users by name or email (REST) |
@@ -48,6 +49,7 @@ This document is the central index for MCP server tool development. It catalogs 
 | `update_task` | Update task fields: status, dates, kind, parent, etc. |
 | `create_task_progress` | Report progress on a task (%, assessment, notes) |
 | `update_task_progress` | Update an existing progress entry |
+| `update_task_effort` | Set per-user estimated hours (read-modify-write; preserves accepted effort, billing, categories) |
 | `create_risk` | Log a project risk with status, type, probability, impact, level |
 | `update_risk` | Update risk fields including mitigation/contingency plans (PUT) |
 | `create_issue` | Log a project issue with type and status |
@@ -88,11 +90,11 @@ These unlock the most-requested agent workflows: assigning people, reading team 
 
 | # | Tool / Enrichment | Type | Backend | Notes |
 |---|-------------------|------|---------|-------|
-| 11 | `get_task_team` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/Users` | See who is assigned to a task. v2 endpoint exists (read-only). |
+| 11 | `get_task_team` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/Users` | See who is assigned to a task. v2 endpoint exists (read-only). Substantially covered by `get_task_effort` (#15), whose `EffortByTeamMember` rows include the assigned users. |
 | 12 | `assign_task_team` | New write | v1 only: `POST .../Task/{TaskId}/Team/{ProjectUserIds}/{TaskManager}` | Assign users to a task. The assign/remove endpoints are **v1-only**. Requires v1 REST calls or a new v2 endpoint in ITM.Tasks. |
 | 13 | `remove_task_team` | New write | v1 only: `DELETE .../Task/{TaskId}/Team/{TaskUserId}` | Same v1-only constraint as assign. |
 | 14 | `get_project_team` | New read | v1 only: `GET .../Project/{id}/AssignedUsers` | List all users assigned to a project. v1-only. |
-| 15 | `get_task_effort` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/EffortByCategory` and `.../EffortByTeamMember` | Read effort/hours data per task. v2 endpoints exist. |
+| 15 | `get_task_effort` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/EffortByCategory` and `.../EffortByTeamMember` | Specced with a paired `update_task_effort` write (per-user estimated hours) in [SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md) (HS 11634). |
 
 ### P3 -- Financial write operations
 
@@ -190,7 +192,7 @@ Summary of backend endpoint coverage by the MCP server.
 | Tasks (CRUD) | 8 | -- | 6 | Good (missing batch, delete) |
 | Task dependencies | -- | 3 | 0 | None |
 | Task team/assignments | 3 (read) | 5 (write) | 0 | None |
-| Task effort/hours | 5 | 5 | 0 | None |
+| Task effort/hours | 5 | 5 | 2 | Estimates read/write (v1.0.15); time entries none |
 | Task progress | 5 | -- | 4 | Good |
 | Risks | 6 | -- | 4 | Good (missing delete, account-wide search) |
 | Issues | 6 | -- | 4 | Good (missing delete, account-wide search) |
@@ -227,6 +229,8 @@ Summary of backend endpoint coverage by the MCP server.
 | [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md) | P1: 10 core CRUD tools (get_task, get_risk, get_issue, search_tasks, update_risk, update_issue, service and activity writes) | Done (v1.0.13, stage verified; prod deploy pending) |
 | [done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) | P8 #37/#38 (get_custom_fields, get_custom_field_options) + per-account customFields session context (Ucloud request) | Done (v1.0.14) |
 | [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
+| [SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Implemented (v1.0.15); local unit+e2e+UI verified; stage pending |
+| [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | Deferred; revisit after estimation ships |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
 | [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md) | OAuth consent page per-scope checkboxes (impl in ITM.Account) | Pending |

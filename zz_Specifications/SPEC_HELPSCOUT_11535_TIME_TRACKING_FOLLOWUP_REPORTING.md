@@ -108,6 +108,13 @@ Once that data is in DataMart, `query_datamart` covers the reporting use cases w
 
 ## 3. Time entries: deferred, and not an MCP feature
 
+> **Update 2026-07-22:** the situation evolved with HS 11634 (explicit request for on-behalf
+> estimation and time logging via MCP). The reasoning below is superseded in part; the current
+> decision record and a guarded tool design live in
+> [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md). The "no `userId` parameter"
+> stance is under reconsideration there; the technical analysis below (three time-entry
+> concepts, replace semantics) remains authoritative.
+
 ### Why not
 
 Two independent reasons, either of which is sufficient.
