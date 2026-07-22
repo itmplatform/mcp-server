@@ -87,15 +87,13 @@ describe('task effort tools', () => {
     expect(row.TaskUserId).toBeGreaterThan(0);
   });
 
-  it('update_task_effort sets the estimate and preserves accepted effort, billing, and the task total', async () => {
+  it('update_task_effort sets the estimate, preserves accepted effort and billing, and recomputes the total', async () => {
     const taskUserId = querySqlNumber(
       `SELECT tu.intTaskUserId FROM dbo.tblTaskUser tu
          JOIN dbo.tblProjectUser pu ON pu.intProjectUserId = tu.intProjectUserId
         WHERE tu.intTaskId = ${taskId} AND pu.intUserId = ${assignedUserId};`,
     );
     const before = {
-      totalHours: querySqlNumber(`SELECT ISNULL(intTaskEstHour, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`),
-      totalMins: querySqlNumber(`SELECT ISNULL(intTaskEstmin, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`),
       workTimeRows: querySqlNumber(`SELECT COUNT(*) FROM dbo.tblTaskWorkTime WHERE intTaskId = ${taskId};`),
       autoAccept: querySqlNumber(`SELECT CAST(IsAutomaticActualEffortAccepted AS int) FROM dbo.tblTaskUser WHERE intTaskUserId = ${taskUserId};`),
       billing: querySqlNumber(`SELECT ISNULL(BillingCategoryId, -1) FROM dbo.tblTaskUser WHERE intTaskUserId = ${taskUserId};`),
@@ -118,8 +116,9 @@ describe('task effort tools', () => {
     expect(querySqlNumber(`SELECT CAST(IsAutomaticActualEffortAccepted AS int) FROM dbo.tblTaskUser WHERE intTaskUserId = ${taskUserId};`)).toBe(before.autoAccept);
     expect(querySqlNumber(`SELECT ISNULL(BillingCategoryId, -1) FROM dbo.tblTaskUser WHERE intTaskUserId = ${taskUserId};`)).toBe(before.billing);
     expect(querySqlNumber(`SELECT ISNULL(intActualEffortAcceptedHours, 0) FROM dbo.tblTaskUser WHERE intTaskUserId = ${taskUserId};`)).toBe(before.acceptedHours);
-    expect(querySqlNumber(`SELECT ISNULL(intTaskEstHour, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`)).toBe(before.totalHours);
-    expect(querySqlNumber(`SELECT ISNULL(intTaskEstmin, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`)).toBe(before.totalMins);
+    // The task total is recomputed as the grid sum (UI behavior): one user, 3:30, no unassigned effort.
+    expect(querySqlNumber(`SELECT ISNULL(intTaskEstHour, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`)).toBe(3);
+    expect(querySqlNumber(`SELECT ISNULL(intTaskEstmin, 0) FROM dbo.tblTask WHERE intTaskId = ${taskId};`)).toBe(30);
     expect(querySqlNumber(`SELECT COUNT(*) FROM dbo.tblTaskWorkTime WHERE intTaskId = ${taskId};`)).toBe(before.workTimeRows);
   });
 

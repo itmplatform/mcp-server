@@ -4,7 +4,7 @@ Per-user task effort: read the effort breakdown and set estimated hours per assi
 
 **New tools (2):**
 - `get_task_effort`: a task's effort breakdown per team member (estimated, accepted, and time-entry hours, plus billing category) and per professional category. The `teamMembers` list doubles as the task team, so this also answers "who is assigned to this task?".
-- `update_task_effort`: sets the ESTIMATED (planned) effort per assigned user, optionally together with the task-level total estimate. Planning data only: it never writes worked hours or accepted effort, and it reads the current state first so accepted effort, automatic-acceptance flags, billing categories, category efforts, and unlisted users are preserved exactly.
+- `update_task_effort`: sets the ESTIMATED (planned) effort per assigned user, optionally together with an explicit task-level total estimate (otherwise the total is recomputed from the estimates, as the web UI does). Planning data only: it never writes worked hours or accepted effort, and it reads the current state first so accepted effort, automatic-acceptance flags, billing categories, category efforts, and unlisted users are preserved exactly.
 
 **Notes:**
 - The target user must already be assigned to the task; assign with `update_task` (`TaskMembers`/`TaskManagers` usernames) and discover assignees with `get_task_effort` or `search_users`.
