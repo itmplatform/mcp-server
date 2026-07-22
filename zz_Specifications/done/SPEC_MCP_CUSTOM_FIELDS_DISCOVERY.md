@@ -6,7 +6,10 @@
 > **Backlog source:** [INDEX.md](INDEX.md) P8 #37 (`get_custom_fields`), #38 (`get_custom_field_options`),
 > plus a new cross-cutting feature: per-account custom-field context injected into the session.
 > **Scope:** 2 new read tools + dynamic MCP `instructions` and `query_datamart` description enrichment.
-> **Status:** In progress.
+> **Status:** Done (v1.0.14, 2026-07-22). Unit (446), local E2E (87), and stage E2E green
+> (13/13 checks against the deployed stage MCP via OAuth: instructions with real account keys,
+> 42 tools, enriched query_datamart description, both tools, DataMart customFields projection).
+> Prod deploy pending.
 
 ---
 
