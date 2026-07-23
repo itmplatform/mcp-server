@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.15",
+  "serverVersion": "1.0.16",
   "tools": [
     {
       "name": "search_projects",
@@ -632,17 +632,17 @@
     },
     {
       "name": "get_task_effort",
-      "description": "Get the effort breakdown of a task: per team member (teamMembers) and per professional category (categories). Distinguishes three concepts: ESTIMATED effort (planned hours), ACCEPTED actual effort (a derived aggregate), and actual effort from TIME ENTRIES (worked hours logged). teamMembers doubles as the task team list: each row has UserId, DisplayName, EmailAddress, plus TaskUserId (the assignment id used by effort updates). Use update_task_effort to change per-user estimated hours.",
+      "description": "Read task effort by assigned user and professional category. Separates planned estimates, accepted actual effort, and worked time entries. teamMembers also lists assignees (UserId, name, email); TaskUserId is the assignment key. Use update_task_effort only for estimates.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
-            "description": "The project ID containing the task"
+            "description": "Project ID"
           },
           "taskId": {
             "type": "number",
-            "description": "The task ID"
+            "description": "Task ID"
           }
         },
         "required": [
@@ -655,17 +655,17 @@
     },
     {
       "name": "update_task_effort",
-      "description": "Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: it never writes worked hours, accepted effort, or billing categories (those are read and preserved). Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). Users not listed keep their current estimates. The task total estimate is recomputed as the sum of per-user and unassigned category estimates (matching the web UI) unless taskTotalEstimate is provided. Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.",
+      "description": "Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. Regular tasks only; returns REST readback.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
-            "description": "The project ID containing the task"
+            "description": "Project ID"
           },
           "taskId": {
             "type": "number",
-            "description": "The task ID (a regular task, not a milestone or summary)"
+            "description": "Regular task ID"
           },
           "userEstimates": {
             "type": "array",
@@ -674,18 +674,18 @@
               "properties": {
                 "userId": {
                   "type": "number",
-                  "description": "The assigned user's ID (see get_task_effort teamMembers or search_users)"
+                  "description": "Assigned UserId from get_task_effort or search_users"
                 },
                 "estimatedHours": {
                   "type": "integer",
                   "minimum": 0,
-                  "description": "Estimated hours (whole hours part)"
+                  "description": "Whole estimated hours"
                 },
                 "estimatedMinutes": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 59,
-                  "description": "Estimated minutes part, 0-59"
+                  "description": "Estimated minutes, 0-59"
                 }
               },
               "required": [
@@ -696,7 +696,7 @@
               "additionalProperties": false
             },
             "minItems": 1,
-            "description": "New estimated effort per user; each user at most once"
+            "description": "One estimate per user"
           },
           "taskTotalEstimate": {
             "type": "object",
@@ -704,13 +704,13 @@
               "hours": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "Task total estimate, hours part"
+                "description": "Total hours"
               },
               "minutes": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 59,
-                "description": "Task total estimate, minutes part, 0-59"
+                "description": "Total minutes, 0-59"
               }
             },
             "required": [
@@ -718,7 +718,7 @@
               "minutes"
             ],
             "additionalProperties": false,
-            "description": "Optional explicit task-level total estimate; when omitted the total is recomputed from the per-user and unassigned category estimates, as the web UI does"
+            "description": "Optional explicit total; otherwise recomputed from user and unassigned-category estimates"
           }
         },
         "required": [
@@ -868,7 +868,7 @@
     },
     {
       "name": "get_reference_data",
-      "description": "Get reference data lists (statuses, types, priorities, risk impact/probability/level, assessments) for any entity. Useful for understanding valid values when filtering or interpreting data. Available entities: projectstatuses, gettaskstatuses, gettasktypes, gettaskpriorities, getprojecttypes, projectpriorities, riskstatuses, risktypes, riskimpacts, riskprobabilities, risklevels, issuestatuses, issuetypes, purchasestatuses, purchasetypes, revenuestatuses, assessments, activitystatuses, servicetypes. Use \"assessments\" to discover valid assessmentId values for create_task_progress. Use \"activitystatuses\" for service activity statuses (these differ from task statuses). Use \"servicetypes\" for service type IDs required by create_service. Use \"risklevels\" to discover valid LevelId values for create_risk. Some risk/issue reference data includes BaseId; write tools accept either Id or BaseId and normalize when v2 REST requires BaseId.",
+      "description": "Get reference IDs for statuses, types, priorities, risks, issues, purchases, revenues, and assessments. Use assessments for task progress; activitystatuses/servicetypes for service writes; and riskstatuses, risktypes, riskimpacts, riskprobabilities, or risklevels for risks. Where BaseId exists, write tools accept either localized Id or BaseId and normalize as needed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1016,7 +1016,7 @@
     },
     {
       "name": "create_task",
-      "description": "Create a new task, milestone, or summary task in a project. KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. Use ParentId to place the task under a summary task (Waterfall only). Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate. Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity \"gettaskstatuses\", \"gettasktypes\", or \"gettaskpriorities\" to discover valid Waterfall IDs.",
+      "description": "Create a regular task, milestone, or summary task. KindId: 1=Milestone, 2=Summary, 3/default=Task (not the TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate; milestones require EndDate; summaries require StatusId. Kanban supports regular tasks only and uses board defaults. ParentId creates Waterfall hierarchy. AutomaticProgress statuses create 100% progress; a later lower report needs a later ReportDate. Use get_reference_data for valid IDs. Returns REST readback.",
       "inputSchema": {
         "type": "object",
         "properties": {

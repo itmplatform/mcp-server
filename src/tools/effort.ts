@@ -158,13 +158,12 @@ export function registerEffortTools(
   server.registerTool(
     'get_task_effort',
     {
-      description: 'Get the effort breakdown of a task: per team member (teamMembers) and per professional category (categories). '
-        + 'Distinguishes three concepts: ESTIMATED effort (planned hours), ACCEPTED actual effort (a derived aggregate), and actual effort from TIME ENTRIES (worked hours logged). '
-        + 'teamMembers doubles as the task team list: each row has UserId, DisplayName, EmailAddress, plus TaskUserId (the assignment id used by effort updates). '
-        + 'Use update_task_effort to change per-user estimated hours.',
+      description: 'Read task effort by assigned user and professional category. Separates planned estimates, '
+        + 'accepted actual effort, and worked time entries. teamMembers also lists assignees '
+        + '(UserId, name, email); TaskUserId is the assignment key. Use update_task_effort only for estimates.',
       inputSchema: {
-        projectId: z.number().describe('The project ID containing the task'),
-        taskId: z.number().describe('The task ID'),
+        projectId: z.number().describe('Project ID'),
+        taskId: z.number().describe('Task ID'),
       },
     },
     async (args) => {
@@ -183,23 +182,22 @@ export function registerEffortTools(
   server.registerTool(
     'update_task_effort',
     {
-      description: 'Set the ESTIMATED (planned) effort of a task per assigned user. This is planning data, not time logging: '
-        + 'it never writes worked hours, accepted effort, or billing categories (those are read and preserved). '
-        + 'Each target user must already be assigned to the task (assign with update_task TaskMembers/TaskManagers first; discover assignees with get_task_effort). '
-        + 'Users not listed keep their current estimates. The task total estimate is recomputed as the sum of per-user and unassigned category estimates (matching the web UI) unless taskTotalEstimate is provided. '
-        + 'Not allowed on milestones or summary tasks. Returns the effort breakdown read back from v2 REST.',
+      description: 'Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. '
+        + 'Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. '
+        + 'Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. '
+        + 'Regular tasks only; returns REST readback.',
       inputSchema: {
-        projectId: z.number().describe('The project ID containing the task'),
-        taskId: z.number().describe('The task ID (a regular task, not a milestone or summary)'),
+        projectId: z.number().describe('Project ID'),
+        taskId: z.number().describe('Regular task ID'),
         userEstimates: z.array(z.object({
-          userId: z.number().describe('The assigned user\'s ID (see get_task_effort teamMembers or search_users)'),
-          estimatedHours: z.number().int().min(0).describe('Estimated hours (whole hours part)'),
-          estimatedMinutes: z.number().int().min(0).max(59).describe('Estimated minutes part, 0-59'),
-        })).min(1).describe('New estimated effort per user; each user at most once'),
+          userId: z.number().describe('Assigned UserId from get_task_effort or search_users'),
+          estimatedHours: z.number().int().min(0).describe('Whole estimated hours'),
+          estimatedMinutes: z.number().int().min(0).max(59).describe('Estimated minutes, 0-59'),
+        })).min(1).describe('One estimate per user'),
         taskTotalEstimate: z.object({
-          hours: z.number().int().min(0).describe('Task total estimate, hours part'),
-          minutes: z.number().int().min(0).max(59).describe('Task total estimate, minutes part, 0-59'),
-        }).optional().describe('Optional explicit task-level total estimate; when omitted the total is recomputed from the per-user and unassigned category estimates, as the web UI does'),
+          hours: z.number().int().min(0).describe('Total hours'),
+          minutes: z.number().int().min(0).max(59).describe('Total minutes, 0-59'),
+        }).optional().describe('Optional explicit total; otherwise recomputed from user and unassigned-category estimates'),
       },
     },
     async (args) => {

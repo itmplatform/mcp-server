@@ -1,3 +1,11 @@
+### v1.0.16
+
+Claude custom-connector compatibility fix. The server still exposes all 44 tools with the same schemas and behavior, but removes duplicated prose from the serialized tool metadata so the complete `tools/list` response stays below a 49 KB compatibility budget.
+
+**Reliability:**
+- Added an end-to-end regression check against the actual UTF-8 `tools/list` response size.
+- Kept the task-methodology, automatic-progress, reference-ID, assignment, and effort-preservation guidance required for safe writes.
+
 ### v1.0.15
 
 Per-user task effort: read the effort breakdown and set estimated hours per assigned user.

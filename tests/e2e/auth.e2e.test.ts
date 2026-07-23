@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { setupE2E, listTools } from './setup.js';
+import { setupE2E, listTools, listToolsWithPayloadSize } from './setup.js';
+
+const CLAUDE_TOOLS_LIST_BUDGET_BYTES = 49_000;
 
 describe('auth and session', () => {
   setupE2E();
@@ -39,6 +41,13 @@ describe('auth and session', () => {
       expect(toolNames).toContain(name);
     }
     expect(toolNames).toHaveLength(44);
+  });
+
+  it('keeps the full tools/list response below the Claude connector compatibility budget', async () => {
+    const result = await listToolsWithPayloadSize(4);
+
+    expect(result.body.result.tools).toHaveLength(44);
+    expect(result.byteLength).toBeLessThan(CLAUDE_TOOLS_LIST_BUDGET_BYTES);
   });
 
   // OAuth scope enforcement E2E: verifies that OAuth sessions with mcp:read only
