@@ -1,3 +1,11 @@
+### v1.0.16
+
+Corrección de compatibilidad con los conectores personalizados de Claude. El servidor sigue exponiendo las 44 herramientas con los mismos esquemas y comportamiento, pero elimina texto duplicado de los metadatos serializados para que la respuesta completa de `tools/list` se mantenga por debajo de un presupuesto de compatibilidad de 49 KB.
+
+**Fiabilidad:**
+- Se añadió una comprobación E2E de regresión sobre el tamaño UTF-8 real de la respuesta `tools/list`.
+- Se conservó la guía necesaria para escrituras seguras: metodología de tareas, progreso automático, IDs de referencia, asignaciones y preservación del esfuerzo.
+
 ### v1.0.15
 
 Esfuerzo por usuario en tareas: consultar el desglose de esfuerzo y definir las horas estimadas por usuario asignado.

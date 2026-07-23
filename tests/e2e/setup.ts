@@ -90,7 +90,7 @@ export async function callTool(name: string, args: Record<string, unknown>, id =
   return response.json();
 }
 
-export async function listTools(id = 2) {
+export async function listToolsWithPayloadSize(id = 2) {
   if (!sessionId) throw new Error('Session not initialized');
   const response = await fetch(MCP_URL, {
     method: 'POST',
@@ -101,7 +101,16 @@ export async function listTools(id = 2) {
     },
     body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/list' }),
   });
-  return response.json();
+  const text = await response.text();
+  return {
+    body: JSON.parse(text),
+    byteLength: Buffer.byteLength(text, 'utf8'),
+  };
+}
+
+export async function listTools(id = 2) {
+  const response = await listToolsWithPayloadSize(id);
+  return response.body;
 }
 
 export {

@@ -71,7 +71,7 @@ describe('reference-data entity path mapping', () => {
     expect(rest.get).toHaveBeenCalledWith('gettaskstatuses');
   });
 
-  it('lists every allowed entity in the tool description', () => {
+  it('publishes every allowed entity in the schema without duplicating the full list in the description', () => {
     const registrations = new Map<string, any>();
     const server = {
       registerTool: vi.fn((name: string, config: any, handler: any) => {
@@ -80,9 +80,11 @@ describe('reference-data entity path mapping', () => {
     };
     registerReferenceDataTools(server as any, { rest: { get: vi.fn() } } as any);
 
-    const description = registrations.get('get_reference_data').config.description;
-    for (const entity of ALLOWED_ENTITIES) {
-      expect(description).toContain(entity);
-    }
+    const config = registrations.get('get_reference_data').config;
+    expect(config.inputSchema.entity.options).toEqual(ALLOWED_ENTITIES);
+    expect(config.description).toContain('activitystatuses');
+    expect(config.description).toContain('servicetypes');
+    expect(config.description).toContain('risklevels');
+    expect(config.description).toContain('BaseId');
   });
 });

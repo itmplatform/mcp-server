@@ -680,14 +680,11 @@ export function registerWriteTools(
   server.registerTool(
     'create_task',
     {
-      description: 'Create a new task, milestone, or summary task in a project. '
-        + 'KindId selects the task kind: 1=Milestone, 2=Summary task, 3=Task (default); this is not the task type (TypeId). '
-        + 'Waterfall regular tasks require StatusId, StartDate, and EndDate. Waterfall milestones require only EndDate (they sit on that date; omit StartDate). '
-        + 'Waterfall summary tasks require only StatusId (dates roll up from children). Kanban projects support only regular tasks and use board defaults without dates. '
-        + 'Use ParentId to place the task under a summary task (Waterfall only). '
-        + 'Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; '
-        + 'a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate. '
-        + 'Returns the created task read back from v2 REST (source of truth). Use get_reference_data with entity "gettaskstatuses", "gettasktypes", or "gettaskpriorities" to discover valid Waterfall IDs.',
+      description: 'Create a regular task, milestone, or summary task. KindId: 1=Milestone, 2=Summary, 3/default=Task (not the TypeId). '
+        + 'Waterfall regular tasks require StatusId, StartDate, and EndDate; milestones require EndDate; summaries require StatusId. '
+        + 'Kanban supports regular tasks only and uses board defaults. ParentId creates Waterfall hierarchy. '
+        + 'AutomaticProgress statuses create 100% progress; a later lower report needs a later ReportDate. '
+        + 'Use get_reference_data for valid IDs. Returns REST readback.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the task in'),
         Name: z.string().describe('Task name (required)'),
