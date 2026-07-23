@@ -1,77 +1,65 @@
 # SPEC: MCP time entry tool (delegated actuals) -- decision record and design
 
-> **Date:** 2026-07-22
 > **Driver:** [Help Scout 11634](https://secure.helpscout.net/conversation/3393666030/11634/) (Gilsandro Cezar, Ucloud PMO):
 > "Permitir indicar el Usuario (User) al realizar el registro de horas (Time Entry) de una tarea."
-> **Relation:** the estimation half of 11634 is delivered by
-> [SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md).
-> This spec covers the **actuals** half: logging worked hours, including on behalf of another user.
-> **Status:** Deferred by explicit product decision (2026-07-22): revisit **after** the estimation
-> tools ship and Gilsandro's expected volume is known. The design below is intended to be
-> implementation-ready when green-lit.
+> **Relation:** the estimation half of 11634 shipped in
+> [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) (v1.0.15). This spec
+> covers the **actuals** half: logging worked hours, including on behalf of another user.
+> **Status:** **ON HOLD.** Not rejected: the design below is implementation-ready. The cons in
+> Section 2 should be addressed before building. Revisit when Gilsandro insists or a new request
+> arrives. The Help Scout thread was closed internally with this decision (FYI Darshi, Karen).
 
 ---
 
-## 1. Decision history and reasoning (why this was deferred, and what has changed)
+## 1. Decision
 
-Recorded so the next evaluation does not restart from zero.
+Do not build an MCP time-entry tool now. Address the cons in Section 2 first (chiefly the
+destructive replace-not-append semantics acting on another person's timesheet, and the
+all-or-nothing write consent). Hold until Gilsandro insists or a new request arrives.
 
-### 1.1 The original deferral (2026-07-13, HS 11535)
+This is a **surface decision, not a capability gap**. On-behalf actuals already work through the
+REST `timehours` endpoint (Section 3), which is live in production with a secured Admin/Full
+Access on-behalf rule. Building the MCP tool would make that existing capability safer and more
+discoverable, not newly possible. Any HTTP-capable agent can already perform delegated time
+writes today, through the raw endpoint, with none of the guardrails the tool would add.
 
-[SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md](SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md)
-Section 3 deferred MCP time-entry tools on two grounds:
+## 2. Pros and cons
 
-1. **Wrong surface:** the customer's need was read as "get Clockify history into ITM", which is
-   a connector job (bulk, scheduled, reconcilable), not an interactive model-driven tool.
-2. **Product stance on impersonation:** "The user is always the authenticated caller. No
-   `userId` parameter." On-behalf writes were considered a connector capability, not an AI-client one.
+**Pros**
 
-The REST layer itself was never the blocker once the impersonation defect was fixed: the
-platform explicitly preserved a **secured** `UserId` field for legitimate on-behalf consumers.
+- **Refusing it changes nothing except safety.** The REST `timehours` endpoint is live in prod,
+  the customer has been told it works, and any HTTP-capable agent can call it today. The choice
+  is not "delegated agent writes: yes/no", it is "guarded or unguarded". An MCP tool with
+  read-first, explicit set/add mode, and a previous-vs-new total in the response is strictly
+  safer than the raw REST call he would otherwise script.
+- **Security groundwork is done and deployed, not theoretical.** The Admin/Full Access on-behalf
+  rule is enforced in prod; an MCP tool inherits it with zero new authorization model.
+- **Delegation is the only possible shape.** Team Members are blocked from MCP, so "everyone logs
+  their own hours" is structurally impossible. If MCP touches time at all, it is a PMO acting for
+  others, which is exactly this use case.
+- **It is the pattern we advertise.** "Claude reads Clockify and posts to ITM" is the
+  cross-system orchestration the README sells; hard to tell the customer to wait for a connector
+  that does not exist yet.
+- **Third ask from the flagship MCP customer,** framed unambiguously as interactive agent work,
+  not a one-time import.
 
-### 1.2 What has changed since (verified 2026-07-22)
+**Cons**
 
-1. **The secured REST contract is live in production.** The `POST /{account}/timehours` fix
-   ([ITM.Web ticket](../../ITM.Web/zz_Tickets/done/2026-07-13-timehours-userid-impersonation.md))
-   is deployed: prod build of 2026-07-20 contains `TimeEntryAuthorizationPolicy` and no longer
-   contains the removed `TokenValidationByUserId` helper (verified by inspecting the deployed
-   `ITM.BusinessAccess.dll` on the production VM). Rule: caller token always validated;
-   self-service for every license; another user's `UserId` requires Company Admin or Full Access;
-   tenant/task/entity, assignment, and editability checks before writes.
-2. **The customer clarified the use case.** He did not answer the 2026-07-14 questions in 11535;
-   instead he opened 11634 asking for per-user estimation **and** per-user time logging through
-   MCP. That describes agent-driven day-to-day PMO operation, not a one-time migration.
-3. **Capability parity already exists.** We told Gilsandro on 2026-07-14 (11535 reply) that the
-   documented REST endpoint supports on-behalf writes with an Admin/Full Access API key. Any
-   agent that can issue HTTP calls can therefore already do delegated time writes today,
-   with none of the guardrails an MCP tool would enforce.
+- **Replace-not-append on user + task + date is the real hazard.** "Add 2h" over an existing 6h
+  yields 2, and it is someone else's timesheet. Mitigated by the design (read-first, mandatory
+  mode, echo both totals) but never zero for a probabilistic caller.
+- **Consent granularity.** `mcp:write` is all-or-nothing; nothing in it says "may log hours in
+  colleagues' names". A confused or injected session under a PMO identity has account-wide
+  timesheet reach (capped only by the existing assignment/editability guards).
+- **Auditability.** `tblTaskTime` has no source column, so agent-written entries are
+  indistinguishable from human ones, and there is no bulk undo. This feeds actual cost and
+  possibly billing.
+- **Wrong tool for bulk sync.** If the real workload is a recurring weekly Clockify sync, an
+  agent loop is the wrong tool and shipping it relieves the pressure to build the
+  [Clockify connector](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md)
+  properly. The customer's expected volume resolves this.
 
-### 1.3 The case for and against, condensed
-
-**For:** third ask from the flagship MCP customer; the security groundwork is done and deployed;
-delegation is the only shape MCP time logging can take (Team Members are blocked from MCP);
-refusing the tool does not prevent delegated agent writes, it only pushes them to raw REST where
-the replace-semantics trap is unguarded; cross-system agent orchestration (Clockify MCP -> ITM
-MCP) is a pattern our own README advertises.
-
-**Against (residual):** a time entry is an audit-sensitive assertion ("person X worked N hours"),
-feeding actual cost and potentially billing, with no source column in `tblTaskTime` to
-distinguish agent writes and no bulk-undo; the REST write is a **replace** keyed on
-user+task+date, exactly the semantic a model gets wrong ("add 2h" over an existing 6h yields 2);
-`mcp:write` consent does not distinguish "may log hours in colleagues' names"; and if the real
-workflow is recurring bulk sync from Clockify, an agent loop is the worst tool for it
-(slow, token-expensive, unreconcilable) compared to the
-[Clockify connector](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md).
-
-### 1.4 The decision (2026-07-22)
-
-Ship estimation first ([SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md)); when
-communicating it in HS 11634, remind Gilsandro that on-behalf actuals already work through the
-documented REST endpoint, and ask one narrow question: **expected entries per week through the
-agent**. Low volume, interactive -> build this tool. High volume, batch-shaped -> prioritize the
-Clockify connector instead (or as well). Then decide.
-
-## 2. Platform contract the tool would ride on (verified, from the ITM.Web ticket)
+## 3. Platform contract the tool would ride on (verified)
 
 - Endpoint: `POST /{AccountName}/timehours` (v1 gateway; no v2 equivalent exists in ITM.Tasks).
   Auth: `Token` header from API-key login, or the session identity MCP already holds.
@@ -79,7 +67,9 @@ Clockify connector instead (or as well). Then decide.
 - Authorization (server-enforced, deployed): self writes for every license; on-behalf positive
   `UserId` only for Company Admin or Full Access; negative `UserId` -> 400; cross-account
   target -> 403; target must be assigned to the task and the entry editable (the old `ispublic`
-  bypass is removed).
+  bypass is removed). Enforced by `TimeEntryAuthorizationPolicy`; the unsafe
+  `TokenValidationByUserId` helper is removed. Source ticket:
+  [ITM.Web/zz_Tickets/done/2026-07-13-timehours-userid-impersonation.md](../../ITM.Web/zz_Tickets/done/2026-07-13-timehours-userid-impersonation.md).
 - **Semantics: replace, not append.** The effective key is user + task + date; posting a total
   replaces the existing total for that key. Types: only "actual effort, direct hours"
   (`intTimeEntryType = 2`) is writable; time-range entries (type 1) have no public write API;
@@ -92,7 +82,7 @@ MCP integration note: the MCP server currently builds v2 URLs (`rest-client.ts` 
 `/v2/{company}`), so this tool needs a small v1 request path (same gateway host, no `/v2`
 prefix, `Token` header semantics). This is the only new plumbing.
 
-## 3. Proposed tool design (for when it is green-lit)
+## 4. Proposed tool design (for when it is green-lit)
 
 One tool, deliberately narrow: **one user + one task + one date per call.** No batch input; bulk
 migration is explicitly out of scope (connector territory).
@@ -123,10 +113,19 @@ migration is explicitly out of scope (connector territory).
 - No accepted-effort writes, ever.
 - No silent default mode: the caller must choose `set` or `add` every time.
 
-## 4. Open questions
+## 5. Cons to resolve before building
 
-1. Gilsandro's expected weekly volume through the agent (asked when announcing estimation).
-2. Whether OAuth consent should call out on-behalf time writes explicitly (today `mcp:write`
-   is all-or-nothing) -- relates to [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md).
-3. Whether the Clockify connector stays on the roadmap if this ships (recommendation: yes for
-   bulk history; the tool and the connector serve different shapes of the same need).
+Each con from Section 2, turned into a prerequisite:
+
+1. **Replace-semantics safety.** Confirm the read-first + mandatory `set`/`add` mode +
+   previous-and-new total echo is sufficient, and that constraining a call to a single
+   user+task+date is acceptable. If not, no tool.
+2. **Consent granularity.** Decide whether on-behalf time writes warrant a distinct scope or a
+   dedicated consent line rather than riding on `mcp:write`. See
+   [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md).
+3. **Auditability.** Decide whether agent-written time entries need a source marker
+   (`tblTaskTime` has no source column today; this is a backend change, not an MCP one).
+4. **Volume / right surface.** Get the customer's expected weekly entry volume. Low and
+   interactive -> this tool. High and batch -> the
+   [Clockify connector](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md)
+   instead of, or as well as, this tool.

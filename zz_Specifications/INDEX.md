@@ -230,7 +230,7 @@ Summary of backend endpoint coverage by the MCP server.
 | [done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) | P8 #37/#38 (get_custom_fields, get_custom_field_options) + per-account customFields session context (Ucloud request) | Done (v1.0.14) |
 | [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
 | [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Done (v1.0.15, prod 2026-07-23) |
-| [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | Deferred; revisit after estimation ships |
+| [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | On hold; address cons first, revisit if Gilsandro insists or a new request arrives |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
 | [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md) | OAuth consent page per-scope checkboxes (impl in ITM.Account) | Pending |
