@@ -4,13 +4,16 @@
 > **Driver:** [Help Scout 11634](https://secure.helpscout.net/conversation/3393666030/11634/) (Gilsandro Cezar, Ucloud PMO):
 > "Permitir indicar el Usuario (User) al realizar la estimación de esfuerzo (Estimated Hours) de una tarea."
 > The second half of 11634 (per-user **time entries**) is explicitly out of scope here; that remains a product
-> decision tracked in [SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md](SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md) Section 3.
-> **Backlog source:** [INDEX.md](INDEX.md) P2 #15 (`get_task_effort`). The read tool also substantially covers
+> decision tracked in [SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md](../SPEC_HELPSCOUT_11535_TIME_TRACKING_FOLLOWUP_REPORTING.md) Section 3.
+> **Backlog source:** [INDEX.md](../INDEX.md) P2 #15 (`get_task_effort`). The read tool also substantially covers
 > P2 #11 (`get_task_team`), because `EffortByTeamMember` returns the assigned users with names and emails.
 > **Scope:** 1 read tool + 1 write tool, implemented entirely in ITM.MCP (target v1.0.15).
 > No ITM.Tasks or ITM.Web changes are required (endpoints and gateway routes exist and are live).
 > One **recommended, non-blocking** hardening ticket for ITM.Tasks (Section 4).
-> **Status:** Proposed. Fact-checked 2026-07-22 against ITM.Tasks, ITM.Web gateway, and the deployed production API.
+> **Status:** DONE (v1.0.15, deployed to production 2026-07-23). Stage E2E 12/12; prod read-path
+> verification 6/6 via OAuth session against api.itmplatform.com (44 tools, both effort tools served,
+> get_task_effort routed through the prod gateway). MCP-only deploy; no ITM.Tasks/ITM.Web changes.
+> The non-blocking ownership hardening (Section 4) is filed as an ITM.Tasks ticket.
 
 ---
 
@@ -21,7 +24,7 @@ Estimated effort in ITM Platform is **per-user planning data** stored on the tas
 (`tblTask.intTaskEstHour/intTaskEstmin`) and optional per-category unassigned effort
 (`tblTaskWorkTime`). None of it is reachable through MCP today: `create_task`/`update_task`
 intentionally reject effort fields because effort has its own v2 route
-(established in [SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md](done/SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md) Section 1.5).
+(established in [SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md](SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md) Section 1.5).
 
 Unlike time entries, setting another user's **estimate** is not impersonation: it is what a PM
 does in the Task Effort dialog. No on-behalf authorization question arises; the caller acts as
@@ -159,7 +162,7 @@ leak. **Recommendation:** open a ticket for ITM.Tasks to add the same ownership 
 construction (they resolve ids fresh and verify pairing), so this does not block v1.0.15, but
 the raw endpoint is exposed to any API-key caller today.
 
-> **Ticket filed 2026-07-23:** [ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md](../../ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md)
+> **Ticket filed 2026-07-23:** [ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md](../../../ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md)
 > (on ITM.Tasks develop). Covers the PUT and both GET effort endpoints plus the unscoped
 > per-user `tblTaskUser` update.
 
@@ -216,7 +219,7 @@ obligation.)
 | `APIDocs/src/content/tool-supplement.ts` | Two entries (read: Tasks category; write: Write Operations) |
 | `APIDocs/src/content/sections/{en,es}/changelog.md` | v1.0.15 entry |
 | Tool manifest | `npm run build` then `tsx scripts/generate-tool-manifest.ts` (with `ITM_CUSTOM_FIELD_CONTEXT=off`) |
-| [INDEX.md](INDEX.md) | Inventory + counts; P2 #15 -> done, #11 -> partially covered; spec row in Active Specs |
+| [INDEX.md](../INDEX.md) | Inventory + counts; P2 #15 -> done, #11 -> partially covered; spec row in Active Specs |
 | Public REST docs | None required (endpoints already public v2; no contract change) |
 
 ## 7. Rollout

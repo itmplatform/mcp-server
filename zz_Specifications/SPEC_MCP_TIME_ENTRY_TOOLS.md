@@ -4,7 +4,7 @@
 > **Driver:** [Help Scout 11634](https://secure.helpscout.net/conversation/3393666030/11634/) (Gilsandro Cezar, Ucloud PMO):
 > "Permitir indicar el Usuario (User) al realizar el registro de horas (Time Entry) de una tarea."
 > **Relation:** the estimation half of 11634 is delivered by
-> [SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md).
+> [SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md).
 > This spec covers the **actuals** half: logging worked hours, including on behalf of another user.
 > **Status:** Deferred by explicit product decision (2026-07-22): revisit **after** the estimation
 > tools ship and Gilsandro's expected volume is known. The design below is intended to be
@@ -65,7 +65,7 @@ workflow is recurring bulk sync from Clockify, an agent loop is the worst tool f
 
 ### 1.4 The decision (2026-07-22)
 
-Ship estimation first ([SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md)); when
+Ship estimation first ([SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md)); when
 communicating it in HS 11634, remind Gilsandro that on-behalf actuals already work through the
 documented REST endpoint, and ask one narrow question: **expected entries per week through the
 agent**. Low volume, interactive -> build this tool. High volume, batch-shaped -> prioritize the

@@ -94,7 +94,7 @@ These unlock the most-requested agent workflows: assigning people, reading team 
 | 12 | `assign_task_team` | New write | v1 only: `POST .../Task/{TaskId}/Team/{ProjectUserIds}/{TaskManager}` | Assign users to a task. The assign/remove endpoints are **v1-only**. Requires v1 REST calls or a new v2 endpoint in ITM.Tasks. |
 | 13 | `remove_task_team` | New write | v1 only: `DELETE .../Task/{TaskId}/Team/{TaskUserId}` | Same v1-only constraint as assign. |
 | 14 | `get_project_team` | New read | v1 only: `GET .../Project/{id}/AssignedUsers` | List all users assigned to a project. v1-only. |
-| 15 | `get_task_effort` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/EffortByCategory` and `.../EffortByTeamMember` | Specced with a paired `update_task_effort` write (per-user estimated hours) in [SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md) (HS 11634). |
+| 15 | `get_task_effort` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/EffortByCategory` and `.../EffortByTeamMember` | Done (v1.0.15) with a paired `update_task_effort` write (per-user estimated hours); see [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) (HS 11634). |
 
 ### P3 -- Financial write operations
 
@@ -229,7 +229,7 @@ Summary of backend endpoint coverage by the MCP server.
 | [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md) | P1: 10 core CRUD tools (get_task, get_risk, get_issue, search_tasks, update_risk, update_issue, service and activity writes) | Done (v1.0.13, stage verified; prod deploy pending) |
 | [done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) | P8 #37/#38 (get_custom_fields, get_custom_field_options) + per-account customFields session context (Ucloud request) | Done (v1.0.14) |
 | [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
-| [SPEC_MCP_TASK_EFFORT_TOOLS.md](SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Implemented (v1.0.15); local unit+e2e+UI verified; stage pending |
+| [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Done (v1.0.15, prod 2026-07-23) |
 | [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | Deferred; revisit after estimation ships |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
