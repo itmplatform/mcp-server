@@ -159,6 +159,10 @@ leak. **Recommendation:** open a ticket for ITM.Tasks to add the same ownership 
 construction (they resolve ids fresh and verify pairing), so this does not block v1.0.15, but
 the raw endpoint is exposed to any API-key caller today.
 
+> **Ticket filed 2026-07-23:** [ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md](../../ITM.Tasks/zz_Tickets/2026-07-23-task-effort-ownership-validation.md)
+> (on ITM.Tasks develop). Covers the PUT and both GET effort endpoints plus the unscoped
+> per-user `tblTaskUser` update.
+
 ## 5. TDD plan
 
 ### Unit (vitest, new `tests/unit/tools/effort.test.ts` + updates)
