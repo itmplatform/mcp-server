@@ -196,7 +196,7 @@ describe('buildEffortUpdatePayload', () => {
       [{ userId: 999, estimatedHours: 1, estimatedMinutes: 0 }],
       [TEAM_ROW],
       [],
-    )).toThrow(/not assigned.*update_task/s);
+    )).toThrow(/not assigned.*cannot create assignments.*ITM Platform/s);
   });
 
   it('rejects duplicate userIds in the same call', () => {

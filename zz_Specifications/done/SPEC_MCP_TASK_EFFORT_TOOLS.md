@@ -15,6 +15,16 @@
 > get_task_effort routed through the prod gateway). MCP-only deploy; no ITM.Tasks/ITM.Web changes.
 > The non-blocking ownership hardening (Section 4) is filed as an ITM.Tasks ticket.
 
+> **Correction (2026-07-27):** this spec assumed throughout that assignment was already reachable
+> via `update_task`/`create_task` `TaskMembers`/`TaskManagers`. **It is not.** The v2 REST task
+> route honors those fields, but no MCP tool exposes them: neither tool's `inputSchema` declares
+> them, and the MCP SDK strips unknown keys before the handler runs, so an agent sending
+> `TaskMembers` gets a successful-looking PATCH that assigns nobody. The milestones spec listed
+> this as a *follow-up candidate* (Section 6 #1, explicitly out of scope), not as shipped
+> behavior; the citation below misread it. Creating assignments is out of scope for MCP entirely.
+> The shipped error message and tool descriptions were corrected to point at ITM Platform / the
+> v2 REST route instead. Inline occurrences are marked **[corrected]** below.
+
 ---
 
 ## 1. Background
@@ -31,9 +41,11 @@ does in the Task Effort dialog. No on-behalf authorization question arises; the 
 themselves and the gateway applies normal project access rules.
 
 **Prerequisite for estimating:** the target user must already be assigned to the task.
-Assignment is already possible via `update_task`/`create_task` `TaskMembers`/`TaskManagers`
-(comma-separated usernames, honored and validated server-side; see milestones spec Section 6 #1).
-The tools below do not create assignments.
+**[corrected]** Assignment is *not* reachable through MCP. The v2 REST task route honors
+`TaskMembers`/`TaskManagers` (comma-separated usernames, validated server-side), but no MCP tool
+declares those fields — the milestones spec recorded them as a follow-up candidate (Section 6 #1),
+not as shipped behavior. Assign in ITM Platform or via v2 REST directly. The tools below do not
+create assignments.
 
 ## 2. Verified backend facts (2026-07-22)
 
@@ -116,8 +128,9 @@ write only with `mcp:write` plus the per-handler `hasScope` guard
 - **Handler flow (read-modify-write, mirroring the UI):**
   1. Scope guard (`mcp:write`).
   2. `GET .../EffortByTeamMember` -> current per-user state. Resolve each requested `userId` to
-     its `TaskUserId`. Unknown user -> tool error: "User {id} is not assigned to task {taskId}.
-     Assign them first with update_task (TaskMembers/TaskManagers usernames), then retry."
+     its `TaskUserId`. Unknown user -> tool error. **[corrected]** As shipped, that error reads
+     "User {id} is not assigned to this task. MCP cannot create assignments; assign the user in
+     ITM Platform (or via the v2 REST task PATCH TaskMembers field), then retry."
      This also defeats trap 1 by construction (fresh, task-scoped `TaskUserId`).
   3. `GET .../{taskId}` task readback (same call as `get_task`) to (a) verify the task belongs
      to `projectId` (compare the project reference field; exact field name verified at
@@ -145,7 +158,8 @@ write only with `mcp:write` plus the per-handler `hasScope` guard
 
 - Writing `ActualEffortAccepted*` or `IsAutomaticActualEffortAccepted` (echo only).
 - Editing `CategoryEfforts` / unassigned category effort (echo only; revisit on demand).
-- Creating or removing assignments (that is `update_task` TaskMembers/TaskManagers).
+- Creating or removing assignments. **[corrected]** Out of scope for MCP as a whole, not just for
+  these two tools: no tool exposes `TaskMembers`/`TaskManagers`.
 - Milestones and summary tasks (rejected client-side).
 
 ## 4. Recommended backend hardening (ITM.Tasks, non-blocking follow-up)
@@ -187,7 +201,8 @@ Red first, then implement:
 
 New `tests/e2e/effort.e2e.test.ts` using `tests/helpers/local-api.ts`:
 
-1. Create project + task, assign the e2e user via `update_task` TaskMembers.
+1. Create project + task, assign the e2e user via TaskMembers. **[corrected]** As implemented this
+   step calls v2 REST `PATCH` directly, not `update_task`, since no MCP tool can assign.
 2. `get_task_effort` returns the assignment with a `TaskUserId`.
 3. `update_task_effort` sets 3h30m for the user; readback shows 3/30; SQL asserts
    `tblTaskUser.intEstimatedHours=3, intEstimatedMins=30`, `IsAutomaticActualEffortAccepted`

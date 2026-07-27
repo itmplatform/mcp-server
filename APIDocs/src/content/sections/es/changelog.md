@@ -15,7 +15,7 @@ Esfuerzo por usuario en tareas: consultar el desglose de esfuerzo y definir las 
 - `update_task_effort`: define el esfuerzo ESTIMADO (planificado) por usuario asignado, opcionalmente junto con una estimación total explícita de la tarea (si no se indica, el total se recalcula a partir de las estimaciones, como hace la interfaz web). Solo datos de planificación: nunca escribe horas trabajadas ni esfuerzo aceptado, y lee el estado actual primero para preservar exactamente el esfuerzo aceptado, los indicadores de aceptación automática, las categorías de facturación, los esfuerzos por categoría y los usuarios no incluidos.
 
 **Notas:**
-- El usuario debe estar ya asignado a la tarea; asigne con `update_task` (`TaskMembers`/`TaskManagers` con nombres de usuario) y descubra los asignados con `get_task_effort` o `search_users`.
+- El usuario debe estar ya asignado a la tarea. Crear asignaciones queda fuera del alcance de MCP: asigne al usuario en ITM Platform, o use el `PATCH` REST v2 de la tarea con nombres de usuario en `TaskMembers`/`TaskManagers`. Descubra los asignados con `get_task_effort` o `search_users`.
 - Se rechazan hitos y tareas resumen: el esfuerzo pertenece a las tareas normales.
 - El registro de horas trabajadas sigue fuera del alcance de MCP; use el endpoint REST documentado `timehours` para imputaciones programáticas.
 

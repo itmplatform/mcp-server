@@ -655,7 +655,7 @@
     },
     {
       "name": "update_task_effort",
-      "description": "Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. Regular tasks only; returns REST readback.",
+      "description": "Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. Find assignees with get_task_effort; MCP cannot assign users, so add them in ITM Platform first. Unlisted users stay unchanged. Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. Regular tasks only; returns REST readback.",
       "inputSchema": {
         "type": "object",
         "properties": {
