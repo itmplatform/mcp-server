@@ -11,6 +11,7 @@ import {
   splitUpdateRiskArgs, splitUpdateIssueArgs,
   splitCreateServiceArgs, splitUpdateServiceArgs,
   splitCreateActivityArgs, splitUpdateActivityArgs,
+  buildTaskTeamSummary, verifyTaskTeamReadback,
 } from '../../../src/tools/write-tools.js';
 
 describe('buildInsufficientScopeResponse', () => {
@@ -320,6 +321,107 @@ describe('splitUpdateTaskArgs', () => {
       taskId: 42,
       PercentComplete: 37,
     })).toThrow('PercentComplete is not supported');
+  });
+});
+
+describe('task assignment fields', () => {
+  it('passes TaskManagers and TaskMembers through with trimmed entries', () => {
+    const { body } = splitCreateTaskArgs({
+      projectId: 100,
+      Name: 'T',
+      TaskManagers: ' ana@x.com , bob@x.com ',
+      TaskMembers: 'carla@x.com',
+    });
+    expect(body.TaskManagers).toBe('ana@x.com,bob@x.com');
+    expect(body.TaskMembers).toBe('carla@x.com');
+  });
+
+  it('drops assignment fields that are empty after trimming', () => {
+    const { body } = splitUpdateTaskArgs({ projectId: 100, taskId: 42, TaskMembers: ' , ' });
+    expect(body).not.toHaveProperty('TaskMembers');
+  });
+
+  it('rejects a username listed in both TaskManagers and TaskMembers', () => {
+    expect(() => splitCreateTaskArgs({
+      projectId: 100,
+      Name: 'T',
+      TaskManagers: 'ana@x.com',
+      TaskMembers: 'ANA@x.com',
+    })).toThrow('both TaskManagers and TaskMembers');
+  });
+
+  it('points the AssignedToUserId rejection at TaskManagers/TaskMembers', () => {
+    expect(() => splitCreateTaskArgs({ projectId: 100, Name: 'T', AssignedToUserId: 5 }))
+      .toThrow('TaskManagers/TaskMembers');
+    expect(() => splitUpdateTaskArgs({ projectId: 100, taskId: 42, AssignedToUserId: 5 }))
+      .toThrow('TaskManagers/TaskMembers');
+  });
+});
+
+describe('buildTaskTeamSummary', () => {
+  const usersResponse = {
+    canAddTeam: 'False',
+    TaskUsers: {
+      'ana@x.com': { UserId: 1, DisplayName: 'Ana A', IsTaskManager: true, TaskUserId: 11, Holidays: [{ HolidayId: 1 }] },
+      'bob@x.com': { UserId: 2, DisplayName: 'Bob B', IsTaskManager: false, TaskUserId: 12 },
+    },
+  };
+
+  it('builds a compact team array without the verbose per-user payload', () => {
+    expect(buildTaskTeamSummary(usersResponse)).toEqual([
+      { Username: 'ana@x.com', UserId: 1, DisplayName: 'Ana A', IsTaskManager: true },
+      { Username: 'bob@x.com', UserId: 2, DisplayName: 'Bob B', IsTaskManager: false },
+    ]);
+  });
+
+  it('returns an empty array for a malformed response', () => {
+    expect(buildTaskTeamSummary(null)).toEqual([]);
+    expect(buildTaskTeamSummary({})).toEqual([]);
+  });
+});
+
+describe('verifyTaskTeamReadback', () => {
+  const usersResponse = {
+    TaskUsers: {
+      'Ana@x.com': { UserId: 1, DisplayName: 'Ana A', IsTaskManager: true },
+      'bob@x.com': { UserId: 2, DisplayName: 'Bob B', IsTaskManager: false },
+    },
+  };
+
+  it('accepts matching assignments with case-insensitive usernames', () => {
+    expect(() => verifyTaskTeamReadback(
+      { TaskManagers: 'ana@x.com', TaskMembers: 'BOB@x.com' },
+      usersResponse,
+      true,
+      'create_task',
+    )).not.toThrow();
+  });
+
+  it('throws when a requested username is missing from the readback', () => {
+    expect(() => verifyTaskTeamReadback(
+      { TaskMembers: 'ghost@x.com' },
+      usersResponse,
+      true,
+      'update_task',
+    )).toThrow('Source-of-truth write verification failed for update_task');
+  });
+
+  it('throws on a Waterfall manager flag mismatch', () => {
+    expect(() => verifyTaskTeamReadback(
+      { TaskManagers: 'bob@x.com' },
+      usersResponse,
+      true,
+      'update_task',
+    )).toThrow('IsTaskManager');
+  });
+
+  it('skips the manager flag check on Kanban where everyone is saved as member', () => {
+    expect(() => verifyTaskTeamReadback(
+      { TaskManagers: 'bob@x.com' },
+      usersResponse,
+      false,
+      'update_task',
+    )).not.toThrow();
   });
 });
 

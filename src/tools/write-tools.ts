@@ -109,13 +109,41 @@ export const TASK_KIND_TASK = 3;
 const SUMMARY_TASK_TYPE_ID_ERROR =
   'Summary tasks (KindId 2) do not use TypeId; omit it. Use TypeId only on regular tasks and milestones.';
 
+export function parseUsernameList(value: unknown): string[] {
+  if (typeof value !== 'string') return [];
+  return value.split(',').map(name => name.trim()).filter(Boolean);
+}
+
+const ASSIGNMENT_FIELDS = ['TaskManagers', 'TaskMembers'] as const;
+
+export function hasAssignmentFields(body: JsonRecord): boolean {
+  return ASSIGNMENT_FIELDS.some(field => hasSuppliedField(body, field));
+}
+
+// The backend applies TaskManagers before TaskMembers, so a user listed in both
+// silently ends up as a plain member; reject the ambiguity up front.
+function normalizeTaskAssignmentFields(body: JsonRecord): void {
+  for (const field of ASSIGNMENT_FIELDS) {
+    if (!hasSuppliedField(body, field)) continue;
+    const names = parseUsernameList(body[field]);
+    if (names.length) body[field] = names.join(',');
+    else delete body[field];
+  }
+  const managers = new Set(parseUsernameList(body.TaskManagers).map(name => name.toLowerCase()));
+  const duplicated = parseUsernameList(body.TaskMembers).filter(name => managers.has(name.toLowerCase()));
+  if (duplicated.length) {
+    throw new Error(`Users listed in both TaskManagers and TaskMembers: ${duplicated.join(', ')} -- list each user in only one field`);
+  }
+}
+
 export function splitCreateTaskArgs(args: { projectId: number; [key: string]: unknown }) {
   const { projectId, ...body } = args;
   normalizeAlias(body, 'Description', 'Details');
   rejectUnsupportedFields('create_task', body, {
-    AssignedToUserId: 'task assignment is managed by task team endpoints, not the task create route',
+    AssignedToUserId: 'use TaskManagers/TaskMembers (comma-separated usernames) to assign users',
     PercentComplete: 'task progress is managed through follow-up/progress APIs, not task create',
   });
+  normalizeTaskAssignmentFields(body);
   return { path: `projects/${projectId}/tasks`, body };
 }
 
@@ -233,9 +261,10 @@ export function splitUpdateTaskArgs(args: { projectId: number; taskId: number; [
   const { projectId, taskId, ...body } = args;
   normalizeAlias(body, 'Description', 'Details');
   rejectUnsupportedFields('update_task', body, {
-    AssignedToUserId: 'task assignment is managed by task team endpoints, not the task PATCH route',
+    AssignedToUserId: 'use TaskManagers/TaskMembers (comma-separated usernames) to assign users',
     PercentComplete: 'task progress is managed through follow-up/progress APIs, not task PATCH',
   });
+  normalizeTaskAssignmentFields(body);
   return { path: `projects/${projectId}/tasks/${taskId}`, body };
 }
 
@@ -566,6 +595,67 @@ export function taskVerificationFieldsFor(body: JsonRecord, readback?: unknown):
   });
 }
 
+// GET .../tasks/{taskId}/users returns { canAddTeam, TaskUsers: { <username>: row } };
+// the row carries the full user profile (holiday calendars included), far too verbose
+// to echo back, so responses carry this compact projection instead.
+function taskUsersByUsername(usersResponse: unknown): Record<string, JsonRecord> {
+  if (usersResponse === null || typeof usersResponse !== 'object') return {};
+  const taskUsers = (usersResponse as JsonRecord).TaskUsers;
+  if (taskUsers === null || typeof taskUsers !== 'object') return {};
+  return taskUsers as Record<string, JsonRecord>;
+}
+
+export function buildTaskTeamSummary(usersResponse: unknown): JsonRecord[] {
+  return Object.entries(taskUsersByUsername(usersResponse)).map(([username, row]) => ({
+    Username: username,
+    UserId: row.UserId,
+    DisplayName: row.DisplayName,
+    IsTaskManager: row.IsTaskManager,
+  }));
+}
+
+function withTeam(readback: unknown, usersResponse: unknown): unknown {
+  const team = buildTaskTeamSummary(usersResponse);
+  if (readback !== null && typeof readback === 'object' && !Array.isArray(readback)) {
+    return { ...(readback as JsonRecord), team };
+  }
+  return { task: readback, team };
+}
+
+// The backend silently skips stakeholder users, so presence must be verified;
+// the manager flag only exists on Waterfall (Kanban saves everyone as member).
+export function verifyTaskTeamReadback(
+  body: JsonRecord,
+  usersResponse: unknown,
+  isWaterfallProject: boolean,
+  entityLabel: string,
+): void {
+  const rowsByUsername = new Map(
+    Object.entries(taskUsersByUsername(usersResponse)).map(([username, row]) => [username.toLowerCase(), row]),
+  );
+
+  const requested = [
+    ...parseUsernameList(body.TaskManagers).map(username => ({ username, isManager: true })),
+    ...parseUsernameList(body.TaskMembers).map(username => ({ username, isManager: false })),
+  ];
+
+  const mismatches: string[] = [];
+  for (const { username, isManager } of requested) {
+    const row = rowsByUsername.get(username.toLowerCase());
+    if (!row) {
+      mismatches.push(`${username} is not on the task team after the write (stakeholder users cannot be assigned)`);
+      continue;
+    }
+    if (isWaterfallProject && row.IsTaskManager !== isManager) {
+      mismatches.push(`${username} expected IsTaskManager ${isManager} but read back ${formatValue(row.IsTaskManager)}`);
+    }
+  }
+
+  if (mismatches.length) {
+    throw new Error(`Source-of-truth write verification failed for ${entityLabel}: ${mismatches.join('; ')}`);
+  }
+}
+
 const CREATE_PROJECT_VERIFICATION_FIELDS: VerificationField[] = [
   { requestField: 'Name', readPaths: ['Name'] },
   { requestField: 'Description', readPaths: ['Description'] },
@@ -697,6 +787,8 @@ export function registerWriteTools(
         EndDate: z.string().optional().describe('End date (ISO 8601). Required for Waterfall regular tasks and milestones.'),
         KindId: z.number().optional().describe('Task kind: 1=Milestone, 2=Summary task, 3=Task (default). Milestones and summary tasks require a Waterfall project.'),
         ParentId: z.number().optional().describe('Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames to assign as team members. Add-only, never removes.'),
       },
     },
     async (args) => {
@@ -709,6 +801,11 @@ export function registerWriteTools(
       const taskId = extractResponseId(data, 'created task');
       const readback = await clients.rest.get(`${path}/${taskId}`);
       verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'create_task');
+      if (hasAssignmentFields(body)) {
+        const usersReadback = await clients.rest.get(`${path}/${taskId}/users`);
+        verifyTaskTeamReadback(body, usersReadback, resolveMethodTypeId(project) === 1, 'create_task');
+        return buildWriteResponse(withTeam(readback, usersReadback));
+      }
       return buildWriteResponse(readback);
     },
   );
@@ -734,19 +831,27 @@ export function registerWriteTools(
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
         KindId: z.number().optional().describe('New task kind: 1=Milestone, 2=Summary task, 3=Task (Waterfall only). Converting to a milestone requires equal StartDate and EndDate in the same call.'),
         ParentId: z.number().optional().describe('New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames to assign as team members. Add-only, never removes.'),
       },
     },
     async (args) => {
       if (effectiveUserContext && !hasScope(effectiveUserContext, 'mcp:write')) return buildInsufficientScopeResponse();
       const { path, body } = splitUpdateTaskArgs(args);
+      const needsProject = hasSuppliedField(body, 'KindId') || hasSuppliedField(body, 'ParentId') || hasAssignmentFields(body);
+      const project = needsProject ? await clients.rest.get(`projects/${args.projectId}`) : undefined;
       if (hasSuppliedField(body, 'KindId') || hasSuppliedField(body, 'ParentId')) {
-        const project = await clients.rest.get(`projects/${args.projectId}`);
         const validationError = getUpdateTaskValidationError(body, project);
         if (validationError) return buildValidationErrorResponse(validationError);
       }
       await clients.rest.patch(path, body);
       const readback = await clients.rest.get(path);
       verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'update_task');
+      if (hasAssignmentFields(body)) {
+        const usersReadback = await clients.rest.get(`${path}/users`);
+        verifyTaskTeamReadback(body, usersReadback, resolveMethodTypeId(project) === 1, 'update_task');
+        return buildWriteResponse(withTeam(readback, usersReadback));
+      }
       return buildWriteResponse(readback);
     },
   );

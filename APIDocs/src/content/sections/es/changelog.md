@@ -1,3 +1,17 @@
+### v1.0.17
+
+Asignación de usuarios: `create_task` y `update_task` ahora pueden asignar usuarios a las tareas.
+
+**Herramientas ampliadas (2):**
+- `create_task` / `update_task`: los nuevos campos opcionales `TaskManagers` y `TaskMembers` aceptan nombres de usuario separados por comas y asignan esos usuarios a la tarea en la misma llamada. Los proyectos en cascada distinguen entre responsables de tarea y miembros del equipo; los proyectos Kanban guardan a todos como miembros. La asignación solo añade: los usuarios indicados se agregan (o se actualiza su indicador de responsable) y nunca se elimina a nadie. Los usuarios que aún no pertenecen al equipo del proyecto se añaden automáticamente.
+- Cuando se usan los campos de asignación, la respuesta incluye un arreglo compacto `team` (nombre de usuario, id, nombre visible, indicador de responsable) leído del endpoint de equipo de la tarea y verificado contra la solicitud.
+
+**Notas:**
+- Los nombres de usuario son los valores `EmailAddress` que devuelve `search_users`; cualquier nombre inválido hace fallar la solicitud completa sin escribir nada.
+- Un usuario listado en ambos campos se rechaza de entrada (el backend lo guardaría silenciosamente como miembro).
+- Esto completa el flujo de estimación de punta a punta: crear la tarea, asignar el equipo y definir las horas estimadas por usuario con `update_task_effort`.
+- Quitar asignados de una tarea sigue sin estar disponible vía MCP (use la interfaz web).
+
 ### v1.0.16
 
 Corrección de compatibilidad con los conectores personalizados de Claude. El servidor sigue exponiendo las 44 herramientas con los mismos esquemas y comportamiento, pero elimina texto duplicado de los metadatos serializados para que la respuesta completa de `tools/list` se mantenga por debajo de un presupuesto de compatibilidad de 49 KB.

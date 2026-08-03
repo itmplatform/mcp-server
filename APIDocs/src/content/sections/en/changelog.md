@@ -1,3 +1,17 @@
+### v1.0.17
+
+Task assignment: `create_task` and `update_task` can now assign users to tasks.
+
+**Extended tools (2):**
+- `create_task` / `update_task`: new optional `TaskManagers` and `TaskMembers` fields accept comma-separated usernames and assign those users to the task in the same call. Waterfall projects distinguish task managers from team members; Kanban projects save everyone as a member. Assignment is add-only: listed users are added (or their manager flag updated) and nobody is ever removed. Users not yet on the project team are added to it automatically.
+- When assignment fields are used, the response includes a compact `team` array (username, user id, display name, manager flag) read back from the task team endpoint and verified against the request.
+
+**Notes:**
+- Usernames are the `EmailAddress` values returned by `search_users`; any invalid username fails the whole request and nothing is written.
+- A username listed in both fields is rejected up front (the backend would silently save it as a plain member).
+- This completes the estimation flow end to end: create the task, assign the team, then set per-user estimated hours with `update_task_effort`.
+- Removing assignees from a task remains unavailable through MCP (use the web UI).
+
 ### v1.0.16
 
 Claude custom-connector compatibility fix. The server still exposes all 44 tools with the same schemas and behavior, but removes duplicated prose from the serialized tool metadata so the complete `tools/list` response stays below a 49 KB compatibility budget.

@@ -1,6 +1,6 @@
 {
   "name": "@itm-platform/mcp-server",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "MCP server for ITM Platform",
   "license": "MIT",
   "mcpName": "io.github.itmplatform/mcp-server",

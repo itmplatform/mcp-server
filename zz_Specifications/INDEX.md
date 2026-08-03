@@ -1,7 +1,7 @@
 # MCP Tool Roadmap and Specification Index
 
 > **Created:** 2026-07-17
-> **Current version:** v1.0.15 (44 tools: 27 read, 17 write)
+> **Current version:** v1.0.17 (44 tools: 27 read, 17 write)
 
 This document is the central index for MCP server tool development. It catalogs the current tool surface, the prioritized backlog of new tools and enrichments, and links to all specification documents.
 
@@ -45,8 +45,8 @@ This document is the central index for MCP server tool development. It catalogs 
 |------|-------------|
 | `create_project` | Create a project (Waterfall or Kanban) |
 | `update_project` | Update project name, status, dates, priority, description |
-| `create_task` | Create task, milestone (KindId 1), or summary task (KindId 2) |
-| `update_task` | Update task fields: status, dates, kind, parent, etc. |
+| `create_task` | Create task, milestone (KindId 1), or summary task (KindId 2); TaskManagers/TaskMembers assign users (v1.0.17) |
+| `update_task` | Update task fields: status, dates, kind, parent, etc.; TaskManagers/TaskMembers add assignees, add-only (v1.0.17) |
 | `create_task_progress` | Report progress on a task (%, assessment, notes) |
 | `update_task_progress` | Update an existing progress entry |
 | `update_task_effort` | Set per-user estimated hours (read-modify-write; preserves accepted effort, billing, categories) |
@@ -91,8 +91,8 @@ These unlock the most-requested agent workflows: assigning people, reading team 
 | # | Tool / Enrichment | Type | Backend | Notes |
 |---|-------------------|------|---------|-------|
 | 11 | `get_task_team` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/Users` | See who is assigned to a task. v2 endpoint exists (read-only). Substantially covered by `get_task_effort` (#15), whose `EffortByTeamMember` rows include the assigned users. |
-| 12 | `assign_task_team` | New write | v1 only: `POST .../Task/{TaskId}/Team/{ProjectUserIds}/{TaskManager}` | Assign users to a task. The assign/remove endpoints are **v1-only**. Requires v1 REST calls or a new v2 endpoint in ITM.Tasks. |
-| 13 | `remove_task_team` | New write | v1 only: `DELETE .../Task/{TaskId}/Team/{TaskUserId}` | Same v1-only constraint as assign. |
+| 12 | `assign_task_team` | New write | v1 only: `POST .../Task/{TaskId}/Team/{ProjectUserIds}/{TaskManager}` | **Adding resolved in v1.0.17** without this tool: `TaskManagers`/`TaskMembers` username fields on create_task/update_task ride the v2 task pipeline; see [SPEC_MCP_TASK_ASSIGNMENT.md](SPEC_MCP_TASK_ASSIGNMENT.md). Removal still needs the v1-only endpoints. |
+| 13 | `remove_task_team` | New write | v1 only: `DELETE .../Task/{TaskId}/Team/{TaskUserId}` | Same v1-only constraint as assign. Still open after v1.0.17 (assignment is add-only). |
 | 14 | `get_project_team` | New read | v1 only: `GET .../Project/{id}/AssignedUsers` | List all users assigned to a project. v1-only. |
 | 15 | `get_task_effort` | New read | `GET v2/.../Projects/{id}/Tasks/{taskId}/EffortByCategory` and `.../EffortByTeamMember` | Done (v1.0.15) with a paired `update_task_effort` write (per-user estimated hours); see [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) (HS 11634). |
 
@@ -191,7 +191,7 @@ Summary of backend endpoint coverage by the MCP server.
 | Projects (CRUD) | 6 | -- | 4 | Good (missing delete, budget update) |
 | Tasks (CRUD) | 8 | -- | 6 | Good (missing batch, delete) |
 | Task dependencies | -- | 3 | 0 | None |
-| Task team/assignments | 3 (read) | 5 (write) | 0 | None |
+| Task team/assignments | 3 (read) | 5 (write) | 2 | Add-only via create_task/update_task username fields (v1.0.17); removal v1-only |
 | Task effort/hours | 5 | 5 | 2 | Estimates read/write (v1.0.15); time entries none |
 | Task progress | 5 | -- | 4 | Good |
 | Risks | 6 | -- | 4 | Good (missing delete, account-wide search) |
@@ -230,6 +230,7 @@ Summary of backend endpoint coverage by the MCP server.
 | [done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md) | P8 #37/#38 (get_custom_fields, get_custom_field_options) + per-account customFields session context (Ucloud request) | Done (v1.0.14) |
 | [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
 | [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Done (v1.0.15, prod 2026-07-23) |
+| [SPEC_MCP_TASK_ASSIGNMENT.md](SPEC_MCP_TASK_ASSIGNMENT.md) | P2 #12 add path: `TaskManagers`/`TaskMembers` on create_task/update_task (HS 11710, 11715) | Done (v1.0.17, stage pending prod) |
 | [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | On hold; address cons first, revisit if Gilsandro insists or a new request arrives |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
@@ -270,3 +271,5 @@ Decisions that affect the backlog or overall direction.
 | 2026-07-17 | P1 implemented entirely inside ITM.MCP (v1.0.13). All backend endpoints and gateway routes already existed. | No ITM.Tasks or ITM.Web changes required. See [SPEC_MCP_P1_CORE_CRUD.md](SPEC_MCP_P1_CORE_CRUD.md). |
 | 2026-07-22 | Per-account custom field session context is sourced from a DataMart key-usage aggregate ($objectToArray over customFields), not from REST definitions. | Reflects the keys actually queryable in DataMart, including per-language variants and dotted-name traps that REST definitions cannot reveal. See [SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md](done/SPEC_MCP_CUSTOM_FIELDS_DISCOVERY.md). |
 | 2026-07-22 | The published APIDocs tool manifest is generated with `ITM_CUSTOM_FIELD_CONTEXT=off`. | Keeps the public query_datamart description account-neutral; the per-account block exists only in live sessions. |
+| 2026-08-03 | Task assignment shipped as `TaskManagers`/`TaskMembers` fields on create_task/update_task instead of a new `assign_task_team` tool. | The v2 task pipeline already honors the fields (verified on stage); no new tool name keeps the 44-tool catalog below the 49 KB Claude budget. Add-only; removal remains v1-only. See [SPEC_MCP_TASK_ASSIGNMENT.md](SPEC_MCP_TASK_ASSIGNMENT.md). |
+| 2026-08-03 | Closing a project needs no new tool: `update_project` with a closed-type `ProjectStatusId` (projectstatuses entry with `IsCompleted: true`) closes it (verified on stage, reversible). | Answers HS 11710 request 3 with existing tools. Caveat: closed statuses block time entry (`IsAllowTimeEntry: false`), so hours must be logged before closing; task writes are NOT blocked by a closed status. |
