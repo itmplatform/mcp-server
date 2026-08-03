@@ -52,8 +52,7 @@ describe('task effort tools', () => {
     milestoneId = milestoneResponse.Id ?? milestoneResponse.id;
 
     // Assign a real account user to the task via the REST TaskMembers
-    // username mechanism. This is REST-only setup: no MCP tool creates
-    // assignments, so update_task cannot be used here.
+    // username mechanism (the same path update_task exposes since v1.0.17).
     const accountId = querySqlNumber(`SELECT intAccountId FROM dbo.tblProject WHERE intProjectId = ${projectId};`);
     const username = querySqlScalar(
       `SELECT TOP 1 strUserName FROM dbo.tblUser WHERE intAccountId = ${accountId} AND strUserName IS NOT NULL AND strUserName <> '' ORDER BY intUserId;`,

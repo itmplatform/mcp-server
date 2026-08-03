@@ -46,8 +46,8 @@ export function buildEffortUpdatePayload(
     const rows = teamRows.filter(row => row.UserId === change.userId);
     if (!rows.length) {
       throw new Error(
-        `User ${change.userId} is not assigned to this task. MCP cannot create assignments; assign the user `
-        + 'in ITM Platform (or via the v2 REST task PATCH TaskMembers field), then retry.',
+        `User ${change.userId} is not assigned to this task. Assign them first with update_task `
+        + '(TaskMembers/TaskManagers accept comma-separated usernames), then retry.',
       );
     }
     if (rows.length > 1) {
@@ -183,7 +183,7 @@ export function registerEffortTools(
     'update_task_effort',
     {
       description: 'Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. '
-        + 'Find assignees with get_task_effort; MCP cannot assign users, so add them in ITM Platform first. Unlisted users stay unchanged. '
+        + 'Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. '
         + 'Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. '
         + 'Regular tasks only; returns REST readback.',
       inputSchema: {

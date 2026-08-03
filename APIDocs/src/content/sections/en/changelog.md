@@ -29,7 +29,7 @@ Per-user task effort: read the effort breakdown and set estimated hours per assi
 - `update_task_effort`: sets the ESTIMATED (planned) effort per assigned user, optionally together with an explicit task-level total estimate (otherwise the total is recomputed from the estimates, as the web UI does). Planning data only: it never writes worked hours or accepted effort, and it reads the current state first so accepted effort, automatic-acceptance flags, billing categories, category efforts, and unlisted users are preserved exactly.
 
 **Notes:**
-- The target user must already be assigned to the task. Creating assignments is out of scope for MCP: assign the user in ITM Platform, or use the v2 REST task `PATCH` with `TaskMembers`/`TaskManagers` usernames. Discover assignees with `get_task_effort` or `search_users`.
+- The target user must already be assigned to the task. At release time creating assignments was out of scope for MCP; since v1.0.17, `create_task`/`update_task` assign users via `TaskManagers`/`TaskMembers`. Discover assignees with `get_task_effort` or `search_users`.
 - Milestones and summary tasks are rejected: effort belongs to regular tasks.
 - Time entry logging (worked hours) remains out of scope for MCP; use the documented REST `timehours` endpoint for programmatic time entries.
 
