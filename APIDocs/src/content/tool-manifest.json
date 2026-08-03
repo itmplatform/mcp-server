@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.16",
+  "serverVersion": "1.0.17",
   "tools": [
     {
       "name": "search_projects",
@@ -1063,6 +1063,14 @@
           "ParentId": {
             "type": "number",
             "description": "Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
+          },
+          "TaskManagers": {
+            "type": "string",
+            "description": "Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress."
+          },
+          "TaskMembers": {
+            "type": "string",
+            "description": "Comma-separated usernames to assign as team members. Add-only, never removes."
           }
         },
         "required": [
@@ -1126,6 +1134,14 @@
           "ParentId": {
             "type": "number",
             "description": "New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
+          },
+          "TaskManagers": {
+            "type": "string",
+            "description": "Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress."
+          },
+          "TaskMembers": {
+            "type": "string",
+            "description": "Comma-separated usernames to assign as team members. Add-only, never removes."
           }
         },
         "required": [

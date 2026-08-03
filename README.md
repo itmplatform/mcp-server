@@ -129,8 +129,8 @@ The server exposes 44 MCP tools, 6 resources, and 4 prompt templates.
 | Tool | What it does |
 |------|--------------|
 | `create_project` | Create a project (Waterfall or Kanban); the project starts with the account default status and the creating user as project manager |
-| `create_task` | Add a task, milestone (KindId 1), or summary task (KindId 2); ParentId builds Gantt hierarchy on Waterfall projects |
-| `update_task` | Update task fields such as status, dates, kind, and parent |
+| `create_task` | Add a task, milestone (KindId 1), or summary task (KindId 2); ParentId builds Gantt hierarchy on Waterfall projects; TaskManagers/TaskMembers assign users by username |
+| `update_task` | Update task fields such as status, dates, kind, and parent; TaskManagers/TaskMembers add assignees by username (add-only, never removes) |
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `update_task_effort` | Set the estimated (planned) hours of a task per assigned user; accepted effort and billing data are preserved |
