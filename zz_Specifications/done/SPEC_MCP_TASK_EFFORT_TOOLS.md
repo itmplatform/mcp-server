@@ -24,6 +24,10 @@
 > behavior; the citation below misread it. Creating assignments is out of scope for MCP entirely.
 > The shipped error message and tool descriptions were corrected to point at ITM Platform / the
 > v2 REST route instead. Inline occurrences are marked **[corrected]** below.
+>
+> **Superseded (2026-08-03):** v1.0.17 declares `TaskManagers`/`TaskMembers` on
+> `create_task`/`update_task`, so MCP assignment now works and the corrected texts were restored
+> to point at `update_task`. See [../SPEC_MCP_TASK_ASSIGNMENT.md](../SPEC_MCP_TASK_ASSIGNMENT.md).
 
 ---
 

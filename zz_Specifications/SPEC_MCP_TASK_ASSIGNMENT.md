@@ -3,6 +3,7 @@
 > **Drivers:**
 > [Help Scout 11710](https://secure.helpscout.net/conversation/3403398037/11710/) (Gilsandro Cezar, Ucloud PMO): assign users to tasks via MCP; today assignment must happen manually in the UI before hours can be estimated via MCP.
 > [Help Scout 11715](https://secure.helpscout.net/conversation/3404221417/11715/) (Ronald Gomez, Teams4Soft): could not assign resources from ChatGPT.
+> [Help Scout 11666](https://secure.helpscout.net/conversation/3396756717/11666/): a customer sent `TaskMembers` through MCP and got a successful-looking PATCH that assigned nobody (the SDK strips undeclared fields), which triggered the 2026-07-27 docs correction.
 > Third and fourth requests for the same capability (earlier: 11586 point 2, 11634).
 > **Origin:** follow-up candidate documented in
 > [done/SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md](done/SPEC_MCP_CREATE_PROJECT_HIERARCHY_MILESTONES.md) Section 6.
@@ -20,10 +21,11 @@ new tool. Rationale:
   is MCP-surface only.
 - No new tool name keeps the tool count at 44 and the tools/list payload well below the
   49,000-byte Claude connector budget (enforced by e2e).
-- It matches the effort tools' contract: `update_task_effort` already tells agents
-  "Assign them first with update_task (TaskMembers/TaskManagers accept comma-separated
-  usernames)" (src/tools/effort.ts) -- that message was written ahead of this feature and
-  becomes true with this spec.
+- It matches the effort tools' contract: `update_task_effort`'s not-assigned error
+  originally pointed agents at update_task TaskMembers/TaskManagers; that text was written
+  ahead of this feature, corrected on 2026-07-27 (HS 11666) because the fields were not
+  declared and the SDK silently stripped them, and is restored to the original wording by
+  this spec now that the fields exist.
 - One call can create a task and assign its team, which is the Ucloud bulk-creation flow.
 
 INDEX P2 #12/#13 (`assign_task_team` / `remove_task_team`) called the write path v1-only;
