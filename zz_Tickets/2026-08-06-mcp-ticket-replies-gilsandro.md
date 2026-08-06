@@ -68,14 +68,21 @@ Saludos cordiales.
 
 ---
 
-## Internal notes (updated 2026-08-06 after implementation)
+## Internal notes (updated 2026-08-06 after stage verification)
 
-- Both features are IMPLEMENTED (v1.0.18): `log_time_entry`, `create_project_progress`,
-  `update_project_progress`, and `includeEntries` on `get_project_progress`. When announcing
-  the release in these threads, add two behavior notes discovered during implementation:
-  (1) a project Seguimiento entry at 100% auto-closes the project (platform behavior), so
-  hours must be logged before the final status report; (2) time entries store one total per
-  user+task+date, and the tool's add/set modes plus previous/new total echo handle that.
+- Both features are IMPLEMENTED and STAGE-VERIFIED (v1.0.18): `log_time_entry`,
+  `create_project_progress`, `update_project_progress`, and `includeEntries` on
+  `get_project_progress`. When announcing the release in these threads, add three behavior
+  notes discovered during implementation: (1) a project Seguimiento entry at 100%
+  auto-closes the project (platform behavior), so hours must be logged before the final
+  status report; (2) time entries store one total per user+task+date, and the tool's
+  add/set modes plus previous/new total echo handle that; (3) time entry requires the
+  project status to allow it (a freshly created project may keep a default status that
+  does not; move it to an execution status first).
+- **PROD ROLLOUT ORDER:** deploy ITM.Web/ITM.API (v1 token validation fix), run
+  `GetIsTaskEditiableByDateAndTask.sql` on the prod DB, then deploy ITM.MCP. Without the
+  first two, the new v1-backed tools fail for OAuth users with "Token expired". See
+  `ITM.Web/zz_Tickets/2026-08-06-v1-token-validation-multi-row.md`.
 
 ## Internal notes
 
