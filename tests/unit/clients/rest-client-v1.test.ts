@@ -103,6 +103,42 @@ describe('V1 RestClient', () => {
       expect(result).toEqual([{ ProjectProgressId: 1 }]);
     });
 
+    it('retries once via onUnauthorized when v1 reports an expired token as HTTP 400', async () => {
+      // v1 TokenValidation returns 400 "Token expired", not 401, when a
+      // concurrent login overwrites the session token row.
+      const authHeaders: Record<string, string> = { Token: 'overwritten' };
+      const onUnauthorized = vi.fn().mockImplementation(() => {
+        authHeaders.Token = 'reexchanged';
+        return Promise.resolve();
+      });
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: false, status: 400, statusText: 'Bad Request',
+          text: () => Promise.resolve(JSON.stringify({ StatusMessage: 'Token expired. Please generate a new token.' })),
+        })
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+      globalThis.fetch = mockFetch;
+
+      const client = createV1RestClient({ apiUrl: 'http://localhost/ITM.API', company: 'acme', authHeaders, onUnauthorized });
+      const result = await client.get('timehours?startdate=2026-08-06&enddate=2026-08-06');
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[1][1].headers.Token).toBe('reexchanged');
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('does not retry a 400 that is not a token failure', async () => {
+      const onUnauthorized = vi.fn();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false, status: 400, statusText: 'Bad Request',
+        text: () => Promise.resolve(JSON.stringify({ StatusMessage: 'Please enter assessment' })),
+      });
+
+      const client = createV1RestClient({ apiUrl: 'http://localhost/ITM.API', company: 'acme', authHeaders: { Token: 't' }, onUnauthorized });
+      await expect(client.post('project/100/progress', {})).rejects.toThrow('Please enter assessment');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
     it('surfaces a JSON StatusMessage on error responses', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
