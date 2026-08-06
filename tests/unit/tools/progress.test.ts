@@ -25,6 +25,9 @@ function createFakeClients() {
       post: vi.fn(),
       patch: vi.fn(),
     },
+    restV1: {
+      get: vi.fn(),
+    },
   } as any;
 }
 
@@ -144,7 +147,54 @@ describe('registerProgressTools', () => {
     const result = await tools.get('get_project_progress')!.cb({ projectId: 100 });
 
     expect(clients.rest.get).toHaveBeenCalledWith('projects/100/progressreports');
+    expect(clients.restV1.get).not.toHaveBeenCalled();
     expect(JSON.parse(result.content[0].text)).toEqual({ Expected: [], FollowUps: [] });
+  });
+
+  it('get_project_progress with includeEntries merges the normalized v1 follow-up entries', async () => {
+    const { server, tools } = createFakeServer();
+    const clients = createFakeClients();
+    clients.rest.get.mockResolvedValue({ Expected: [], FollowUps: [{ Date: '2026-08-06', Percentage: 60 }] });
+    clients.restV1.get.mockResolvedValue([{
+      ProjectProgressId: 55,
+      ProjectId: 100,
+      Assessment: { AssessmentId: 3, AssessmentName: 'Bueno' },
+      ShortDescription: 'On track',
+      DetailDescription: 'Details',
+      PercentageCompleted: 60,
+      ReportDate: '2026-08-06',
+      CreatedBy: { UserId: 42, DisplayName: 'PMO' },
+    }]);
+    registerProgressTools(server, clients);
+
+    const result = await tools.get('get_project_progress')!.cb({ projectId: 100, includeEntries: true });
+
+    expect(clients.restV1.get).toHaveBeenCalledWith('project/100/progress');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.FollowUps).toEqual([{ Date: '2026-08-06', Percentage: 60 }]);
+    expect(parsed.entries).toEqual([{
+      ProjectProgressId: 55,
+      ProjectId: 100,
+      ReportDate: '2026-08-06',
+      Percentage: 60,
+      AssessmentId: 3,
+      AssessmentName: 'Bueno',
+      ShortDescription: 'On track',
+      Description: 'Details',
+      CreatedBy: { UserId: 42, DisplayName: 'PMO' },
+    }]);
+  });
+
+  it('get_project_progress includeEntries returns an empty list when the project has no follow-ups', async () => {
+    const { server, tools } = createFakeServer();
+    const clients = createFakeClients();
+    clients.rest.get.mockResolvedValue({ Expected: [], FollowUps: [] });
+    clients.restV1.get.mockResolvedValue([]);
+    registerProgressTools(server, clients);
+
+    const result = await tools.get('get_project_progress')!.cb({ projectId: 100, includeEntries: true });
+
+    expect(JSON.parse(result.content[0].text).entries).toEqual([]);
   });
 
   it('create_task_progress POSTs, reads back the created entry, and returns it with the stale notice', async () => {

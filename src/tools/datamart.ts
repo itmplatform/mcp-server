@@ -55,9 +55,9 @@ Allowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $op
 Allowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset
 Banned: $lookup, $merge, $out, $function, $accumulator, $where, $facet
 
-Key fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual, customFields (account-defined custom fields: an object keyed by the field's display name; see get_custom_fields).
+Key fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual, customFields (object keyed by field display name; see get_custom_fields).
 
-Important: Projecting full embedded arrays (tasks: 1, risks: 1, issues: 1, purchases: 1, revenues: 1, activities: 1) is rejected because they can be too large. Use dot notation (e.g. "tasks.name": 1) or the dedicated subcomponent tools with limit/skip.${accountContextBlock}`,
+Projecting full embedded arrays (tasks: 1, risks: 1, etc.) is rejected as too large; use dot notation (e.g. "tasks.name": 1) or the subcomponent tools with limit/skip.${accountContextBlock}`,
       inputSchema: {
         operation: z.enum(['component', 'components', 'aggregateComponents']).describe('The DataMart operation'),
         id: z.number().optional().describe('Component ID (for "component" operation)'),

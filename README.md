@@ -90,7 +90,7 @@ The MCP server authenticates as you, calls ITM Platform APIs, and returns only t
 
 ## Capabilities
 
-The server exposes 44 MCP tools, 6 resources, and 4 prompt templates.
+The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 
 ### Read Tools
 
@@ -112,7 +112,7 @@ The server exposes 44 MCP tools, 6 resources, and 4 prompt templates.
 | `get_issue` | Retrieve full detail of a single issue, including resolution and impact fields |
 | `list_task_progress` | List the progress (follow-up) history for a task |
 | `get_task_effort` | Get a task's effort breakdown per team member and per professional category; doubles as the task team list |
-| `get_project_progress` | Get project progress report: expected, baseline, and actual curves |
+| `get_project_progress` | Get project progress report: expected, baseline, and actual curves; optionally the full project Seguimiento entries |
 | `list_service_activities` | List activities for a service with pagination |
 | `get_service_purchases` | List purchase orders for a service with pagination |
 | `get_service_revenues` | List revenue items for a service with pagination |
@@ -134,6 +134,9 @@ The server exposes 44 MCP tools, 6 resources, and 4 prompt templates.
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `update_task_effort` | Set the estimated (planned) hours of a task per assigned user; accepted effort and billing data are preserved |
+| `log_time_entry` | Log actual worked hours on a task for one user and date; adds to or replaces the day's total, echoing previous and new totals |
+| `create_project_progress` | Create a project-level progress (Seguimiento) entry: percentage, assessment, and status description; 100% auto-closes the project |
+| `update_project_progress` | Update an existing project progress entry |
 | `create_risk` | Log a project risk |
 | `update_risk` | Update risk fields such as status, probability, impact, level, and mitigation or contingency plans |
 | `create_issue` | Log a project issue with a required issue type and status |
