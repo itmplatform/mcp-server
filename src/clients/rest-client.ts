@@ -139,11 +139,17 @@ function createRequestPipeline(pipeline: RequestPipeline): RestClient {
   };
 }
 
+// Some v2 gateway routes are backed by v1 controllers that report an expired
+// token as HTTP 400 with a message instead of 401 (e.g. after a concurrent
+// login overwrites the platform's single token row per user).
+const TOKEN_FAILURE_400 = (bodyText: string): boolean => /token expired|invalid token/i.test(bodyText);
+
 export function createRestClient(config: RestClientConfig): RestClient {
   return createRequestPipeline({
     baseUrl: `${config.apiUrl}/v2/${config.company}`,
     resolveHeaders: async () => ({ ...config.authHeaders }),
     onAuthRetry: config.onUnauthorized,
+    authRetryOn400Body: TOKEN_FAILURE_400,
     parseBody: response => response.json(),
     log: config.log,
   });
@@ -207,9 +213,8 @@ export function createV1RestClient(config: RestClientConfig): RestClient {
       v1Token = undefined;
       await loginOnce();
     },
-    // A concurrent login overwrites the platform's single token row per user;
-    // v1 TokenValidation then answers 400 "Token expired" instead of 401.
-    authRetryOn400Body: bodyText => /token expired|invalid token/i.test(bodyText),
+    // v1 TokenValidation answers 400 "Token expired" instead of 401.
+    authRetryOn400Body: TOKEN_FAILURE_400,
     parseBody: async response => {
       if (response.status === 204) return null;
       const text = await response.text();
