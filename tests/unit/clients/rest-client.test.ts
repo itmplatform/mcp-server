@@ -321,6 +321,35 @@ describe('RestClient', () => {
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
 
+    it('retries once when a v1-backed route reports an expired token as HTTP 400', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue(undefined);
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: false, status: 400, statusText: 'Bad Request',
+          text: () => Promise.resolve(JSON.stringify({ StatusMessage: 'Token expired. Please generate a new token.' })),
+        })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([{ Id: 1 }]) });
+      globalThis.fetch = mockFetch;
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      const result = await client.get('assessments');
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(result).toEqual([{ Id: 1 }]);
+    });
+
+    it('does not retry a 400 that is not a token failure', async () => {
+      const onUnauthorized = vi.fn();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false, status: 400, statusText: 'Bad Request',
+        text: () => Promise.resolve(JSON.stringify({ StatusMessage: 'Please enter task end date.' })),
+      });
+
+      const client = createRestClient({ ...config, onUnauthorized });
+      await expect(client.post('projects/100/tasks', { Name: 'x' })).rejects.toThrow('Please enter task end date.');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
     it('throws original 401 error when onUnauthorized rejects', async () => {
       const onUnauthorized = vi.fn().mockRejectedValue(new Error('exchange failed'));
       globalThis.fetch = vi.fn().mockResolvedValue({
