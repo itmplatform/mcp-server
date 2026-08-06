@@ -79,12 +79,13 @@ Saludos cordiales.
   add/set modes plus previous/new total echo handle that; (3) time entry requires the
   project status to allow it (a freshly created project may keep a default status that
   does not; move it to an execution status first).
-- **PROD ROLLOUT ORDER:** (1) ITM.Web/ITM.API prod release with the v1 token validation
-  fix; the `GetIsTaskEditiableByDateAndTask` sproc is applied automatically by the
-  ITM.API-Prod pipeline's sp-delta step, no manual DB step. Pushed to main 2026-08-06
-  (runs 7430/7431), deploy stage awaits Daniel's approval. (2) Then deploy ITM.MCP.
-  Without step 1 the new v1-backed tools fail for OAuth users with "Token expired". See
-  `ITM.Web/zz_Tickets/2026-08-06-v1-token-validation-multi-row.md`.
+- **PROD ROLLOUT:** step 1 DONE 2026-08-06 ~15:30-15:55 UTC: ITM.Web/ITM.API prod release
+  deployed (runs 7430/7431, approved by Daniel) with the v1 token validation fix; the
+  `GetIsTaskEditiableByDateAndTask` sproc was applied to the prod DB automatically by the
+  pipeline's sp-delta step. Verified: new ITM.BusinessAccess.dll live on the API site, an
+  OAuth mcp_ session validated on a v1-backed prod route, app healthy. Remaining step 2:
+  deploy ITM.MCP v1.0.18 to prod (develop -> main, pipeline needs Daniel's approval), then
+  send these replies. See `ITM.Web/zz_Tickets/2026-08-06-v1-token-validation-multi-row.md`.
 
 ## Internal notes
 
