@@ -5,9 +5,17 @@
 > **Relation:** the estimation half of 11634 shipped in
 > [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) (v1.0.15). This spec
 > covers the **actuals** half: logging worked hours, including on behalf of another user.
-> **Status:** **ON HOLD.** Not rejected: the design below is implementation-ready. The cons in
-> Section 2 should be addressed before building. Revisit when Gilsandro insists or a new request
-> arrives. The Help Scout thread was closed internally with this decision (FYI Darshi, Karen).
+> **Status:** **IMPLEMENTED 2026-08-06** (green-lit by Daniel after the revisit trigger fired:
+> [HS 11710](https://secure.helpscout.net/conversation/3403398037/11710/) re-requested time
+> entries on 2026-07-30 and on 2026-08-04 answered the volume question -- continuous daily
+> flow, ~50 entries/day -- resolving prerequisite 4; the tool is the right surface, not the
+> Clockify connector). Shipped as `log_time_entry` per the Section 4 design (one
+> user+task+date per call, mandatory set/add mode, read-first, both totals echoed), together
+> with the project progress tools on the shared v1 request path (target v1.0.18). Cons 1-2
+> are mitigated by the design and the license pre-check; con 3 (no source column in
+> `tblTaskTime`) is accepted for now. Local unit + e2e green; stage verification pending.
+> Implementation notes: the v1 GET `timehours` returns 204 No Content when the range has no
+> entries (client handles empty bodies), and `teammember` accepts a UserId or username.
 
 ---
 
@@ -125,7 +133,10 @@ Each con from Section 2, turned into a prerequisite:
    [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md).
 3. **Auditability.** Decide whether agent-written time entries need a source marker
    (`tblTaskTime` has no source column today; this is a backend change, not an MCP one).
-4. **Volume / right surface.** Get the customer's expected weekly entry volume. Low and
-   interactive -> this tool. High and batch -> the
+4. **Volume / right surface.** ~~Get the customer's expected weekly entry volume.~~
+   **Resolved 2026-08-04** (HS 11710): continuous daily flow, ~50 entries/day (~250/week)
+   spread across the team on active projects; day-to-day operational logging (small tasks,
+   handover work), no external time system to sync from. This is interactive agent-driven
+   volume -- the tool is the right surface. The
    [Clockify connector](../../ITM.Connector/zz_Specifications/clockify-time-sync/clockify-time-sync.md)
-   instead of, or as well as, this tool.
+   remains a separate concern for customers syncing from an external tracker.

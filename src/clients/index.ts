@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import { createDataMartClient, type DataMartClient } from './datamart-client.js';
-import { createRestClient, type RestClient } from './rest-client.js';
+import { createRestClient, createV1RestClient, type RestClient } from './rest-client.js';
 import { createNoOpAuditClient, type AuditClient } from './audit-client.js';
 
 export interface ClientConfig {
@@ -14,6 +14,7 @@ export interface ClientConfig {
 export interface Clients {
   datamart: DataMartClient;
   rest: RestClient;
+  restV1: RestClient;
   audit: AuditClient;
 }
 
@@ -21,6 +22,7 @@ export function createClients(config: ClientConfig, audit?: AuditClient): Client
   return {
     datamart: createDataMartClient(config),
     rest: createRestClient(config),
+    restV1: createV1RestClient(config),
     audit: audit ?? createNoOpAuditClient(),
   };
 }

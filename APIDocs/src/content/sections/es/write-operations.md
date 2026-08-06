@@ -9,6 +9,10 @@ La IA puede modificar sus datos de ITM Platform, no solo leerlos. Las operacione
 | **Actualizar tarea** | Cambia nombre, estado, prioridad, fechas, tipo de elemento o tarea padre |
 | **Crear seguimiento de tarea** | Reporta el avance de una tarea (porcentaje, valoración, notas). Dispara los mismos efectos que reportar avance en la aplicación: transiciones de estado, propagación a tareas resumen y avance automático del proyecto |
 | **Actualizar seguimiento de tarea** | Corrige una entrada de seguimiento existente |
+| **Crear seguimiento de proyecto** | Reporta el estado a nivel de proyecto (Seguimiento): porcentaje completado, evaluación y descripción del estado. Una entrada al 100% cierra automáticamente el proyecto |
+| **Actualizar seguimiento de proyecto** | Corrige un seguimiento de proyecto existente |
+| **Registrar horas trabajadas** | Registra horas efectivamente trabajadas en una tarea para un usuario y una fecha, sumando o reemplazando el total del día. Registrar horas de otro usuario requiere licencia de Company Admin o Full Access |
+| **Actualizar esfuerzo de tarea** | Define las horas estimadas (planificadas) de una tarea por usuario asignado |
 | **Crear riesgo** | Registra un nuevo riesgo en un proyecto. Tipo, estado, impacto, probabilidad y nivel son obligatorios; los IDs válidos se descubren con la herramienta de datos de referencia (incluida la entidad `risklevels`) |
 | **Actualizar riesgo** | Cambia estado, tipo, probabilidad, impacto, nivel o los planes de mitigación y contingencia del riesgo |
 | **Crear incidencia** | Registra una nueva incidencia en un proyecto |

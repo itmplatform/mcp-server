@@ -1,7 +1,7 @@
 # MCP Tool Roadmap and Specification Index
 
 > **Created:** 2026-07-17
-> **Current version:** v1.0.17 (44 tools: 27 read, 17 write)
+> **Current version:** v1.0.18 (47 tools: 27 read, 20 write)
 
 This document is the central index for MCP server tool development. It catalogs the current tool surface, the prioritized backlog of new tools and enrichments, and links to all specification documents.
 
@@ -39,7 +39,7 @@ This document is the central index for MCP server tool development. It catalogs 
 | `get_user` | User profile with roles and contact info |
 | `get_reference_data` | Statuses, types, priorities, and other lookup lists (19 entities) |
 
-### Write Tools (16, gated by `mcp:write` scope)
+### Write Tools (20, gated by `mcp:write` scope)
 
 | Tool | What it does |
 |------|-------------|
@@ -50,6 +50,9 @@ This document is the central index for MCP server tool development. It catalogs 
 | `create_task_progress` | Report progress on a task (%, assessment, notes) |
 | `update_task_progress` | Update an existing progress entry |
 | `update_task_effort` | Set per-user estimated hours (read-modify-write; preserves accepted effort, billing, categories) |
+| `log_time_entry` | Log worked hours for one user+task+date via v1 timehours; mandatory set/add mode, previous and new totals echoed (v1.0.18) |
+| `create_project_progress` | Project-level Seguimiento entry via v1; 100% auto-closes the project (sproc side effect) (v1.0.18) |
+| `update_project_progress` | Update a project Seguimiento entry; client-side merge of stored assessment/percentage (v1.0.18) |
 | `create_risk` | Log a project risk with status, type, probability, impact, level |
 | `update_risk` | Update risk fields including mitigation/contingency plans (PUT) |
 | `create_issue` | Log a project issue with type and status |
@@ -192,8 +195,9 @@ Summary of backend endpoint coverage by the MCP server.
 | Tasks (CRUD) | 8 | -- | 6 | Good (missing batch, delete) |
 | Task dependencies | -- | 3 | 0 | None |
 | Task team/assignments | 3 (read) | 5 (write) | 2 | Add-only via create_task/update_task username fields (v1.0.17); removal v1-only |
-| Task effort/hours | 5 | 5 | 2 | Estimates read/write (v1.0.15); time entries none |
+| Task effort/hours | 5 | 5 | 3 | Estimates read/write (v1.0.15); worked hours via log_time_entry on v1 timehours (v1.0.18) |
 | Task progress | 5 | -- | 4 | Good |
+| Project follow-up (Seguimiento) | 1 (graph) | 4 | 3 | Create/update + entries read via v1 (v1.0.18); delete excluded |
 | Risks | 6 | -- | 4 | Good (missing delete, account-wide search) |
 | Issues | 6 | -- | 4 | Good (missing delete, account-wide search) |
 | Purchases (project) | 8 | -- | 1 | Read-only |
@@ -231,7 +235,8 @@ Summary of backend endpoint coverage by the MCP server.
 | [SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md](SPEC_MCP_CUSTOM_FIELDS_IN_TYPED_READS.md) | customFields in get_project/get_service output and search opt-in | Proposed (revisit after discovery usage is observed) |
 | [done/SPEC_MCP_TASK_EFFORT_TOOLS.md](done/SPEC_MCP_TASK_EFFORT_TOOLS.md) | P2 #15 + write: `get_task_effort` + `update_task_effort` (per-user estimated hours, HS 11634) | Done (v1.0.15, prod 2026-07-23) |
 | [SPEC_MCP_TASK_ASSIGNMENT.md](SPEC_MCP_TASK_ASSIGNMENT.md) | P2 #12 add path: `TaskManagers`/`TaskMembers` on create_task/update_task (HS 11710, 11715) | Done (v1.0.17, stage pending prod) |
-| [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634) | On hold; address cons first, revisit if Gilsandro insists or a new request arrives |
+| [SPEC_MCP_TIME_ENTRY_TOOLS.md](SPEC_MCP_TIME_ENTRY_TOOLS.md) | Delegated actuals (`log_time_entry`): decision record + guarded design (HS 11634, 11710) | Implemented 2026-08-06 (v1.0.18); stage verification pending |
+| [SPEC_MCP_PROJECT_PROGRESS_TOOLS.md](SPEC_MCP_PROJECT_PROGRESS_TOOLS.md) | Project-level Seguimiento: `create_project_progress`, `update_project_progress`, entries in `get_project_progress` (HS 11761) | Implemented 2026-08-06 (v1.0.18, Option B on the shared v1 path); stage verification pending |
 | [SPEC_MCP_BULK_OPERATIONS.md](SPEC_MCP_BULK_OPERATIONS.md) | Phases 2-3: general-purpose bulk field updates and async mass operations | Pending (owner decisions needed) |
 | [SPEC_MCP_WHATS_NEW_DISCOVERY.md](SPEC_MCP_WHATS_NEW_DISCOVERY.md) | Server instructions banner + `itm://changelog` resource | Pending |
 | [SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md](SPEC_OAUTH_CONSENT_SCOPE_CHECKBOXES.md) | OAuth consent page per-scope checkboxes (impl in ITM.Account) | Pending |
@@ -273,3 +278,5 @@ Decisions that affect the backlog or overall direction.
 | 2026-07-22 | The published APIDocs tool manifest is generated with `ITM_CUSTOM_FIELD_CONTEXT=off`. | Keeps the public query_datamart description account-neutral; the per-account block exists only in live sessions. |
 | 2026-08-03 | Task assignment shipped as `TaskManagers`/`TaskMembers` fields on create_task/update_task instead of a new `assign_task_team` tool. | The v2 task pipeline already honors the fields (verified on stage); no new tool name keeps the 44-tool catalog below the 49 KB Claude budget. Add-only; removal remains v1-only. See [SPEC_MCP_TASK_ASSIGNMENT.md](SPEC_MCP_TASK_ASSIGNMENT.md). |
 | 2026-08-03 | Closing a project needs no new tool: `update_project` with a closed-type `ProjectStatusId` (projectstatuses entry with `IsCompleted: true`) closes it (verified on stage, reversible). | Answers HS 11710 request 3 with existing tools. Caveat: closed statuses block time entry (`IsAllowTimeEntry: false`), so hours must be logged before closing; task writes are NOT blocked by a closed status. |
+| 2026-08-06 | v1 REST path added to the MCP client (`restV1`): no `/v2` prefix, `Token` header; API-key sessions exchange the key once via `{account}/Login/{APIKey}`. Used by log_time_entry and the project progress tools. | Unlocks v1-only endpoints (timehours, project follow-ups) without backend deploys. The gateway's Bearer conversion never runs for v1 URLs, hence the login exchange. |
+| 2026-08-06 | Inserting a project follow-up at 100% auto-closes the project: the logic lives in the `tblProjectFollowUpInsert` stored procedure (E2E-verified), contradicting the earlier C#-only reading. | create_project_progress warns about it; agents must log hours before a 100% status report. The update sproc does not auto-close. |

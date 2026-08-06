@@ -158,9 +158,9 @@ export function registerEffortTools(
   server.registerTool(
     'get_task_effort',
     {
-      description: 'Read task effort by assigned user and professional category. Separates planned estimates, '
-        + 'accepted actual effort, and worked time entries. teamMembers also lists assignees '
-        + '(UserId, name, email); TaskUserId is the assignment key. Use update_task_effort only for estimates.',
+      description: 'Read task effort by assigned user and professional category: planned estimates, accepted actual '
+        + 'effort, and worked time. teamMembers lists assignees (UserId, name, email); TaskUserId is the assignment key. '
+        + 'Estimates are written with update_task_effort.',
       inputSchema: {
         projectId: z.number().describe('Project ID'),
         taskId: z.number().describe('Task ID'),
@@ -185,7 +185,7 @@ export function registerEffortTools(
       description: 'Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. '
         + 'Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. '
         + 'Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. '
-        + 'Regular tasks only; returns REST readback.',
+        + 'Regular tasks only.',
       inputSchema: {
         projectId: z.number().describe('Project ID'),
         taskId: z.number().describe('Regular task ID'),
@@ -197,7 +197,7 @@ export function registerEffortTools(
         taskTotalEstimate: z.object({
           hours: z.number().int().min(0).describe('Total hours'),
           minutes: z.number().int().min(0).max(59).describe('Total minutes, 0-59'),
-        }).optional().describe('Optional explicit total; otherwise recomputed from user and unassigned-category estimates'),
+        }).optional().describe('Explicit task total; otherwise recomputed'),
       },
     },
     async (args) => {

@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.17",
+  "serverVersion": "1.0.18",
   "tools": [
     {
       "name": "search_projects",
@@ -492,7 +492,7 @@
     },
     {
       "name": "list_task_progress",
-      "description": "List the progress (seguimiento/follow-up) history for a task, newest first. Each entry contains TaskFollowUpId, Percentage, AssessmentId, ShortDescription, Description, ReportDate, CreatedBy, IsCompleted. Task progress is a time-series of entries, not a single field on the task; this is why update_task rejects PercentComplete.",
+      "description": "List the progress (seguimiento/follow-up) history for a task, newest first. Task progress is a time-series of entries, not a single task field; this is why update_task rejects PercentComplete.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -515,13 +515,17 @@
     },
     {
       "name": "get_project_progress",
-      "description": "Get the project progress report: the expected progress curve (from task dates and working days), the baseline expected curve, and the historical follow-up entries (date + percentage). Useful to compare planned vs actual progress.",
+      "description": "Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). With includeEntries true, also returns the full project-level Seguimiento entries (ProjectProgressId, assessment, descriptions) for use with update_project_progress.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "projectId": {
             "type": "number",
             "description": "The project ID to get the progress report for"
+          },
+          "includeEntries": {
+            "type": "boolean",
+            "description": "Also return the full follow-up entries (default false)"
           }
         },
         "required": [
@@ -533,7 +537,7 @@
     },
     {
       "name": "create_task_progress",
-      "description": "Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task's completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Use get_reference_data with entity \"assessments\" to discover valid assessmentId values. Returns the created entry read back from v2 REST.",
+      "description": "Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task's completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Discover assessmentId values with get_reference_data entity \"assessments\".",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -582,7 +586,7 @@
     },
     {
       "name": "update_task_progress",
-      "description": "Update an existing task progress (seguimiento/follow-up) entry via PATCH. Only send the fields you want to change. Use list_task_progress to find the progressId. Returns the updated entry read back from v2 REST.",
+      "description": "Update an existing task progress (seguimiento/follow-up) entry via PATCH; send only the fields to change. Find the progressId with list_task_progress.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -596,7 +600,7 @@
           },
           "progressId": {
             "type": "number",
-            "description": "The progress entry ID to update (TaskFollowUpId from list_task_progress)"
+            "description": "Progress entry ID (TaskFollowUpId from list_task_progress)"
           },
           "reportDate": {
             "type": "string",
@@ -631,8 +635,97 @@
       }
     },
     {
+      "name": "create_project_progress",
+      "description": "Create a project-level progress (Seguimiento) entry: the project status report with report date, completion percentage, assessment rating, and status description. Independent from per-task progress and from the get_project_progress curves. WARNING: percentage 100 automatically CLOSES the project, which blocks further time entry; log hours first (reopen with update_project if needed). Assessment IDs: get_reference_data entity \"assessments\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID to report status on"
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "Report date (ISO 8601)"
+          },
+          "percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Project completion percentage, 0-100"
+          },
+          "assessmentId": {
+            "type": "number",
+            "description": "Assessment rating ID (required; entity \"assessments\")"
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "Brief status summary (required)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed status narrative"
+          }
+        },
+        "required": [
+          "projectId",
+          "reportDate",
+          "percentage",
+          "assessmentId",
+          "shortDescription"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_project_progress",
+      "description": "Update an existing project-level progress (Seguimiento) entry; send only the fields to change. Find the progressId with get_project_progress includeEntries true.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "The project ID the progress entry belongs to"
+          },
+          "progressId": {
+            "type": "number",
+            "description": "The progress entry ID to update (ProjectProgressId)"
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "New report date (ISO 8601)"
+          },
+          "percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "New completion percentage, 0-100"
+          },
+          "assessmentId": {
+            "type": "number",
+            "description": "New assessment rating ID"
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "New brief status summary"
+          },
+          "description": {
+            "type": "string",
+            "description": "New detailed status narrative"
+          }
+        },
+        "required": [
+          "projectId",
+          "progressId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_task_effort",
-      "description": "Read task effort by assigned user and professional category. Separates planned estimates, accepted actual effort, and worked time entries. teamMembers also lists assignees (UserId, name, email); TaskUserId is the assignment key. Use update_task_effort only for estimates.",
+      "description": "Read task effort by assigned user and professional category: planned estimates, accepted actual effort, and worked time. teamMembers lists assignees (UserId, name, email); TaskUserId is the assignment key. Estimates are written with update_task_effort.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -655,7 +748,7 @@
     },
     {
       "name": "update_task_effort",
-      "description": "Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. Regular tasks only; returns REST readback.",
+      "description": "Set planned effort for assigned users; never logs worked time or changes accepted effort or billing. Find assignees with get_task_effort and assign missing users with update_task first. Unlisted users stay unchanged. Unless taskTotalEstimate is supplied, the total is recomputed from user and unassigned-category estimates. Regular tasks only.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -718,13 +811,71 @@
               "minutes"
             ],
             "additionalProperties": false,
-            "description": "Optional explicit total; otherwise recomputed from user and unassigned-category estimates"
+            "description": "Explicit task total; otherwise recomputed"
           }
         },
         "required": [
           "projectId",
           "taskId",
           "userEstimates"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "log_time_entry",
+      "description": "Log actual worked hours on a task for one user and date. ITM Platform stores ONE total per user+task+date: mode \"add\" adds to it, \"set\" replaces it (0:00 clears). The response echoes the previous and new totals. The user must be assigned to the task (TaskMembers on update_task) and the project status must allow time entry (closed projects block it). userId defaults to the session user; another user requires a Company Admin or Full Access license and the hours are attributed to that user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "Project ID containing the task"
+          },
+          "taskId": {
+            "type": "number",
+            "description": "Task ID to log time on"
+          },
+          "date": {
+            "type": "string",
+            "description": "Work date (YYYY-MM-DD); not in the future"
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24,
+            "description": "Whole hours worked"
+          },
+          "minutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 59,
+            "description": "Minutes worked, 0-59 (default 0)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "set",
+              "add"
+            ],
+            "description": "\"add\" adds to the existing total; \"set\" replaces it"
+          },
+          "userId": {
+            "type": "number",
+            "description": "User to log time for (default: session user)"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Comment stored on the day's entry"
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId",
+          "date",
+          "hours",
+          "mode"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -773,7 +924,7 @@
     },
     {
       "name": "query_datamart",
-      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual, customFields (account-defined custom fields: an object keyed by the field's display name; see get_custom_fields).\n\nImportant: Projecting full embedded arrays (tasks: 1, risks: 1, issues: 1, purchases: 1, revenues: 1, activities: 1) is rejected because they can be too large. Use dot notation (e.g. \"tasks.name\": 1) or the dedicated subcomponent tools with limit/skip.",
+      "description": "Run a custom query against ITM DataMart (MongoDB-backed). For advanced analysis beyond typed tools.\n\nOperations:\n- \"components\": list with filters. Params: where, project, sort, limit (max 200), skip\n- \"component\": single by ID. Params: id, project\n- \"aggregateComponents\": aggregation pipeline. Params: pipeline (must end with $limit, max 1000)\n\nAllowed filter operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte, $regex, $options, $exists, $not, $and, $or, $nor\nAllowed pipeline stages: $match, $project, $group, $sort, $limit, $skip, $unwind, $addFields, $set, $unset\nBanned: $lookup, $merge, $out, $function, $accumulator, $where, $facet\n\nKey fields: id, name, code, componentType, statusLabel, priorityLabel, percentComplete, startDate, endDate, methodology, managers, budgetTopDown, budgetActual, customFields (object keyed by field display name; see get_custom_fields).\n\nProjecting full embedded arrays (tasks: 1, risks: 1, etc.) is rejected as too large; use dot notation (e.g. \"tasks.name\": 1) or the subcomponent tools with limit/skip.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -907,7 +1058,7 @@
     },
     {
       "name": "get_custom_fields",
-      "description": "Get the account's custom field definitions for an entity type: project, task, risk, issue, service, activity, purchase, or revenue. Returns Id, BaseId, Name, TypeId, TypeName (Text, Number, Percentage, Date, HTML, RYGList, DropDownList, List), Description, Required.\n\nCustom field VALUES live in DataMart documents under \"customFields\", an object keyed by the field's display Name exactly as returned here (keys are case- and accent-sensitive and may contain trailing spaces). Query them with query_datamart, e.g. project: {\"customFields\": 1} or where: {\"customFields.<Name>\": {\"$eq\": ...}}. On accounts that work in several languages the key follows each component's language; definitions can be fetched per language (languageId 1=English, 2=Spanish, 3=Portuguese) to learn the variant names of the same BaseId. For RYGList, DropDownList, and List fields, get valid values with get_custom_field_options.",
+      "description": "Get the account's custom field definitions for an entity type: project, task, risk, issue, service, activity, purchase, or revenue. Returns Id, BaseId, Name, TypeId, TypeName (Text, Number, Percentage, Date, HTML, RYGList, DropDownList, List), Description, Required.\n\nVALUES live in DataMart under \"customFields\", keyed by the display Name exactly as returned here (case- and accent-sensitive, may contain trailing spaces). Query via query_datamart, e.g. project {\"customFields\": 1} or where {\"customFields.<Name>\": ...}. On multilingual accounts the key follows each component's language; fetch definitions per languageId to learn the variant names of the same BaseId. Dropdown values: get_custom_field_options.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -927,7 +1078,7 @@
           },
           "languageId": {
             "type": "number",
-            "description": "Definition language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language."
+            "description": "Language: 1=English, 2=Spanish, 3=Portuguese (default: your user language)"
           }
         },
         "required": [
@@ -949,7 +1100,7 @@
           },
           "languageId": {
             "type": "number",
-            "description": "Option language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language."
+            "description": "Language: 1=English, 2=Spanish, 3=Portuguese (default: your user language)"
           }
         },
         "required": [
@@ -961,7 +1112,7 @@
     },
     {
       "name": "create_project",
-      "description": "Create a new project. Name and TypeId are required; use get_reference_data with entity \"getprojecttypes\" to discover valid project type IDs. ProjectMethodTypeId selects the methodology: 1=Waterfall (default when omitted), 2=Kanban (created with default board columns). The project is always created with the account default status; status cannot be set at creation, call update_project afterwards to change it. The authenticated user becomes the project manager when their license allows it. Returns the created project read back from v2 REST (source of truth).",
+      "description": "Create a new project. Name and TypeId are required (entity \"getprojecttypes\"). ProjectMethodTypeId selects the methodology: 1=Waterfall (default when omitted), 2=Kanban (created with default board columns). Status cannot be set at creation (the account default status applies); change it with update_project. The caller becomes project manager when their license allows it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -971,7 +1122,7 @@
           },
           "TypeId": {
             "type": "number",
-            "description": "Project type ID (required). Use get_reference_data with entity \"getprojecttypes\" to discover valid IDs."
+            "description": "Project type ID (required; entity \"getprojecttypes\")"
           },
           "ProjectMethodTypeId": {
             "type": "number",
@@ -991,7 +1142,7 @@
           },
           "PriorityId": {
             "type": "number",
-            "description": "Project priority ID; account default when omitted. Use get_reference_data with entity \"projectpriorities\"."
+            "description": "Priority ID; account default when omitted (entity \"projectpriorities\")"
           },
           "InternalCode": {
             "type": "string",
@@ -999,11 +1150,11 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards."
+            "description": "NOT SUPPORTED at creation; the account default status applies. Change it with update_project."
           },
           "ProjectStatusId": {
             "type": "number",
-            "description": "NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards."
+            "description": "NOT SUPPORTED at creation; the account default status applies. Change it with update_project."
           }
         },
         "required": [
@@ -1016,7 +1167,7 @@
     },
     {
       "name": "create_task",
-      "description": "Create a regular task, milestone, or summary task. KindId: 1=Milestone, 2=Summary, 3/default=Task (not the TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate; milestones require EndDate; summaries require StatusId. Kanban supports regular tasks only and uses board defaults. ParentId creates Waterfall hierarchy. AutomaticProgress statuses create 100% progress; a later lower report needs a later ReportDate. Use get_reference_data for valid IDs. Returns REST readback.",
+      "description": "Create a regular task, milestone, or summary task. KindId: 1=Milestone, 2=Summary, 3/default=Task (not the TypeId). Waterfall regular tasks require StatusId, StartDate, and EndDate; milestones require EndDate; summaries require StatusId. Kanban supports regular tasks only and uses board defaults. ParentId creates Waterfall hierarchy. AutomaticProgress statuses create 100% progress; a later lower report needs a later ReportDate. Use get_reference_data for valid IDs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1030,15 +1181,15 @@
           },
           "Description": {
             "type": "string",
-            "description": "Task description. Compatibility alias for the v2 REST Details field."
+            "description": "Task description (alias of Details)"
           },
           "Details": {
             "type": "string",
-            "description": "Task details/description field used by v2 REST"
+            "description": "Details field used by v2 REST"
           },
           "StatusId": {
             "type": "number",
-            "description": "Task status ID. Required for Waterfall regular and summary tasks; not required for milestones; Kanban uses board-specific status defaults."
+            "description": "Status ID; required for Waterfall regular and summary tasks, not for milestones; Kanban uses board defaults"
           },
           "TypeId": {
             "type": "number",
@@ -1050,27 +1201,27 @@
           },
           "StartDate": {
             "type": "string",
-            "description": "Start date (ISO 8601). Required for Waterfall regular tasks. For milestones omit it or set it equal to EndDate."
+            "description": "Start date (ISO 8601); required for Waterfall regular tasks. Milestones: omit or equal to EndDate."
           },
           "EndDate": {
             "type": "string",
-            "description": "End date (ISO 8601). Required for Waterfall regular tasks and milestones."
+            "description": "End date (ISO 8601); required for Waterfall regular tasks and milestones"
           },
           "KindId": {
             "type": "number",
-            "description": "Task kind: 1=Milestone, 2=Summary task, 3=Task (default). Milestones and summary tasks require a Waterfall project."
+            "description": "Kind: 1=Milestone, 2=Summary, 3=Task (default); 1 and 2 require a Waterfall project"
           },
           "ParentId": {
             "type": "number",
-            "description": "Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
+            "description": "Parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies"
           },
           "TaskManagers": {
             "type": "string",
-            "description": "Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress."
+            "description": "Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only."
           },
           "TaskMembers": {
             "type": "string",
-            "description": "Comma-separated usernames to assign as team members. Add-only, never removes."
+            "description": "Comma-separated usernames added as team members. Add-only."
           }
         },
         "required": [
@@ -1083,7 +1234,7 @@
     },
     {
       "name": "update_task",
-      "description": "Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.",
+      "description": "Update task fields via PATCH; send only the fields to change. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1101,11 +1252,11 @@
           },
           "Description": {
             "type": "string",
-            "description": "New description. Compatibility alias for the v2 REST Details field."
+            "description": "New description (alias of Details)"
           },
           "Details": {
             "type": "string",
-            "description": "New task details/description field used by v2 REST"
+            "description": "Details field used by v2 REST"
           },
           "StatusId": {
             "type": "number",
@@ -1129,19 +1280,19 @@
           },
           "KindId": {
             "type": "number",
-            "description": "New task kind: 1=Milestone, 2=Summary task, 3=Task (Waterfall only). Converting to a milestone requires equal StartDate and EndDate in the same call."
+            "description": "New kind: 1=Milestone, 2=Summary, 3=Task (Waterfall only); to milestone requires equal StartDate and EndDate in the same call"
           },
           "ParentId": {
             "type": "number",
-            "description": "New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies."
+            "description": "New parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies"
           },
           "TaskManagers": {
             "type": "string",
-            "description": "Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress."
+            "description": "Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only."
           },
           "TaskMembers": {
             "type": "string",
-            "description": "Comma-separated usernames to assign as team members. Add-only, never removes."
+            "description": "Comma-separated usernames added as team members. Add-only."
           }
         },
         "required": [
@@ -1154,7 +1305,7 @@
     },
     {
       "name": "create_risk",
-      "description": "Log a new risk in a project. Returns the created risk read back from v2 REST. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required by the v2 risk create route. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", or \"risklevels\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "description": "Log a new risk in a project. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required. Discover IDs with get_reference_data (entities \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", \"risklevels\"); localized Ids are normalized automatically.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1172,23 +1323,23 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Risk status ID (required). Use get_reference_data with entity \"riskstatuses\" to discover valid IDs."
+            "description": "Risk status ID (required; entity \"riskstatuses\")"
           },
           "TypeId": {
             "type": "number",
-            "description": "Risk type ID (required). Use get_reference_data with entity \"risktypes\" to discover valid IDs."
+            "description": "Risk type ID (required; entity \"risktypes\")"
           },
           "ProbabilityId": {
             "type": "number",
-            "description": "Risk probability ID (required). Use get_reference_data with entity \"riskprobabilities\" to discover valid IDs."
+            "description": "Risk probability ID (required; entity \"riskprobabilities\")"
           },
           "ImpactId": {
             "type": "number",
-            "description": "Risk impact ID (required). Use get_reference_data with entity \"riskimpacts\" to discover valid IDs."
+            "description": "Risk impact ID (required; entity \"riskimpacts\")"
           },
           "LevelId": {
             "type": "number",
-            "description": "Risk level ID (required). Use get_reference_data with entity \"risklevels\" to discover valid IDs."
+            "description": "Risk level ID (required; entity \"risklevels\")"
           },
           "MitigationPlan": {
             "type": "string",
@@ -1210,7 +1361,7 @@
     },
     {
       "name": "create_issue",
-      "description": "Log a new issue in a project. Returns the created issue read back from v2 REST. Use get_reference_data with entity \"issuestatuses\" or \"issuetypes\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "description": "Log a new issue in a project. Discover IDs with get_reference_data (entities \"issuestatuses\", \"issuetypes\"); localized Ids are normalized automatically.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1228,15 +1379,15 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "Issue status ID (required). Mapped to the v2 REST Status field."
+            "description": "Issue status ID (required)"
           },
           "TypeId": {
             "type": "number",
-            "description": "Issue type ID (required). Mapped to the v2 REST Type field."
+            "description": "Issue type ID (required)"
           },
           "Resolution": {
             "type": "string",
-            "description": "Resolution description. Mapped to the v2 REST FinalResolution field."
+            "description": "Resolution description"
           }
         },
         "required": [
@@ -1251,7 +1402,7 @@
     },
     {
       "name": "update_project",
-      "description": "Update project fields via PATCH. Only send the fields you want to change. Returns the updated project read back from v2 REST.",
+      "description": "Update project fields via PATCH; send only the fields to change.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1269,11 +1420,11 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "New project status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST."
+            "description": "New project status ID (alias of ProjectStatusId)"
           },
           "ProjectStatusId": {
             "type": "number",
-            "description": "New project status ID field used by v2 REST"
+            "description": "New project status ID (v2 field name)"
           },
           "PriorityId": {
             "type": "number",
@@ -1297,7 +1448,7 @@
     },
     {
       "name": "update_risk",
-      "description": "Update risk fields (partial update; only send the fields you want to change). Returns the updated risk read back from v2 REST. Use get_reference_data with entity \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", or \"risklevels\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "description": "Update risk fields; send only the fields to change. Discover IDs with get_reference_data (entities \"riskstatuses\", \"risktypes\", \"riskimpacts\", \"riskprobabilities\", \"risklevels\"); localized Ids are normalized automatically.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1356,7 +1507,7 @@
     },
     {
       "name": "update_issue",
-      "description": "Update issue fields via PATCH (only send the fields you want to change). Returns the updated issue read back from v2 REST. Use get_reference_data with entity \"issuestatuses\" or \"issuetypes\" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.",
+      "description": "Update issue fields via PATCH; send only the fields to change. Discover IDs with get_reference_data (entities \"issuestatuses\", \"issuetypes\"); localized Ids are normalized automatically.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1378,15 +1529,15 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "New issue status ID. Mapped to the v2 REST Status field."
+            "description": "New issue status ID"
           },
           "TypeId": {
             "type": "number",
-            "description": "New issue type ID. Mapped to the v2 REST Type field."
+            "description": "New issue type ID"
           },
           "Resolution": {
             "type": "string",
-            "description": "New resolution description. Mapped to the v2 REST FinalResolution field."
+            "description": "New resolution description"
           }
         },
         "required": [
@@ -1399,7 +1550,7 @@
     },
     {
       "name": "create_service",
-      "description": "Create a new service. Name and TypeId are required; use get_reference_data with entity \"servicetypes\" to discover valid service type IDs. The service is always created with the account default status; call update_service afterwards to change it. Returns the created service read back from v2 REST (source of truth).",
+      "description": "Create a new service. Name and TypeId are required; use get_reference_data with entity \"servicetypes\" to discover valid service type IDs. The service is always created with the account default status; call update_service afterwards to change it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1409,7 +1560,7 @@
           },
           "TypeId": {
             "type": "number",
-            "description": "Service type ID (required). Use get_reference_data with entity \"servicetypes\" to discover valid IDs."
+            "description": "Service type ID (required; entity \"servicetypes\")"
           },
           "Description": {
             "type": "string",
@@ -1425,7 +1576,7 @@
           },
           "PriorityId": {
             "type": "number",
-            "description": "Service priority ID; account default when omitted. Use get_reference_data with entity \"projectpriorities\"."
+            "description": "Priority ID; account default when omitted (entity \"projectpriorities\")"
           },
           "InternalCode": {
             "type": "string",
@@ -1433,11 +1584,11 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards."
+            "description": "NOT SUPPORTED at creation; the account default status applies. Change it with update_service."
           },
           "ProjectStatusId": {
             "type": "number",
-            "description": "NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards."
+            "description": "NOT SUPPORTED at creation; the account default status applies. Change it with update_service."
           }
         },
         "required": [
@@ -1450,7 +1601,7 @@
     },
     {
       "name": "update_service",
-      "description": "Update service fields via PATCH. Only send the fields you want to change. Returns the updated service read back from v2 REST. Use get_reference_data with entity \"projectstatuses\" to discover status IDs.",
+      "description": "Update service fields via PATCH; send only the fields to change. Status IDs come from get_reference_data entity \"projectstatuses\".",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1468,11 +1619,11 @@
           },
           "StatusId": {
             "type": "number",
-            "description": "New service status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST."
+            "description": "New service status ID (alias of ProjectStatusId)"
           },
           "ProjectStatusId": {
             "type": "number",
-            "description": "New service status ID field used by v2 REST"
+            "description": "New service status ID (v2 field name)"
           },
           "PriorityId": {
             "type": "number",
@@ -1496,7 +1647,7 @@
     },
     {
       "name": "create_activity",
-      "description": "Create a new activity in a service. Activities are the service counterpart of project tasks and form a flat list (no milestones, summary tasks, or hierarchy). Name, StatusId, StartDate, and EndDate are required. Activity statuses differ from task statuses; use get_reference_data with entity \"activitystatuses\" to discover valid IDs. Returns the created activity read back from v2 REST (source of truth).",
+      "description": "Create a new activity in a service. Activities form a flat list (no milestones, summaries, or hierarchy). Name, StatusId, StartDate, and EndDate are required. Activity statuses differ from task statuses; use get_reference_data with entity \"activitystatuses\" to discover valid IDs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1510,15 +1661,15 @@
           },
           "Description": {
             "type": "string",
-            "description": "Activity description. Compatibility alias for the v2 REST Details field."
+            "description": "Activity description (alias of Details)"
           },
           "Details": {
             "type": "string",
-            "description": "Activity details/description field used by v2 REST"
+            "description": "Details field used by v2 REST"
           },
           "StatusId": {
             "type": "number",
-            "description": "Activity status ID (required). Use get_reference_data with entity \"activitystatuses\" to discover valid IDs."
+            "description": "Activity status ID (required; entity \"activitystatuses\")"
           },
           "TypeId": {
             "type": "number",
@@ -1538,11 +1689,11 @@
           },
           "KindId": {
             "type": "number",
-            "description": "NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks."
+            "description": "NOT SUPPORTED: activities form a flat list; milestones exist only on project tasks."
           },
           "ParentId": {
             "type": "number",
-            "description": "NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks."
+            "description": "NOT SUPPORTED: activities form a flat list; hierarchy exists only on project tasks."
           }
         },
         "required": [
@@ -1558,7 +1709,7 @@
     },
     {
       "name": "update_activity",
-      "description": "Update activity fields via PATCH. Only send the fields you want to change. Returns the updated activity read back from v2 REST. Activity statuses differ from task statuses; use get_reference_data with entity \"activitystatuses\" to discover valid IDs.",
+      "description": "Update activity fields via PATCH; send only the fields to change. Activity statuses differ from task statuses (entity \"activitystatuses\").",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1576,11 +1727,11 @@
           },
           "Description": {
             "type": "string",
-            "description": "New description. Compatibility alias for the v2 REST Details field."
+            "description": "New description (alias of Details)"
           },
           "Details": {
             "type": "string",
-            "description": "New activity details/description field used by v2 REST"
+            "description": "Details field used by v2 REST"
           },
           "StatusId": {
             "type": "number",
@@ -1604,11 +1755,11 @@
           },
           "KindId": {
             "type": "number",
-            "description": "NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks."
+            "description": "NOT SUPPORTED: activities form a flat list; milestones exist only on project tasks."
           },
           "ParentId": {
             "type": "number",
-            "description": "NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks."
+            "description": "NOT SUPPORTED: activities form a flat list; hierarchy exists only on project tasks."
           }
         },
         "required": [
@@ -1621,7 +1772,7 @@
     },
     {
       "name": "bulk_update_task_status",
-      "description": "Apply one status to many tasks of a project in a single call (much faster than looping update_task). Collect task IDs first via list_project_tasks or search, then chunk into calls of at most 100 IDs. Resolve valid status IDs via get_reference_data (entity \"gettaskstatuses\"): statuses differ between Waterfall and Kanban projects, and Kanban projects interpret statusId as the Kanban column ID, so pass projectMethodTypeId (1=Waterfall, 2=Kanban) or use statusName instead. Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.",
+      "description": "Apply one status to many tasks of a project in one call (faster than looping update_task). Collect task IDs via list_project_tasks or search_tasks; chunk into calls of at most 100 IDs. Resolve valid status IDs via get_reference_data (entity \"gettaskstatuses\"): statuses differ between Waterfall and Kanban projects, and Kanban projects interpret statusId as the Kanban column ID, so pass projectMethodTypeId (1=Waterfall, 2=Kanban) or use statusName instead. Always check the failed array; retrying a failed chunk is safe.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1636,7 +1787,7 @@
             },
             "minItems": 1,
             "maxItems": 100,
-            "description": "Task IDs to update (1-100 per call; chunk larger sets into multiple calls)"
+            "description": "Task IDs to update (max 100 per call)"
           },
           "statusId": {
             "type": "number",
@@ -1661,7 +1812,7 @@
     },
     {
       "name": "bulk_update_activity_status",
-      "description": "Apply one status to many activities of a service in a single call. Collect activity IDs first via list_service_activities, then chunk into calls of at most 100 IDs. Resolve valid activity status IDs via get_reference_data with entity \"activitystatuses\" (activity statuses differ from task statuses), or pass statusName. Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.",
+      "description": "Apply one status to many activities of a service in a single call. Collect activity IDs first via list_service_activities, then chunk into calls of at most 100 IDs. Resolve valid activity status IDs via get_reference_data with entity \"activitystatuses\" (activity statuses differ from task statuses), or pass statusName. Always check the failed array; retrying a failed chunk is safe.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1676,7 +1827,7 @@
             },
             "minItems": 1,
             "maxItems": 100,
-            "description": "Activity IDs to update (1-100 per call; chunk larger sets into multiple calls)"
+            "description": "Activity IDs to update (max 100 per call)"
           },
           "statusId": {
             "type": "number",
@@ -1684,7 +1835,7 @@
           },
           "statusName": {
             "type": "string",
-            "description": "Target activity status name, resolved against the activitystatuses reference list when statusId is omitted"
+            "description": "Target activity status name, used when statusId is omitted"
           },
           "projectMethodTypeId": {
             "type": "number",

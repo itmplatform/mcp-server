@@ -9,6 +9,7 @@ import {
   verifyRequestedFields,
   type VerificationField,
 } from './write-tools.js';
+import { fetchNormalizedProgressEntries } from './project-progress.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -66,7 +67,7 @@ export function registerProgressTools(
   server.registerTool(
     'list_task_progress',
     {
-      description: 'List the progress (seguimiento/follow-up) history for a task, newest first. Each entry contains TaskFollowUpId, Percentage, AssessmentId, ShortDescription, Description, ReportDate, CreatedBy, IsCompleted. Task progress is a time-series of entries, not a single field on the task; this is why update_task rejects PercentComplete.',
+      description: 'List the progress (seguimiento/follow-up) history for a task, newest first. Task progress is a time-series of entries, not a single task field; this is why update_task rejects PercentComplete.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to list progress entries for'),
@@ -81,14 +82,22 @@ export function registerProgressTools(
   server.registerTool(
     'get_project_progress',
     {
-      description: 'Get the project progress report: the expected progress curve (from task dates and working days), the baseline expected curve, and the historical follow-up entries (date + percentage). Useful to compare planned vs actual progress.',
+      description: 'Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). With includeEntries true, also returns the full project-level Seguimiento entries (ProjectProgressId, assessment, descriptions) for use with update_project_progress.',
       inputSchema: {
         projectId: z.number().describe('The project ID to get the progress report for'),
+        includeEntries: z.boolean().optional().describe('Also return the full follow-up entries (default false)'),
       },
     },
     async (args) => {
       const data = await clients.rest.get(`projects/${args.projectId}/progressreports`);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      if (!args.includeEntries) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      }
+      const entries = await fetchNormalizedProgressEntries(clients, args.projectId);
+      const graph = data && typeof data === 'object' && !Array.isArray(data)
+        ? data as Record<string, unknown>
+        : { graph: data };
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ...graph, entries }, null, 2) }] };
     },
   );
 
@@ -99,7 +108,7 @@ export function registerProgressTools(
   server.registerTool(
     'create_task_progress',
     {
-      description: 'Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task\'s completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Use get_reference_data with entity "assessments" to discover valid assessmentId values. Returns the created entry read back from v2 REST.',
+      description: 'Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task\'s completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Discover assessmentId values with get_reference_data entity "assessments".',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to report progress on'),
@@ -124,11 +133,11 @@ export function registerProgressTools(
   server.registerTool(
     'update_task_progress',
     {
-      description: 'Update an existing task progress (seguimiento/follow-up) entry via PATCH. Only send the fields you want to change. Use list_task_progress to find the progressId. Returns the updated entry read back from v2 REST.',
+      description: 'Update an existing task progress (seguimiento/follow-up) entry via PATCH; send only the fields to change. Find the progressId with list_task_progress.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID the progress entry belongs to'),
-        progressId: z.number().describe('The progress entry ID to update (TaskFollowUpId from list_task_progress)'),
+        progressId: z.number().describe('Progress entry ID (TaskFollowUpId from list_task_progress)'),
         reportDate: z.string().optional().describe('New report date (ISO 8601)'),
         percentage: z.number().int().min(0).max(100).optional().describe('New progress percentage, 0-100'),
         assessmentId: z.number().optional().describe('New assessment rating ID'),

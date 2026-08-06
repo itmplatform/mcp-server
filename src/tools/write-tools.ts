@@ -730,24 +730,23 @@ export function registerWriteTools(
   server.registerTool(
     'create_project',
     {
-      description: 'Create a new project. Name and TypeId are required; use get_reference_data with entity "getprojecttypes" to discover valid project type IDs. '
+      description: 'Create a new project. Name and TypeId are required (entity "getprojecttypes"). '
         + 'ProjectMethodTypeId selects the methodology: 1=Waterfall (default when omitted), 2=Kanban (created with default board columns). '
-        + 'The project is always created with the account default status; status cannot be set at creation, call update_project afterwards to change it. '
-        + 'The authenticated user becomes the project manager when their license allows it. '
-        + 'Returns the created project read back from v2 REST (source of truth).',
+        + 'Status cannot be set at creation (the account default status applies); change it with update_project. '
+        + 'The caller becomes project manager when their license allows it.',
       inputSchema: {
         Name: z.string().describe('Project name (required, must be unique in the account)'),
-        TypeId: z.number().describe('Project type ID (required). Use get_reference_data with entity "getprojecttypes" to discover valid IDs.'),
+        TypeId: z.number().describe('Project type ID (required; entity "getprojecttypes")'),
         ProjectMethodTypeId: z.number().optional().describe('Project methodology: 1=Waterfall (default when omitted), 2=Kanban'),
         Description: z.string().optional().describe('Project description'),
         StartDate: z.string().optional().describe('Start date (ISO 8601)'),
         EndDate: z.string().optional().describe('End date (ISO 8601)'),
-        PriorityId: z.number().optional().describe('Project priority ID; account default when omitted. Use get_reference_data with entity "projectpriorities".'),
+        PriorityId: z.number().optional().describe('Priority ID; account default when omitted (entity "projectpriorities")'),
         InternalCode: z.string().optional().describe('Internal project code'),
         // Published so the SDK does not silently strip them; the handler rejects
         // both with a pointer to update_project instead of ignoring the value.
-        StatusId: z.number().optional().describe('NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards.'),
-        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation: the project is always created with the account default status. Use update_project to change the status afterwards.'),
+        StatusId: z.number().optional().describe('NOT SUPPORTED at creation; the account default status applies. Change it with update_project.'),
+        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation; the account default status applies. Change it with update_project.'),
       },
     },
     async (args) => {
@@ -774,21 +773,21 @@ export function registerWriteTools(
         + 'Waterfall regular tasks require StatusId, StartDate, and EndDate; milestones require EndDate; summaries require StatusId. '
         + 'Kanban supports regular tasks only and uses board defaults. ParentId creates Waterfall hierarchy. '
         + 'AutomaticProgress statuses create 100% progress; a later lower report needs a later ReportDate. '
-        + 'Use get_reference_data for valid IDs. Returns REST readback.',
+        + 'Use get_reference_data for valid IDs.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the task in'),
         Name: z.string().describe('Task name (required)'),
-        Description: z.string().optional().describe('Task description. Compatibility alias for the v2 REST Details field.'),
-        Details: z.string().optional().describe('Task details/description field used by v2 REST'),
-        StatusId: z.number().optional().describe('Task status ID. Required for Waterfall regular and summary tasks; not required for milestones; Kanban uses board-specific status defaults.'),
+        Description: z.string().optional().describe('Task description (alias of Details)'),
+        Details: z.string().optional().describe('Details field used by v2 REST'),
+        StatusId: z.number().optional().describe('Status ID; required for Waterfall regular and summary tasks, not for milestones; Kanban uses board defaults'),
         TypeId: z.number().optional().describe('Task type ID (account default when omitted). Not the same as KindId.'),
         PriorityId: z.number().optional().describe('Task priority ID (account default when omitted)'),
-        StartDate: z.string().optional().describe('Start date (ISO 8601). Required for Waterfall regular tasks. For milestones omit it or set it equal to EndDate.'),
-        EndDate: z.string().optional().describe('End date (ISO 8601). Required for Waterfall regular tasks and milestones.'),
-        KindId: z.number().optional().describe('Task kind: 1=Milestone, 2=Summary task, 3=Task (default). Milestones and summary tasks require a Waterfall project.'),
-        ParentId: z.number().optional().describe('Parent task ID to place this task under (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
-        TaskManagers: z.string().optional().describe('Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress.'),
-        TaskMembers: z.string().optional().describe('Comma-separated usernames to assign as team members. Add-only, never removes.'),
+        StartDate: z.string().optional().describe('Start date (ISO 8601); required for Waterfall regular tasks. Milestones: omit or equal to EndDate.'),
+        EndDate: z.string().optional().describe('End date (ISO 8601); required for Waterfall regular tasks and milestones'),
+        KindId: z.number().optional().describe('Kind: 1=Milestone, 2=Summary, 3=Task (default); 1 and 2 require a Waterfall project'),
+        ParentId: z.number().optional().describe('Parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames added as team members. Add-only.'),
       },
     },
     async (args) => {
@@ -813,7 +812,7 @@ export function registerWriteTools(
   server.registerTool(
     'update_task',
     {
-      description: 'Update task fields via PATCH. Only send the fields you want to change. Returns the updated task read back from v2 REST. '
+      description: 'Update task fields via PATCH; send only the fields to change. '
         + 'KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. '
         + 'Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. '
         + 'Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; '
@@ -822,17 +821,17 @@ export function registerWriteTools(
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to update'),
         Name: z.string().optional().describe('New task name'),
-        Description: z.string().optional().describe('New description. Compatibility alias for the v2 REST Details field.'),
-        Details: z.string().optional().describe('New task details/description field used by v2 REST'),
+        Description: z.string().optional().describe('New description (alias of Details)'),
+        Details: z.string().optional().describe('Details field used by v2 REST'),
         StatusId: z.number().optional().describe('New status ID'),
         TypeId: z.number().optional().describe('New type ID'),
         PriorityId: z.number().optional().describe('New priority ID'),
         StartDate: z.string().optional().describe('New start date (ISO 8601)'),
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
-        KindId: z.number().optional().describe('New task kind: 1=Milestone, 2=Summary task, 3=Task (Waterfall only). Converting to a milestone requires equal StartDate and EndDate in the same call.'),
-        ParentId: z.number().optional().describe('New parent task ID (Waterfall only). A regular-task parent is automatically converted to a summary task unless it has assignees or dependencies.'),
-        TaskManagers: z.string().optional().describe('Comma-separated usernames to assign as task managers (Kanban saves them as members). Add-only, never removes. Usernames come from search_users EmailAddress.'),
-        TaskMembers: z.string().optional().describe('Comma-separated usernames to assign as team members. Add-only, never removes.'),
+        KindId: z.number().optional().describe('New kind: 1=Milestone, 2=Summary, 3=Task (Waterfall only); to milestone requires equal StartDate and EndDate in the same call'),
+        ParentId: z.number().optional().describe('New parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames added as team members. Add-only.'),
       },
     },
     async (args) => {
@@ -859,16 +858,16 @@ export function registerWriteTools(
   server.registerTool(
     'create_risk',
     {
-      description: 'Log a new risk in a project. Returns the created risk read back from v2 REST. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required by the v2 risk create route. Use get_reference_data with entity "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", or "risklevels" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      description: 'Log a new risk in a project. TypeId, StatusId, ImpactId, ProbabilityId, and LevelId are all required. Discover IDs with get_reference_data (entities "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", "risklevels"); localized Ids are normalized automatically.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the risk in'),
         Name: z.string().describe('Risk name (required)'),
         Description: z.string().optional().describe('Risk description'),
-        StatusId: z.number().describe('Risk status ID (required). Use get_reference_data with entity "riskstatuses" to discover valid IDs.'),
-        TypeId: z.number().describe('Risk type ID (required). Use get_reference_data with entity "risktypes" to discover valid IDs.'),
-        ProbabilityId: z.number().describe('Risk probability ID (required). Use get_reference_data with entity "riskprobabilities" to discover valid IDs.'),
-        ImpactId: z.number().describe('Risk impact ID (required). Use get_reference_data with entity "riskimpacts" to discover valid IDs.'),
-        LevelId: z.number().describe('Risk level ID (required). Use get_reference_data with entity "risklevels" to discover valid IDs.'),
+        StatusId: z.number().describe('Risk status ID (required; entity "riskstatuses")'),
+        TypeId: z.number().describe('Risk type ID (required; entity "risktypes")'),
+        ProbabilityId: z.number().describe('Risk probability ID (required; entity "riskprobabilities")'),
+        ImpactId: z.number().describe('Risk impact ID (required; entity "riskimpacts")'),
+        LevelId: z.number().describe('Risk level ID (required; entity "risklevels")'),
         MitigationPlan: z.string().optional().describe('Mitigation plan description'),
       },
     },
@@ -887,14 +886,14 @@ export function registerWriteTools(
   server.registerTool(
     'create_issue',
     {
-      description: 'Log a new issue in a project. Returns the created issue read back from v2 REST. Use get_reference_data with entity "issuestatuses" or "issuetypes" to discover IDs; the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      description: 'Log a new issue in a project. Discover IDs with get_reference_data (entities "issuestatuses", "issuetypes"); localized Ids are normalized automatically.',
       inputSchema: {
         projectId: z.number().describe('The project ID to create the issue in'),
         Name: z.string().describe('Issue name (required)'),
         Description: z.string().optional().describe('Issue description'),
-        StatusId: z.number().describe('Issue status ID (required). Mapped to the v2 REST Status field.'),
-        TypeId: z.number().describe('Issue type ID (required). Mapped to the v2 REST Type field.'),
-        Resolution: z.string().optional().describe('Resolution description. Mapped to the v2 REST FinalResolution field.'),
+        StatusId: z.number().describe('Issue status ID (required)'),
+        TypeId: z.number().describe('Issue type ID (required)'),
+        Resolution: z.string().optional().describe('Resolution description'),
       },
     },
     async (args) => {
@@ -912,13 +911,13 @@ export function registerWriteTools(
   server.registerTool(
     'update_project',
     {
-      description: 'Update project fields via PATCH. Only send the fields you want to change. Returns the updated project read back from v2 REST.',
+      description: 'Update project fields via PATCH; send only the fields to change.',
       inputSchema: {
         projectId: z.number().describe('The project ID to update'),
         Name: z.string().optional().describe('New project name'),
         Description: z.string().optional().describe('New project description'),
-        StatusId: z.number().optional().describe('New project status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST.'),
-        ProjectStatusId: z.number().optional().describe('New project status ID field used by v2 REST'),
+        StatusId: z.number().optional().describe('New project status ID (alias of ProjectStatusId)'),
+        ProjectStatusId: z.number().optional().describe('New project status ID (v2 field name)'),
         PriorityId: z.number().optional().describe('New priority ID'),
         StartDate: z.string().optional().describe('New start date (ISO 8601)'),
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
@@ -937,9 +936,7 @@ export function registerWriteTools(
   server.registerTool(
     'update_risk',
     {
-      description: 'Update risk fields (partial update; only send the fields you want to change). Returns the updated risk read back from v2 REST. '
-        + 'Use get_reference_data with entity "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", or "risklevels" to discover IDs; '
-        + 'the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      description: 'Update risk fields; send only the fields to change. Discover IDs with get_reference_data (entities "riskstatuses", "risktypes", "riskimpacts", "riskprobabilities", "risklevels"); localized Ids are normalized automatically.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the risk'),
         riskId: z.number().describe('The risk ID to update'),
@@ -968,17 +965,15 @@ export function registerWriteTools(
   server.registerTool(
     'update_issue',
     {
-      description: 'Update issue fields via PATCH (only send the fields you want to change). Returns the updated issue read back from v2 REST. '
-        + 'Use get_reference_data with entity "issuestatuses" or "issuetypes" to discover IDs; '
-        + 'the tool accepts localized Id values and normalizes them to BaseId values where v2 REST requires them.',
+      description: 'Update issue fields via PATCH; send only the fields to change. Discover IDs with get_reference_data (entities "issuestatuses", "issuetypes"); localized Ids are normalized automatically.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the issue'),
         issueId: z.number().describe('The issue ID to update'),
         Name: z.string().optional().describe('New issue name'),
         Description: z.string().optional().describe('New issue description'),
-        StatusId: z.number().optional().describe('New issue status ID. Mapped to the v2 REST Status field.'),
-        TypeId: z.number().optional().describe('New issue type ID. Mapped to the v2 REST Type field.'),
-        Resolution: z.string().optional().describe('New resolution description. Mapped to the v2 REST FinalResolution field.'),
+        StatusId: z.number().optional().describe('New issue status ID'),
+        TypeId: z.number().optional().describe('New issue type ID'),
+        Resolution: z.string().optional().describe('New resolution description'),
       },
     },
     async (args) => {
@@ -996,20 +991,19 @@ export function registerWriteTools(
     'create_service',
     {
       description: 'Create a new service. Name and TypeId are required; use get_reference_data with entity "servicetypes" to discover valid service type IDs. '
-        + 'The service is always created with the account default status; call update_service afterwards to change it. '
-        + 'Returns the created service read back from v2 REST (source of truth).',
+        + 'The service is always created with the account default status; call update_service afterwards to change it.',
       inputSchema: {
         Name: z.string().describe('Service name (required, must be unique among services in the account)'),
-        TypeId: z.number().describe('Service type ID (required). Use get_reference_data with entity "servicetypes" to discover valid IDs.'),
+        TypeId: z.number().describe('Service type ID (required; entity "servicetypes")'),
         Description: z.string().optional().describe('Service description'),
         StartDate: z.string().optional().describe('Start date (ISO 8601)'),
         EndDate: z.string().optional().describe('End date (ISO 8601)'),
-        PriorityId: z.number().optional().describe('Service priority ID; account default when omitted. Use get_reference_data with entity "projectpriorities".'),
+        PriorityId: z.number().optional().describe('Priority ID; account default when omitted (entity "projectpriorities")'),
         InternalCode: z.string().optional().describe('Internal service code'),
         // Published so the SDK does not silently strip them; the handler rejects
         // both with a pointer to update_service instead of ignoring the value.
-        StatusId: z.number().optional().describe('NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards.'),
-        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation: the service is always created with the account default status. Use update_service to change the status afterwards.'),
+        StatusId: z.number().optional().describe('NOT SUPPORTED at creation; the account default status applies. Change it with update_service.'),
+        ProjectStatusId: z.number().optional().describe('NOT SUPPORTED at creation; the account default status applies. Change it with update_service.'),
       },
     },
     async (args) => {
@@ -1026,14 +1020,13 @@ export function registerWriteTools(
   server.registerTool(
     'update_service',
     {
-      description: 'Update service fields via PATCH. Only send the fields you want to change. Returns the updated service read back from v2 REST. '
-        + 'Use get_reference_data with entity "projectstatuses" to discover status IDs.',
+      description: 'Update service fields via PATCH; send only the fields to change. Status IDs come from get_reference_data entity "projectstatuses".',
       inputSchema: {
         serviceId: z.number().describe('The service ID to update'),
         Name: z.string().optional().describe('New service name'),
         Description: z.string().optional().describe('New service description'),
-        StatusId: z.number().optional().describe('New service status ID. Compatibility alias mapped to ProjectStatusId before calling v2 REST.'),
-        ProjectStatusId: z.number().optional().describe('New service status ID field used by v2 REST'),
+        StatusId: z.number().optional().describe('New service status ID (alias of ProjectStatusId)'),
+        ProjectStatusId: z.number().optional().describe('New service status ID (v2 field name)'),
         PriorityId: z.number().optional().describe('New priority ID'),
         StartDate: z.string().optional().describe('New start date (ISO 8601)'),
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
@@ -1052,24 +1045,23 @@ export function registerWriteTools(
   server.registerTool(
     'create_activity',
     {
-      description: 'Create a new activity in a service. Activities are the service counterpart of project tasks and form a flat list (no milestones, summary tasks, or hierarchy). '
+      description: 'Create a new activity in a service. Activities form a flat list (no milestones, summaries, or hierarchy). '
         + 'Name, StatusId, StartDate, and EndDate are required. Activity statuses differ from task statuses; '
-        + 'use get_reference_data with entity "activitystatuses" to discover valid IDs. '
-        + 'Returns the created activity read back from v2 REST (source of truth).',
+        + 'use get_reference_data with entity "activitystatuses" to discover valid IDs.',
       inputSchema: {
         serviceId: z.number().describe('The service ID to create the activity in'),
         Name: z.string().describe('Activity name (required)'),
-        Description: z.string().optional().describe('Activity description. Compatibility alias for the v2 REST Details field.'),
-        Details: z.string().optional().describe('Activity details/description field used by v2 REST'),
-        StatusId: z.number().describe('Activity status ID (required). Use get_reference_data with entity "activitystatuses" to discover valid IDs.'),
+        Description: z.string().optional().describe('Activity description (alias of Details)'),
+        Details: z.string().optional().describe('Details field used by v2 REST'),
+        StatusId: z.number().describe('Activity status ID (required; entity "activitystatuses")'),
         TypeId: z.number().optional().describe('Activity type ID (account default when omitted)'),
         PriorityId: z.number().optional().describe('Activity priority ID (account default when omitted)'),
         StartDate: z.string().describe('Start date (ISO 8601, required)'),
         EndDate: z.string().describe('End date (ISO 8601, required)'),
         // Published so the SDK does not silently strip them; the handler rejects
         // both because service activities form a flat list.
-        KindId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks.'),
-        ParentId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks.'),
+        KindId: z.number().optional().describe('NOT SUPPORTED: activities form a flat list; milestones exist only on project tasks.'),
+        ParentId: z.number().optional().describe('NOT SUPPORTED: activities form a flat list; hierarchy exists only on project tasks.'),
       },
     },
     async (args) => {
@@ -1086,14 +1078,14 @@ export function registerWriteTools(
   server.registerTool(
     'update_activity',
     {
-      description: 'Update activity fields via PATCH. Only send the fields you want to change. Returns the updated activity read back from v2 REST. '
-        + 'Activity statuses differ from task statuses; use get_reference_data with entity "activitystatuses" to discover valid IDs.',
+      description: 'Update activity fields via PATCH; send only the fields to change. '
+        + 'Activity statuses differ from task statuses (entity "activitystatuses").',
       inputSchema: {
         serviceId: z.number().describe('The service ID containing the activity'),
         activityId: z.number().describe('The activity ID to update'),
         Name: z.string().optional().describe('New activity name'),
-        Description: z.string().optional().describe('New description. Compatibility alias for the v2 REST Details field.'),
-        Details: z.string().optional().describe('New activity details/description field used by v2 REST'),
+        Description: z.string().optional().describe('New description (alias of Details)'),
+        Details: z.string().optional().describe('Details field used by v2 REST'),
         StatusId: z.number().optional().describe('New activity status ID'),
         TypeId: z.number().optional().describe('New activity type ID'),
         PriorityId: z.number().optional().describe('New activity priority ID'),
@@ -1101,8 +1093,8 @@ export function registerWriteTools(
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
         // Published so the SDK does not silently strip them; the handler rejects
         // both because service activities form a flat list.
-        KindId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; milestones and summary tasks exist only on project tasks.'),
-        ParentId: z.number().optional().describe('NOT SUPPORTED: service activities are a flat list; hierarchy exists only on project tasks.'),
+        KindId: z.number().optional().describe('NOT SUPPORTED: activities form a flat list; milestones exist only on project tasks.'),
+        ParentId: z.number().optional().describe('NOT SUPPORTED: activities form a flat list; hierarchy exists only on project tasks.'),
       },
     },
     async (args) => {
@@ -1118,15 +1110,15 @@ export function registerWriteTools(
   server.registerTool(
     'bulk_update_task_status',
     {
-      description: 'Apply one status to many tasks of a project in a single call (much faster than looping update_task). '
-        + `Collect task IDs first via list_project_tasks or search, then chunk into calls of at most ${BULK_STATUS_MAX_IDS} IDs. `
+      description: 'Apply one status to many tasks of a project in one call (faster than looping update_task). '
+        + `Collect task IDs via list_project_tasks or search_tasks; chunk into calls of at most ${BULK_STATUS_MAX_IDS} IDs. `
         + 'Resolve valid status IDs via get_reference_data (entity "gettaskstatuses"): statuses differ between Waterfall and Kanban projects, '
         + 'and Kanban projects interpret statusId as the Kanban column ID, so pass projectMethodTypeId (1=Waterfall, 2=Kanban) or use statusName instead. '
-        + 'Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.',
+        + 'Always check the failed array; retrying a failed chunk is safe.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the tasks'),
         taskIds: z.array(z.number()).min(1).max(BULK_STATUS_MAX_IDS)
-          .describe(`Task IDs to update (1-${BULK_STATUS_MAX_IDS} per call; chunk larger sets into multiple calls)`),
+          .describe(`Task IDs to update (max ${BULK_STATUS_MAX_IDS} per call)`),
         statusId: z.number().optional().describe('Target status ID (Kanban column ID for Kanban projects). Either statusId or statusName is required.'),
         statusName: z.string().optional().describe('Target status name, resolved server-side when statusId is omitted'),
         projectMethodTypeId: z.number().optional().describe('Project methodology: 1=Waterfall, 2=Kanban. Needed for Kanban status resolution and name lookup.'),
@@ -1148,13 +1140,13 @@ export function registerWriteTools(
       description: 'Apply one status to many activities of a service in a single call. '
         + `Collect activity IDs first via list_service_activities, then chunk into calls of at most ${BULK_STATUS_MAX_IDS} IDs. `
         + 'Resolve valid activity status IDs via get_reference_data with entity "activitystatuses" (activity statuses differ from task statuses), or pass statusName. '
-        + 'Returns a compact summary; always check the failed array of every chunk. Re-applying the same status is harmless, so retrying a failed chunk is safe.',
+        + 'Always check the failed array; retrying a failed chunk is safe.',
       inputSchema: {
         serviceId: z.number().describe('The service ID containing the activities'),
         activityIds: z.array(z.number()).min(1).max(BULK_STATUS_MAX_IDS)
-          .describe(`Activity IDs to update (1-${BULK_STATUS_MAX_IDS} per call; chunk larger sets into multiple calls)`),
+          .describe(`Activity IDs to update (max ${BULK_STATUS_MAX_IDS} per call)`),
         statusId: z.number().optional().describe('Target activity status ID. Either statusId or statusName is required.'),
-        statusName: z.string().optional().describe('Target activity status name, resolved against the activitystatuses reference list when statusId is omitted'),
+        statusName: z.string().optional().describe('Target activity status name, used when statusId is omitted'),
         projectMethodTypeId: z.number().optional().describe('Service methodology type ID passed through to the backend'),
       },
     },

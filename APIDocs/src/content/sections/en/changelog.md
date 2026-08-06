@@ -1,3 +1,20 @@
+### v1.0.18
+
+Time entries and project status reports: log worked hours and manage the project-level Seguimiento.
+
+**New tools (3):**
+- `log_time_entry`: logs actual worked hours on a task for one user and one date. ITM Platform stores a single total per user + task + date, so the tool reads the existing total first, then applies your choice of mode: `add` (adds the hours) or `set` (replaces the total; 0:00 clears the entry). The response always echoes the previous and the new total. Logging for another user requires a Company Admin or Full Access license and attributes the hours to that user.
+- `create_project_progress`: creates a project-level progress (Seguimiento) entry: report date, completion percentage, assessment rating, and status description. This is the project status report shown in the Project > Progress tab, independent from per-task progress.
+- `update_project_progress`: updates an existing project progress entry; omitted fields keep their stored values.
+
+**Extended tools (1):**
+- `get_project_progress`: new optional `includeEntries` parameter returns the full project follow-up entries (id, assessment, descriptions, author) alongside the progress curves.
+
+**Notes:**
+- The user must be assigned to the task before time can be logged (`TaskMembers`/`TaskManagers` on `create_task`/`update_task`), and closed projects block time entry: log hours before closing a project.
+- Creating a project progress entry at 100% automatically closes the project (the platform applies the account's completed status). Log pending hours first; reopen with `update_project` if needed.
+- Assessment ratings are discovered with `get_reference_data` entity `assessments`, the same values used by task progress.
+
 ### v1.0.17
 
 Task assignment: `create_task` and `update_task` can now assign users to tasks.

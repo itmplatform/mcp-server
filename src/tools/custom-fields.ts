@@ -42,10 +42,10 @@ export function registerCustomFieldTools(
     {
       description: `Get the account's custom field definitions for an entity type: project, task, risk, issue, service, activity, purchase, or revenue. Returns Id, BaseId, Name, TypeId, TypeName (Text, Number, Percentage, Date, HTML, RYGList, DropDownList, List), Description, Required.
 
-Custom field VALUES live in DataMart documents under "customFields", an object keyed by the field's display Name exactly as returned here (keys are case- and accent-sensitive and may contain trailing spaces). Query them with query_datamart, e.g. project: {"customFields": 1} or where: {"customFields.<Name>": {"$eq": ...}}. On accounts that work in several languages the key follows each component's language; definitions can be fetched per language (languageId 1=English, 2=Spanish, 3=Portuguese) to learn the variant names of the same BaseId. For RYGList, DropDownList, and List fields, get valid values with get_custom_field_options.`,
+VALUES live in DataMart under "customFields", keyed by the display Name exactly as returned here (case- and accent-sensitive, may contain trailing spaces). Query via query_datamart, e.g. project {"customFields": 1} or where {"customFields.<Name>": ...}. On multilingual accounts the key follows each component's language; fetch definitions per languageId to learn the variant names of the same BaseId. Dropdown values: get_custom_field_options.`,
       inputSchema: {
         entity: z.enum(CUSTOM_FIELD_ENTITIES).describe('The entity type whose custom field definitions to retrieve'),
-        languageId: z.number().optional().describe('Definition language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language.'),
+        languageId: z.number().optional().describe('Language: 1=English, 2=Spanish, 3=Portuguese (default: your user language)'),
       },
     },
     async (args) => {
@@ -61,7 +61,7 @@ Custom field VALUES live in DataMart documents under "customFields", an object k
       description: 'Get the selectable options of a dropdown custom field (RYGList, DropDownList, or List types), using the BaseId returned by get_custom_fields. Returns Id, BaseId, Text, Color (RYG lists), SortOrder, IsDefault. The option Text is the value stored in DataMart "customFields" for the component.',
       inputSchema: {
         customFieldBaseId: z.number().describe('The custom field BaseId from get_custom_fields'),
-        languageId: z.number().optional().describe('Option language: 1=English, 2=Spanish, 3=Portuguese. Defaults to your user language.'),
+        languageId: z.number().optional().describe('Language: 1=English, 2=Spanish, 3=Portuguese (default: your user language)'),
       },
     },
     async (args) => {

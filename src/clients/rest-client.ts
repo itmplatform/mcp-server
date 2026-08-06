@@ -60,19 +60,22 @@ async function readErrorDetail(response: Response): Promise<string | undefined> 
   }
 }
 
-export function createRestClient(config: RestClientConfig): RestClient {
-  const baseUrl = `${config.apiUrl}/v2/${config.company}`;
-  const log = config.log;
+interface RequestPipeline {
+  baseUrl: string;
+  resolveHeaders: () => Promise<Record<string, string>>;
+  onAuthRetry?: () => Promise<void>;
+  parseBody: (response: Response) => Promise<unknown>;
+  log?: Logger;
+}
+
+function createRequestPipeline(pipeline: RequestPipeline): RestClient {
+  const { baseUrl, log } = pipeline;
 
   async function request(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<unknown> {
     const start = Date.now();
-    const buildHeaders = (): Record<string, string> => ({
-      ...config.authHeaders,
-      'Content-Type': 'application/json',
-    });
-    const buildFetchOpts = (signal?: AbortSignal) => ({
+    const buildFetchOpts = async (signal?: AbortSignal) => ({
       method,
-      headers: buildHeaders(),
+      headers: { ...(await pipeline.resolveHeaders()), 'Content-Type': 'application/json' },
       ...(signal ? { signal } : {}),
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
@@ -83,14 +86,14 @@ export function createRestClient(config: RestClientConfig): RestClient {
       : undefined;
 
     try {
-      let response = await fetch(`${baseUrl}/${path}`, buildFetchOpts(controller?.signal));
+      let response = await fetch(`${baseUrl}/${path}`, await buildFetchOpts(controller?.signal));
 
-      if (response.status === 401 && config.onUnauthorized) {
+      if (response.status === 401 && pipeline.onAuthRetry) {
         try {
-          await config.onUnauthorized();
-          response = await fetch(`${baseUrl}/${path}`, buildFetchOpts(controller?.signal));
+          await pipeline.onAuthRetry();
+          response = await fetch(`${baseUrl}/${path}`, await buildFetchOpts(controller?.signal));
         } catch {
-          // re-exchange failed; fall through to the error below
+          // re-authentication failed; fall through to the error below
         }
       }
 
@@ -101,7 +104,7 @@ export function createRestClient(config: RestClientConfig): RestClient {
         throw new Error(`REST request failed: ${response.status} ${response.statusText}${detailSuffix}`);
       }
 
-      const result = await response.json();
+      const result = await pipeline.parseBody(response);
       log?.debug({ method, path, ms: Date.now() - start }, 'REST request OK');
       return result;
     } catch (err) {
@@ -121,4 +124,81 @@ export function createRestClient(config: RestClientConfig): RestClient {
     patch: (path: string, body: unknown, opts?: RequestOptions) => request('PATCH', path, body, opts),
     put: (path: string, body: unknown, opts?: RequestOptions) => request('PUT', path, body, opts),
   };
+}
+
+export function createRestClient(config: RestClientConfig): RestClient {
+  return createRequestPipeline({
+    baseUrl: `${config.apiUrl}/v2/${config.company}`,
+    resolveHeaders: async () => ({ ...config.authHeaders }),
+    onAuthRetry: config.onUnauthorized,
+    parseBody: response => response.json(),
+    log: config.log,
+  });
+}
+
+// v1 endpoints live outside the /v2 gateway prefix and only authenticate with
+// the `Token` header: the gateway's Bearer-to-token conversion never runs for
+// them. API-key sessions therefore exchange the key through the v1 Login
+// route once and reuse the resulting token.
+export function createV1RestClient(config: RestClientConfig): RestClient {
+  const baseUrl = `${config.apiUrl}/${config.company}`;
+  let v1Token: string | undefined;
+  let loginPromise: Promise<void> | undefined;
+
+  function sessionToken(): string | undefined {
+    const token = config.authHeaders['Token'];
+    return typeof token === 'string' && token.length > 0 ? token : undefined;
+  }
+
+  function apiKey(): string | undefined {
+    const auth = config.authHeaders['Authorization'];
+    if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+      const key = auth.slice('Bearer '.length).trim();
+      if (key) return key;
+    }
+    return undefined;
+  }
+
+  async function performLogin(): Promise<void> {
+    const key = apiKey();
+    if (!key) throw new Error('v1 REST call requires a session token or an API key');
+    const response = await fetch(`${baseUrl}/Login/${encodeURIComponent(key)}`, { method: 'GET' });
+    const body = response.ok ? await response.json().catch(() => undefined) : undefined;
+    const token = body && typeof body === 'object' ? (body as Record<string, unknown>).Token : undefined;
+    if (typeof token !== 'string' || !token) {
+      throw new Error(`v1 API-key login failed: ${response.status} ${response.statusText}`);
+    }
+    v1Token = token;
+  }
+
+  async function loginOnce(): Promise<void> {
+    if (!loginPromise) {
+      loginPromise = performLogin().finally(() => { loginPromise = undefined; });
+    }
+    return loginPromise;
+  }
+
+  return createRequestPipeline({
+    baseUrl,
+    resolveHeaders: async () => {
+      if (sessionToken()) return { ...config.authHeaders };
+      if (!v1Token) await loginOnce();
+      return { Token: v1Token! };
+    },
+    onAuthRetry: async () => {
+      if (sessionToken()) {
+        if (!config.onUnauthorized) throw new Error('unauthorized');
+        await config.onUnauthorized();
+        return;
+      }
+      v1Token = undefined;
+      await loginOnce();
+    },
+    parseBody: async response => {
+      if (response.status === 204) return null;
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    },
+    log: config.log,
+  });
 }

@@ -1,3 +1,20 @@
+### v1.0.18
+
+Registro de horas y seguimiento de proyecto: impute horas trabajadas y gestione el Seguimiento a nivel de proyecto.
+
+**Herramientas nuevas (3):**
+- `log_time_entry`: registra horas efectivamente trabajadas en una tarea para un usuario y una fecha. ITM Platform guarda un único total por usuario + tarea + fecha, por lo que la herramienta lee primero el total existente y aplica el modo elegido: `add` (suma las horas) o `set` (reemplaza el total; 0:00 elimina el registro). La respuesta siempre incluye el total anterior y el nuevo. Registrar horas de otro usuario requiere licencia de Company Admin o Full Access y las horas se atribuyen a ese usuario.
+- `create_project_progress`: crea un seguimiento a nivel de proyecto: fecha del informe, porcentaje completado, evaluación y descripción del estado. Es el informe de estado que se muestra en la pestaña Proyecto > Seguimiento, independiente del seguimiento por tarea.
+- `update_project_progress`: actualiza un seguimiento de proyecto existente; los campos omitidos conservan su valor.
+
+**Herramientas ampliadas (1):**
+- `get_project_progress`: el nuevo parámetro opcional `includeEntries` devuelve los seguimientos completos del proyecto (id, evaluación, descripciones, autor) junto con las curvas de avance.
+
+**Notas:**
+- El usuario debe estar asignado a la tarea antes de imputar horas (`TaskMembers`/`TaskManagers` en `create_task`/`update_task`), y los proyectos cerrados bloquean el registro de horas: impute antes de cerrar.
+- Crear un seguimiento de proyecto al 100% cierra automáticamente el proyecto (la plataforma aplica el estado de cierre de la cuenta). Impute las horas pendientes primero; puede reabrir con `update_project`.
+- Las evaluaciones se descubren con `get_reference_data` entidad `assessments`, los mismos valores del seguimiento de tareas.
+
 ### v1.0.17
 
 Asignación de usuarios: `create_task` y `update_task` ahora pueden asignar usuarios a las tareas.
