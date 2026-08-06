@@ -161,9 +161,12 @@ export function registerTimeEntryTools(
 
       const restError = collectRestErrors(response);
       if (restError) {
-        const hint = restError.includes('not assigned')
-          ? ' Assign the user to the task first with update_task (TaskMembers/TaskManagers accept comma-separated usernames), then retry.'
-          : '';
+        let hint = '';
+        if (restError.includes('not assigned')) {
+          hint = ' Assign the user to the task first with update_task (TaskMembers/TaskManagers accept comma-separated usernames), then retry.';
+        } else if (/editing not allowed/i.test(restError)) {
+          hint = ' The work date must fall inside the task AND project date ranges (unless the account allows out-of-range entries), the project status must allow time entry, and the period must not be invoiced.';
+        }
         return { content: [{ type: 'text' as const, text: `Time entry failed: ${restError}.${hint}` }], isError: true };
       }
 
