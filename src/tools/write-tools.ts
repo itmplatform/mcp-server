@@ -813,10 +813,10 @@ export function registerWriteTools(
     'update_task',
     {
       description: 'Update task fields via PATCH; send only the fields to change. '
-        + 'KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. '
-        + 'Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. '
-        + 'Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; '
-        + 'a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.',
+        + 'KindId changes the task kind (1=Milestone, 2=Summary, 3=Task; not TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. '
+        + 'Converting to a milestone requires equal StartDate and EndDate in the same call. '
+        + 'A status with AutomaticProgress (such as Completed) creates a 100% progress entry; '
+        + 'a later lower report only takes effect with a later ReportDate (percentComplete tracks the latest entry by ReportDate).',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to update'),

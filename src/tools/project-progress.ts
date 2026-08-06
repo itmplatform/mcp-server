@@ -111,10 +111,9 @@ export function registerProjectProgressTools(
     'create_project_progress',
     {
       description: 'Create a project-level progress (Seguimiento) entry: the project status report with report date, '
-        + 'completion percentage, assessment rating, and status description. Independent from per-task progress and from '
-        + 'the get_project_progress curves. WARNING: percentage 100 automatically CLOSES the project, which blocks further '
-        + 'time entry; log hours first (reopen with update_project if needed). Assessment IDs: get_reference_data entity '
-        + '"assessments".',
+        + 'completion percentage, assessment rating, and status description. Independent from per-task progress. '
+        + 'WARNING: percentage 100 automatically CLOSES the project, which blocks further time entry; log hours first '
+        + '(reopen with update_project if needed). Assessment IDs: get_reference_data entity "assessments".',
       inputSchema: {
         projectId: z.number().describe('The project ID to report status on'),
         reportDate: z.string().describe('Report date (ISO 8601)'),

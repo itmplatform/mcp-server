@@ -82,7 +82,7 @@ export function registerProgressTools(
   server.registerTool(
     'get_project_progress',
     {
-      description: 'Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). With includeEntries true, also returns the full project-level Seguimiento entries (ProjectProgressId, assessment, descriptions) for use with update_project_progress.',
+      description: 'Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). includeEntries true adds the full Seguimiento entries (ProjectProgressId, assessment, descriptions) for update_project_progress.',
       inputSchema: {
         projectId: z.number().describe('The project ID to get the progress report for'),
         includeEntries: z.boolean().optional().describe('Also return the full follow-up entries (default false)'),

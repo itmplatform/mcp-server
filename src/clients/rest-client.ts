@@ -47,12 +47,13 @@ function detailFromJson(value: unknown): string | undefined {
   return undefined;
 }
 
-async function readErrorDetail(response: Response): Promise<string | undefined> {
-  if (typeof response.text !== 'function') return undefined;
+async function readErrorText(response: Response): Promise<string> {
+  if (typeof response.text !== 'function') return '';
+  return response.text().catch(() => '');
+}
 
-  const text = await response.text().catch(() => '');
+function detailFromText(text: string): string | undefined {
   if (!text) return undefined;
-
   try {
     return detailFromJson(JSON.parse(text)) ?? normalizeErrorDetail(text);
   } catch {
@@ -64,6 +65,9 @@ interface RequestPipeline {
   baseUrl: string;
   resolveHeaders: () => Promise<Record<string, string>>;
   onAuthRetry?: () => Promise<void>;
+  // Extra auth-failure detector for a 400 response body (v1 reports expired
+  // tokens as 400, not 401). Only consulted when onAuthRetry is set.
+  authRetryOn400Body?: (bodyText: string) => boolean;
   parseBody: (response: Response) => Promise<unknown>;
   log?: Logger;
 }
@@ -87,18 +91,27 @@ function createRequestPipeline(pipeline: RequestPipeline): RestClient {
 
     try {
       let response = await fetch(`${baseUrl}/${path}`, await buildFetchOpts(controller?.signal));
+      let consumedErrorText: string | undefined;
 
-      if (response.status === 401 && pipeline.onAuthRetry) {
-        try {
-          await pipeline.onAuthRetry();
-          response = await fetch(`${baseUrl}/${path}`, await buildFetchOpts(controller?.signal));
-        } catch {
-          // re-authentication failed; fall through to the error below
+      if (pipeline.onAuthRetry) {
+        let authFailure = response.status === 401;
+        if (!authFailure && response.status === 400 && pipeline.authRetryOn400Body) {
+          consumedErrorText = await readErrorText(response);
+          authFailure = pipeline.authRetryOn400Body(consumedErrorText);
+        }
+        if (authFailure) {
+          try {
+            await pipeline.onAuthRetry();
+            response = await fetch(`${baseUrl}/${path}`, await buildFetchOpts(controller?.signal));
+            consumedErrorText = undefined;
+          } catch {
+            // re-authentication failed; fall through to the error below
+          }
         }
       }
 
       if (!response.ok) {
-        const detail = await readErrorDetail(response);
+        const detail = detailFromText(consumedErrorText ?? await readErrorText(response));
         log?.error({ method, path, status: response.status, detail, ms: Date.now() - start }, 'REST request failed');
         const detailSuffix = detail ? ` -- ${detail}` : '';
         throw new Error(`REST request failed: ${response.status} ${response.statusText}${detailSuffix}`);
@@ -194,6 +207,9 @@ export function createV1RestClient(config: RestClientConfig): RestClient {
       v1Token = undefined;
       await loginOnce();
     },
+    // A concurrent login overwrites the platform's single token row per user;
+    // v1 TokenValidation then answers 400 "Token expired" instead of 401.
+    authRetryOn400Body: bodyText => /token expired|invalid token/i.test(bodyText),
     parseBody: async response => {
       if (response.status === 204) return null;
       const text = await response.text();
