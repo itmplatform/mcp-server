@@ -239,6 +239,22 @@ describe('log_time_entry', () => {
     expect(clients.restV1.post).not.toHaveBeenCalled();
   });
 
+  it('adds a date-window hint when editing is not allowed', async () => {
+    const { tools, clients } = await setup();
+    clients.restV1.get.mockResolvedValueOnce(null);
+    clients.restV1.post.mockResolvedValue({
+      StatusCode: 400,
+      Errors: [{ EntityId: 100, WorkItemId: 200, Message: 'Work item editing not allowed' }],
+    });
+
+    const result = await tools.get('log_time_entry')!.cb({
+      projectId: 100, taskId: 200, date: TODAY, hours: 1, minutes: 0, mode: 'set',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/task AND project date ranges/);
+  });
+
   it('surfaces per-row REST errors such as unassigned users', async () => {
     const { tools, clients } = await setup();
     clients.restV1.get.mockResolvedValueOnce(null);
