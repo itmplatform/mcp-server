@@ -908,6 +908,54 @@ describe('task hierarchy and milestone handler wiring', () => {
   });
 });
 
+describe('task team readback rights URL', () => {
+  function register(rest: any) {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, { rest } as any);
+    return registrations;
+  }
+
+  const usersReadback = {
+    canAddTeam: 'True',
+    TaskUsers: { 'bob@x.com': { UserId: 5, DisplayName: 'Bob', IsTaskManager: 'False' } },
+  };
+
+  it('create_task readback sends the TaskTeam page URL for the rights check', async () => {
+    const rest = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ Id: 100, MethodTypeId: 2 })
+        .mockResolvedValueOnce({ Id: 7001, Name: 'T', KindId: 3 })
+        .mockResolvedValueOnce(usersReadback),
+      post: vi.fn().mockResolvedValue({ Id: 7001 }),
+    };
+    const result = await register(rest).get('create_task').handler({
+      projectId: 100, Name: 'T', TaskMembers: 'bob@x.com',
+    });
+    expect(result.isError).toBeFalsy();
+    expect(rest.get).toHaveBeenLastCalledWith('projects/100/tasks/7001/users?URL=UserPages/TaskTeam.aspx');
+  });
+
+  it('update_task readback sends the TaskTeam page URL for the rights check', async () => {
+    const rest = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ Id: 100, MethodTypeId: 2 })
+        .mockResolvedValueOnce({ Id: 42, Name: 'T' })
+        .mockResolvedValueOnce(usersReadback),
+      patch: vi.fn().mockResolvedValue({}),
+    };
+    const result = await register(rest).get('update_task').handler({
+      projectId: 100, taskId: 42, TaskMembers: 'bob@x.com',
+    });
+    expect(result.isError).toBeFalsy();
+    expect(rest.get).toHaveBeenLastCalledWith('projects/100/tasks/42/users?URL=UserPages/TaskTeam.aspx');
+  });
+});
+
 describe('create_risk handler wiring', () => {
   function register(rest: any) {
     const registrations = new Map<string, any>();
