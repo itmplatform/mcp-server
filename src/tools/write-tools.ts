@@ -595,6 +595,13 @@ export function taskVerificationFieldsFor(body: JsonRecord, readback?: unknown):
   });
 }
 
+// The backend forwards the URL param to a page-rights check; backends without the
+// ITM.Tasks null-URL fallback (pre 2026-08) throw a NullReferenceException in
+// ITM.Account when it is missing, so always send the page the web UI uses.
+export function taskUsersReadbackPath(taskPath: string): string {
+  return `${taskPath}/users?URL=UserPages/TaskTeam.aspx`;
+}
+
 // GET .../tasks/{taskId}/users returns { canAddTeam, TaskUsers: { <username>: row } };
 // the row carries the full user profile (holiday calendars included), far too verbose
 // to echo back, so responses carry this compact projection instead.
@@ -801,7 +808,7 @@ export function registerWriteTools(
       const readback = await clients.rest.get(`${path}/${taskId}`);
       verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'create_task');
       if (hasAssignmentFields(body)) {
-        const usersReadback = await clients.rest.get(`${path}/${taskId}/users`);
+        const usersReadback = await clients.rest.get(taskUsersReadbackPath(`${path}/${taskId}`));
         verifyTaskTeamReadback(body, usersReadback, resolveMethodTypeId(project) === 1, 'create_task');
         return buildWriteResponse(withTeam(readback, usersReadback));
       }
@@ -847,7 +854,7 @@ export function registerWriteTools(
       const readback = await clients.rest.get(path);
       verifyRequestedFields(body, readback, taskVerificationFieldsFor(body, readback), 'update_task');
       if (hasAssignmentFields(body)) {
-        const usersReadback = await clients.rest.get(`${path}/users`);
+        const usersReadback = await clients.rest.get(taskUsersReadbackPath(path));
         verifyTaskTeamReadback(body, usersReadback, resolveMethodTypeId(project) === 1, 'update_task');
         return buildWriteResponse(withTeam(readback, usersReadback));
       }
