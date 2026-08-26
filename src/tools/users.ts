@@ -6,7 +6,7 @@ export function registerUserTools(server: McpServer, clients: Clients) {
   server.registerTool(
     'search_users',
     {
-      description: 'Find team members by name or email. Returns userId, name, email, role. Uses v2 REST API (not DataMart).',
+      description: 'Find team members by name or email. Returns user ID, display name, and email. Uses projected v2 REST search (not DataMart).',
       inputSchema: {
         query: z.string().optional().describe('Search by name or email (case-insensitive)'),
         limit: z.number().optional().describe('Max results (default 50)'),
@@ -16,11 +16,14 @@ export function registerUserTools(server: McpServer, clients: Clients) {
       const body: Record<string, unknown> = {
         page: 1,
         pageSize: Math.min(args.limit ?? 50, 200),
+        Columns: { $in: ['UserId', 'DisplayName', 'EmailAddress'] },
+        sortBy: 'DisplayName',
+        sortOrder: 'asc',
       };
       if (args.query) {
         body.Filter = { Name: { $regex: args.query } };
       }
-      const data = await clients.rest.post('AllUsers', body);
+      const data = await clients.rest.post('Users/Search?paged=true', body);
       return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
     },
   );

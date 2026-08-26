@@ -448,7 +448,8 @@ Used for entities DataMart does not cover, and for all write operations.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v2/{co}/AllUsers` | GET/POST | List/search users (supports filter, pagination, sort via POST body) |
+| `/v2/{co}/Users/Search` | POST | Projected active-user search (filter, pagination, sort, Columns) |
+| `/v2/{co}/AllUsers` | GET/POST | Legacy full-user compatibility route; do not use for new integrations |
 | `/v2/{co}/users/{id}` | GET | User details |
 | `/v2/{co}/roles` | GET | Role list |
 | `/v2/{co}/holidays` | GET | Holiday calendars |
@@ -601,7 +602,7 @@ Use OpenAPI as a source of truth for input/output validation (zod schemas) but h
 
 | Tool | Description | API call |
 |------|-------------|----------|
-| `search_users` | Find team members | `POST /v2/{co}/AllUsers` (with filter body) |
+| `search_users` | Find team members | `POST /v2/{co}/Users/Search?paged=true` (projected identity columns) |
 | `get_user` | User details | `GET /v2/{co}/users/{id}` |
 | `get_reference_data` | Status lists, types, priorities for an entity | `GET /v2/{co}/{entity}statuses` etc. |
 
@@ -1274,6 +1275,10 @@ curl -s -X POST http://localhost:6170/mcp \
 ```
 
 Expected: array of users with `userId`, `name`, `email`.
+
+As of 2026-08-26 this tool requests only `UserId`, `DisplayName`, and `EmailAddress` from
+`Users/Search`. The previous Node POST to legacy `AllUsers` was visible in production IIS telemetry
+and must disappear after MCP deployment before that compatibility route can be retired.
 
 **get_user -- single user (v2 REST):**
 
