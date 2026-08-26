@@ -1,28 +1,39 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { registerUserTools } from '../../../src/tools/users.js';
 
 describe('search_users query composition', () => {
-  it('builds POST body with name filter', () => {
-    const args = { query: 'daniel', limit: 5 };
-    const body: Record<string, unknown> = {
-      page: 1,
-      pageSize: Math.min(args.limit ?? 50, 200),
+  function registerAndGetHandler() {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
     };
-    if (args.query) body.Filter = { Name: { $regex: args.query } };
+    const rest = { post: vi.fn().mockResolvedValue({ list: [] }), get: vi.fn() };
+    registerUserTools(server as any, { rest } as any);
+    return { handler: registrations.get('search_users').handler, rest };
+  }
 
-    expect(body.Filter).toEqual({ Name: { $regex: 'daniel' } });
-    expect(body.pageSize).toBe(5);
+  it('POSTs Users/Search with a projected identity response and name-or-email filter', async () => {
+    const { handler, rest } = registerAndGetHandler();
+    await handler({ query: 'daniel', limit: 5 });
+
+    expect(rest.post).toHaveBeenCalledWith('Users/Search?paged=true', {
+      page: 1,
+      pageSize: 5,
+      Columns: { $in: ['UserId', 'DisplayName', 'EmailAddress'] },
+      Filter: { Name: { $regex: 'daniel' } },
+      sortBy: 'DisplayName',
+      sortOrder: 'asc',
+    });
   });
 
-  it('defaults pageSize to 50', () => {
-    const args: { query?: string; limit?: number } = {};
-    const pageSize = Math.min(args.limit ?? 50, 200);
-    expect(pageSize).toBe(50);
-  });
-
-  it('caps pageSize at 200', () => {
-    const args = { limit: 500 };
-    const pageSize = Math.min(args.limit ?? 50, 200);
-    expect(pageSize).toBe(200);
+  it('defaults pageSize to 50 and caps it at 200', async () => {
+    const { handler, rest } = registerAndGetHandler();
+    await handler({});
+    await handler({ limit: 500 });
+    expect(rest.post.mock.calls[0][1].pageSize).toBe(50);
+    expect(rest.post.mock.calls[1][1].pageSize).toBe(200);
   });
 });
 
