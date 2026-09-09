@@ -1,3 +1,15 @@
+### v1.0.21
+
+Los usuarios sin login (recursos sin acceso) ya pueden asignarse a tareas.
+
+**Herramientas ampliadas (3):**
+- `create_task` / `update_task`: `TaskManagers` y `TaskMembers` aceptan también ids numéricos de usuario (el `UserId` que devuelve `search_users`). Los nombres de usuario siguen funcionando igual. El id es la única forma de asignar a un usuario sin login, cuyo `EmailAddress` está vacío.
+- `search_users`: los resultados incluyen ahora `IsNonLoginUser`, para que el agente sepa cuándo usar el id en lugar del email.
+
+**Corregido:**
+- Al asignar un usuario sin login la escritura se realizaba pero la herramienta devolvía error ("is not on the task team after the write"), porque la relectura del equipo identifica a estos usuarios por un id interno en lugar de por nombre de usuario y la verificación solo comparaba nombres. La verificación ahora compara por id de usuario, y el array `team` de la respuesta devuelve `Username: null` para los miembros sin nombre de usuario.
+- El mensaje de error de verificación ya no atribuye la causa a un rol de stakeholder que no puede ver; remite a `search_users` y al rol del usuario en el proyecto.
+
 ### v1.0.18
 
 Registro de horas y seguimiento de proyecto: impute horas trabajadas y gestione el Seguimiento a nivel de proyecto.

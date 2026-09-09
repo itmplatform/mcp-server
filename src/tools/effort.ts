@@ -47,7 +47,7 @@ export function buildEffortUpdatePayload(
     if (!rows.length) {
       throw new Error(
         `User ${change.userId} is not assigned to this task. Assign them first with update_task `
-        + '(TaskMembers/TaskManagers accept comma-separated usernames), then retry.',
+        + '(TaskMembers/TaskManagers accept comma-separated usernames or numeric UserIds), then retry.',
       );
     }
     if (rows.length > 1) {

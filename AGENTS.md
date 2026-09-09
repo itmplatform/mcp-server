@@ -36,6 +36,7 @@ and `../README.md`.
 - Reads use DataMart only where its dataset is complete enough for the contract. Use REST for canonical single-record reads, writes, write readbacks, and data absent from DataMart. Never infer a successful write from eventually consistent DataMart results.
 - Enforce permissions and scopes in code. Tool descriptions are guidance, not an authorization boundary. Return actionable validation errors without leaking credentials, tokens, private data, or internal stack details.
 - For write tools, read the exact target and current state, validate side effects, write once, read back from the canonical API, and clean up every synthetic E2E record and association.
+- Example data in the public MCP docs (`APIDocs/`), in tool descriptions, and in the changelog must come from the demo environment, never from customer accounts on stage or production.
 
 ## Build and test
 

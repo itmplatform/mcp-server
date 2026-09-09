@@ -1,3 +1,15 @@
+### v1.0.21
+
+Non-login users (resources without a login) can now be assigned to tasks.
+
+**Extended tools (3):**
+- `create_task` / `update_task`: `TaskManagers` and `TaskMembers` also accept numeric user ids (the `UserId` returned by `search_users`). Usernames keep working as before. The id is the only way to assign a non-login user, whose `EmailAddress` is empty.
+- `search_users`: the results now include `IsNonLoginUser`, so an agent knows when to use the id instead of the email.
+
+**Fixed:**
+- Assigning a non-login user was written correctly but reported as failed ("is not on the task team after the write"), because the task team readback keys such users by an internal id instead of a username and the verification compared usernames only. The verification now matches by user id, and the `team` array in the response reports `Username: null` for members without a username.
+- The verification error no longer claims a stakeholder cause it cannot see; it points to `search_users` and the user's project role instead.
+
 ### v1.0.18
 
 Time entries and project status reports: log worked hours and manage the project-level Seguimiento.

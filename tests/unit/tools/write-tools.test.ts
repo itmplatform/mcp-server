@@ -1519,3 +1519,71 @@ describe('P1 write tool handlers', () => {
     expect(result.isError).toBeFalsy();
   });
 });
+
+describe('non-login users in task team readbacks', () => {
+  // ITM.Tasks keys TaskUsers by EmailAddress, or by TaskUserId when the user has no
+  // username (non-login users). The MCP must match by UserId in that case.
+  const usersResponse = {
+    canAddTeam: 'True',
+    TaskUsers: {
+      'Ana@x.com': { UserId: 1, EmailAddress: 'Ana@x.com', DisplayName: 'Ana A', IsTaskManager: true, TaskUserId: 11 },
+      '1023475': { UserId: 64169, EmailAddress: '', DisplayName: 'No Login', IsTaskManager: false, TaskUserId: 1023475 },
+    },
+  };
+
+  function errorMessage(fn: () => void): string {
+    try {
+      fn();
+    } catch (error) {
+      return (error as Error).message;
+    }
+    return '';
+  }
+
+  it('summarises a non-login member by UserId without inventing a username', () => {
+    // JavaScript lists integer-like keys first, so compare by UserId order.
+    const summary = buildTaskTeamSummary(usersResponse).sort((a, b) => Number(a.UserId) - Number(b.UserId));
+    expect(summary).toEqual([
+      { Username: 'Ana@x.com', UserId: 1, DisplayName: 'Ana A', IsTaskManager: true },
+      { Username: null, UserId: 64169, DisplayName: 'No Login', IsTaskManager: false },
+    ]);
+  });
+
+  it('accepts a numeric UserId and matches it against the row UserId, not the object key', () => {
+    expect(() => verifyTaskTeamReadback({ TaskMembers: '64169' }, usersResponse, true, 'update_task')).not.toThrow();
+    expect(() => verifyTaskTeamReadback({ TaskManagers: '1' }, usersResponse, true, 'update_task')).not.toThrow();
+    expect(() => verifyTaskTeamReadback({ TaskManagers: 'ana@x.com', TaskMembers: '64169' }, usersResponse, true, 'create_task')).not.toThrow();
+  });
+
+  it('still checks the manager flag for numeric ids on Waterfall', () => {
+    expect(() => verifyTaskTeamReadback({ TaskManagers: '64169' }, usersResponse, true, 'update_task')).toThrow('IsTaskManager');
+  });
+
+  it('reports a missing user without asserting a stakeholder cause it cannot see', () => {
+    const message = errorMessage(() => verifyTaskTeamReadback({ TaskMembers: '999' }, usersResponse, true, 'update_task'));
+    expect(message).toMatch(/999 is not on the task team after the write/);
+    expect(message).not.toMatch(/cannot be assigned/);
+  });
+
+  it('does not treat the TaskUserId object key as a username', () => {
+    const message = errorMessage(() => verifyTaskTeamReadback({ TaskMembers: '1023475' }, usersResponse, true, 'update_task'));
+    expect(message).toMatch(/1023475 is not on the task team/);
+  });
+
+  it('documents numeric UserIds on the assignment fields of both task tools', () => {
+    const registrations = new Map<string, any>();
+    const server = {
+      registerTool: vi.fn((name: string, config: any, handler: any) => {
+        registrations.set(name, { config, handler });
+      }),
+    };
+    registerWriteTools(server as any, {} as any);
+    for (const tool of ['create_task', 'update_task']) {
+      for (const field of ['TaskManagers', 'TaskMembers']) {
+        const description = registrations.get(tool).config.inputSchema[field].description as string;
+        expect(description, `${tool}.${field}`).toContain('UserId');
+        expect(description, `${tool}.${field}`).toContain('non-login');
+      }
+    }
+  });
+});

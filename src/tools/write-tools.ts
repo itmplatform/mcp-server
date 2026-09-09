@@ -602,23 +602,56 @@ export function taskUsersReadbackPath(taskPath: string): string {
   return `${taskPath}/users?URL=UserPages/TaskTeam.aspx`;
 }
 
-// GET .../tasks/{taskId}/users returns { canAddTeam, TaskUsers: { <username>: row } };
-// the row carries the full user profile (holiday calendars included), far too verbose
-// to echo back, so responses carry this compact projection instead.
-function taskUsersByUsername(usersResponse: unknown): Record<string, JsonRecord> {
-  if (usersResponse === null || typeof usersResponse !== 'object') return {};
+// GET .../tasks/{taskId}/users returns { canAddTeam, TaskUsers: { <key>: row } }. The key is
+// the username, or the TaskUserId when the user has none (non-login users), so rows are
+// identified by UserId or EmailAddress and never by the key alone. The row carries the full
+// user profile (holiday calendars included), far too verbose to echo back, so responses
+// carry the compact projection built below instead.
+interface TaskTeamRow {
+  key: string;
+  row: JsonRecord;
+}
+
+function taskTeamRows(usersResponse: unknown): TaskTeamRow[] {
+  if (usersResponse === null || typeof usersResponse !== 'object') return [];
   const taskUsers = (usersResponse as JsonRecord).TaskUsers;
-  if (taskUsers === null || typeof taskUsers !== 'object') return {};
-  return taskUsers as Record<string, JsonRecord>;
+  if (taskUsers === null || typeof taskUsers !== 'object') return [];
+  return Object.entries(taskUsers as Record<string, JsonRecord>).map(([key, row]) => ({ key, row }));
+}
+
+// ITM.Account resolves a numeric TaskManagers/TaskMembers value through Users/{id:int},
+// so a digits-only value is a UserId; anything else is a username.
+export function isNumericIdentifier(value: string): boolean {
+  return /^\d+$/.test(value.trim());
+}
+
+function rowUsername({ key, row }: TaskTeamRow): string | null {
+  if (typeof row.EmailAddress === 'string' && row.EmailAddress.trim()) return row.EmailAddress;
+  return isNumericIdentifier(key) ? null : key;
+}
+
+function rowUserId(row: JsonRecord): number | undefined {
+  if (typeof row.UserId === 'number') return row.UserId;
+  if (typeof row.UserId === 'string' && isNumericIdentifier(row.UserId)) return Number(row.UserId);
+  return undefined;
 }
 
 export function buildTaskTeamSummary(usersResponse: unknown): JsonRecord[] {
-  return Object.entries(taskUsersByUsername(usersResponse)).map(([username, row]) => ({
-    Username: username,
-    UserId: row.UserId,
-    DisplayName: row.DisplayName,
-    IsTaskManager: row.IsTaskManager,
+  return taskTeamRows(usersResponse).map(entry => ({
+    Username: rowUsername(entry),
+    UserId: entry.row.UserId,
+    DisplayName: entry.row.DisplayName,
+    IsTaskManager: entry.row.IsTaskManager,
   }));
+}
+
+function findTaskTeamRow(rows: TaskTeamRow[], requested: string): JsonRecord | undefined {
+  if (isNumericIdentifier(requested)) {
+    const userId = Number(requested);
+    return rows.find(entry => rowUserId(entry.row) === userId)?.row;
+  }
+  const wanted = requested.toLowerCase();
+  return rows.find(entry => (rowUsername(entry) ?? '').toLowerCase() === wanted)?.row;
 }
 
 function withTeam(readback: unknown, usersResponse: unknown): unknown {
@@ -629,17 +662,16 @@ function withTeam(readback: unknown, usersResponse: unknown): unknown {
   return { task: readback, team };
 }
 
-// The backend silently skips stakeholder users, so presence must be verified;
-// the manager flag only exists on Waterfall (Kanban saves everyone as member).
+// The backend silently skips project stakeholders and unknown identifiers, so presence
+// must be verified; the manager flag only exists on Waterfall (Kanban saves everyone as
+// member).
 export function verifyTaskTeamReadback(
   body: JsonRecord,
   usersResponse: unknown,
   isWaterfallProject: boolean,
   entityLabel: string,
 ): void {
-  const rowsByUsername = new Map(
-    Object.entries(taskUsersByUsername(usersResponse)).map(([username, row]) => [username.toLowerCase(), row]),
-  );
+  const rows = taskTeamRows(usersResponse);
 
   const requested = [
     ...parseUsernameList(body.TaskManagers).map(username => ({ username, isManager: true })),
@@ -648,9 +680,13 @@ export function verifyTaskTeamReadback(
 
   const mismatches: string[] = [];
   for (const { username, isManager } of requested) {
-    const row = rowsByUsername.get(username.toLowerCase());
+    const row = findTaskTeamRow(rows, username);
     if (!row) {
-      mismatches.push(`${username} is not on the task team after the write (stakeholder users cannot be assigned)`);
+      mismatches.push(
+        `${username} is not on the task team after the write `
+        + '(ITM Platform silently skips project stakeholders and unknown identifiers; '
+        + 'check the user with search_users and their project role)',
+      );
       continue;
     }
     if (isWaterfallProject && row.IsTaskManager !== isManager) {
@@ -793,8 +829,8 @@ export function registerWriteTools(
         EndDate: z.string().optional().describe('End date (ISO 8601); required for Waterfall regular tasks and milestones'),
         KindId: z.number().optional().describe('Kind: 1=Milestone, 2=Summary, 3=Task (default); 1 and 2 require a Waterfall project'),
         ParentId: z.number().optional().describe('Parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies'),
-        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only.'),
-        TaskMembers: z.string().optional().describe('Comma-separated usernames added as team members. Add-only.'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) or numeric UserIds (search_users UserId; the only option for non-login users, whose EmailAddress is empty) added as task managers; Kanban saves them as members. Add-only.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames or numeric UserIds (use the UserId for non-login users) added as team members. Add-only.'),
       },
     },
     async (args) => {
@@ -837,8 +873,8 @@ export function registerWriteTools(
         EndDate: z.string().optional().describe('New end date (ISO 8601)'),
         KindId: z.number().optional().describe('New kind: 1=Milestone, 2=Summary, 3=Task (Waterfall only); to milestone requires equal StartDate and EndDate in the same call'),
         ParentId: z.number().optional().describe('New parent task ID (Waterfall only); a regular-task parent converts to a summary unless it has assignees or dependencies'),
-        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only.'),
-        TaskMembers: z.string().optional().describe('Comma-separated usernames added as team members. Add-only.'),
+        TaskManagers: z.string().optional().describe('Comma-separated usernames (search_users EmailAddress) or numeric UserIds (search_users UserId; the only option for non-login users, whose EmailAddress is empty) added as task managers; Kanban saves them as members. Add-only.'),
+        TaskMembers: z.string().optional().describe('Comma-separated usernames or numeric UserIds (use the UserId for non-login users) added as team members. Add-only.'),
       },
     },
     async (args) => {

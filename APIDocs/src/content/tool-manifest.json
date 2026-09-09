@@ -1,5 +1,5 @@
 {
-  "serverVersion": "1.0.18",
+  "serverVersion": "1.0.21",
   "tools": [
     {
       "name": "search_projects",
@@ -515,7 +515,7 @@
     },
     {
       "name": "get_project_progress",
-      "description": "Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). With includeEntries true, also returns the full project-level Seguimiento entries (ProjectProgressId, assessment, descriptions) for use with update_project_progress.",
+      "description": "Get the project progress report: expected curve, baseline curve, and follow-up history (date + percentage). includeEntries true adds the full Seguimiento entries (ProjectProgressId, assessment, descriptions) for update_project_progress.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -636,7 +636,7 @@
     },
     {
       "name": "create_project_progress",
-      "description": "Create a project-level progress (Seguimiento) entry: the project status report with report date, completion percentage, assessment rating, and status description. Independent from per-task progress and from the get_project_progress curves. WARNING: percentage 100 automatically CLOSES the project, which blocks further time entry; log hours first (reopen with update_project if needed). Assessment IDs: get_reference_data entity \"assessments\".",
+      "description": "Create a project-level progress (Seguimiento) entry: the project status report with report date, completion percentage, assessment rating, and status description. Independent from per-task progress. WARNING: percentage 100 automatically CLOSES the project, which blocks further time entry; log hours first (reopen with update_project if needed). Assessment IDs: get_reference_data entity \"assessments\".",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -982,7 +982,7 @@
     },
     {
       "name": "search_users",
-      "description": "Find team members by name or email. Returns userId, name, email, role. Uses v2 REST API (not DataMart).",
+      "description": "Find team members by name or email. Returns user ID, display name, email (the username) and IsNonLoginUser. Non-login users have an empty EmailAddress: address them by UserId in TaskManagers/TaskMembers. Uses projected v2 REST search (not DataMart).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1217,11 +1217,11 @@
           },
           "TaskManagers": {
             "type": "string",
-            "description": "Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only."
+            "description": "Comma-separated usernames (search_users EmailAddress) or numeric UserIds (search_users UserId; the only option for non-login users, whose EmailAddress is empty) added as task managers; Kanban saves them as members. Add-only."
           },
           "TaskMembers": {
             "type": "string",
-            "description": "Comma-separated usernames added as team members. Add-only."
+            "description": "Comma-separated usernames or numeric UserIds (use the UserId for non-login users) added as team members. Add-only."
           }
         },
         "required": [
@@ -1234,7 +1234,7 @@
     },
     {
       "name": "update_task",
-      "description": "Update task fields via PATCH; send only the fields to change. KindId changes the task kind (1=Milestone, 2=Summary task, 3=Task; not the task type TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting a task to a milestone requires supplying StartDate and EndDate with the same value in the same call. Setting a status that has AutomaticProgress (such as Completed) creates a 100% progress entry automatically; a later lower progress report only takes effect with a ReportDate after the auto-generated entry, since percentComplete tracks the latest entry by ReportDate.",
+      "description": "Update task fields via PATCH; send only the fields to change. KindId changes the task kind (1=Milestone, 2=Summary, 3=Task; not TypeId) and ParentId moves the task under a summary task; both are Waterfall-only. Converting to a milestone requires equal StartDate and EndDate in the same call. A status with AutomaticProgress (such as Completed) creates a 100% progress entry; a later lower report only takes effect with a later ReportDate (percentComplete tracks the latest entry by ReportDate).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1288,11 +1288,11 @@
           },
           "TaskManagers": {
             "type": "string",
-            "description": "Comma-separated usernames (search_users EmailAddress) added as task managers; Kanban saves them as members. Add-only."
+            "description": "Comma-separated usernames (search_users EmailAddress) or numeric UserIds (search_users UserId; the only option for non-login users, whose EmailAddress is empty) added as task managers; Kanban saves them as members. Add-only."
           },
           "TaskMembers": {
             "type": "string",
-            "description": "Comma-separated usernames added as team members. Add-only."
+            "description": "Comma-separated usernames or numeric UserIds (use the UserId for non-login users) added as team members. Add-only."
           }
         },
         "required": [
