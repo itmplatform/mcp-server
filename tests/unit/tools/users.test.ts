@@ -14,14 +14,14 @@ describe('search_users query composition', () => {
     return { handler: registrations.get('search_users').handler, rest };
   }
 
-  it('POSTs Users/Search with a projected identity response and name-or-email filter', async () => {
+  it('POSTs Users/Search with a projected identity response (including the non-login flag) and name-or-email filter', async () => {
     const { handler, rest } = registerAndGetHandler();
     await handler({ query: 'daniel', limit: 5 });
 
     expect(rest.post).toHaveBeenCalledWith('Users/Search?paged=true', {
       page: 1,
       pageSize: 5,
-      Columns: { $in: ['UserId', 'DisplayName', 'EmailAddress'] },
+      Columns: { $in: ['UserId', 'DisplayName', 'EmailAddress', 'IsNonLoginUser'] },
       Filter: { Name: { $regex: 'daniel' } },
       sortBy: 'DisplayName',
       sortOrder: 'asc',

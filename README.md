@@ -118,7 +118,7 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 | `get_service_revenues` | List revenue items for a service with pagination |
 | `aggregate_portfolio` | Group and summarize portfolio data |
 | `query_datamart` | Run validated DataMart queries for advanced analysis |
-| `search_users` | Find users and team members |
+| `search_users` | Find users and team members; returns `IsNonLoginUser` so non-login users (empty `EmailAddress`) can be addressed by `UserId` |
 | `get_user` | Retrieve user details |
 | `get_reference_data` | Retrieve statuses, types, priorities, and other reference lists |
 | `get_custom_fields` | Retrieve the account's custom field definitions for projects, tasks, risks, issues, services, activities, purchases, or revenues |
@@ -129,8 +129,8 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 | Tool | What it does |
 |------|--------------|
 | `create_project` | Create a project (Waterfall or Kanban); the project starts with the account default status and the creating user as project manager |
-| `create_task` | Add a task, milestone (KindId 1), or summary task (KindId 2); ParentId builds Gantt hierarchy on Waterfall projects; TaskManagers/TaskMembers assign users by username |
-| `update_task` | Update task fields such as status, dates, kind, and parent; TaskManagers/TaskMembers add assignees by username (add-only, never removes) |
+| `create_task` | Add a task, milestone (KindId 1), or summary task (KindId 2); ParentId builds Gantt hierarchy on Waterfall projects; TaskManagers/TaskMembers assign users by username or numeric UserId (the id is the only option for non-login users) |
+| `update_task` | Update task fields such as status, dates, kind, and parent; TaskManagers/TaskMembers add assignees by username or numeric UserId (add-only, never removes) |
 | `create_task_progress` | Report progress on a task (percentage, assessment, notes) with full side effects |
 | `update_task_progress` | Update an existing task progress entry |
 | `update_task_effort` | Set the estimated (planned) hours of a task per assigned user; accepted effort and billing data are preserved |
@@ -151,6 +151,10 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 
 Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
 Validation failures include the actionable message returned by REST instead of only the HTTP status.
+
+### Data source routing
+
+Reads come from DataMart whenever DataMart holds the data (quota-free, portfolio-wide); REST is reserved for data DataMart lacks, single-item authoritative reads (`get_task`), write readbacks, and reference data. Writes always go to REST. When DataMart gains a dataset, the matching GET tools must migrate to DataMart. Full rule and current routing map: [zz_Specifications/progress-history-reads-from-datamart.md](zz_Specifications/progress-history-reads-from-datamart.md).
 
 When the account defines custom fields, each session is enriched with per-account context: the server lists the DataMart `customFields` keys actually in use in the MCP initialize instructions and in the `query_datamart` tool description, so agents can read and filter custom field values without prior discovery.
 

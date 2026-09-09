@@ -163,7 +163,7 @@ export function registerTimeEntryTools(
       if (restError) {
         let hint = '';
         if (restError.includes('not assigned')) {
-          hint = ' Assign the user to the task first with update_task (TaskMembers/TaskManagers accept comma-separated usernames), then retry.';
+          hint = ' Assign the user to the task first with update_task (TaskMembers/TaskManagers accept comma-separated usernames or numeric UserIds), then retry.';
         } else if (/editing not allowed/i.test(restError)) {
           hint = ' The work date must fall inside the task AND project date ranges (unless the account allows out-of-range entries), the project status must allow time entry, and the period must not be invoiced.';
         }
