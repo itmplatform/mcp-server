@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { hashParameters, type AuditClient } from './clients/audit-client.js';
-import { guardResultSize, type ResultSizeGuardConfig } from './validation/result-size-guard.js';
+import { guardResultSize, isResultTrimmed, type ResultSizeGuardConfig } from './validation/result-size-guard.js';
 
 interface InstrumentUserContext {
   userId: number;
@@ -29,9 +29,13 @@ export function instrumentServer(
         const guard = guardResultSize(rawResult, sizeGuardConfig);
         const result = guard.result;
         const isError = result?.isError === true;
+        const wasTrimmed = isResultTrimmed(rawResult);
 
         if (guard.warning) {
           log.warn({ tool: name, responseBytes: guard.responseBytes, durationMs }, guard.warning);
+        }
+        if (wasTrimmed) {
+          log.info({ tool: name, responseBytes: guard.responseBytes, durationMs }, 'Tool result trimmed to fit the size budget');
         }
         if (guard.wasTruncated) {
           log.error({ tool: name, responseBytes: guard.responseBytes, durationMs }, 'Tool result truncated: too large');
@@ -52,7 +56,7 @@ export function instrumentServer(
           aiClientId: userCtx.aiClientId,
           durationMs,
           responseBytes: guard.responseBytes,
-          wasTruncated: guard.wasTruncated,
+          wasTruncated: guard.wasTruncated || wasTrimmed,
         }).catch(() => {});
 
         return result;

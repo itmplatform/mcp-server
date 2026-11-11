@@ -1,3 +1,32 @@
+### v1.0.23
+
+Las listas de tareas grandes ya no fallan: los listados paginados devuelven lo que cabe e indican cómo continuar.
+
+**Cambio de comportamiento (listados paginados):**
+- `list_project_tasks` y `search_tasks`: cuando las tareas pedidas no caben en el límite de 100 KB por respuesta, la página vuelve más corta en lugar de fallar, con `trimmedForSize: true`, `requestedLimit`, `limit` igual al número de tareas devueltas y `nextSkip` para continuar. Antes la llamada entera fallaba con "Result too large" y el agente tenía que adivinar un `limit` menor. Lo mismo se aplica a `get_project_risks`, `get_project_issues`, `get_project_purchases`, `get_project_revenues`, `list_service_activities`, `get_service_purchases` y `get_service_revenues`.
+- Una tarea cuyo historial de avance supera por sí solo el límite se devuelve con sus `progressReports` más recientes, junto con `progressReportsTotal` y `progressReportsTruncated: true`. El resto de campos se devuelve completo.
+- Los resultados de los listados paginados son JSON compacto (sin sangría), de modo que caben alrededor de una quinta parte más de elementos por página. El contenido no cambia.
+- `search_tasks` desempata por id de tarea las tareas con la misma fecha de fin, para que páginas consecutivas no repitan ni omitan tareas.
+
+**Herramientas ampliadas (3):**
+- `list_project_tasks` y `search_tasks`: nuevo parámetro opcional `fields` que devuelve solo los campos de tarea indicados (por ejemplo `["name", "statusLabel", "endDate"]`; `id` se incluye siempre). Sin él, las tareas se devuelven completas como hasta ahora.
+- `list_task_progress`: nuevos parámetros opcionales `limit` y `skip` para paginar el historial. Sin ellos sigue devolviendo el historial completo como array, salvo que supere el límite de tamaño, en cuyo caso devuelve una página recortada.
+
+**Corregido:**
+- El mensaje "Result too large" recomendaba reducir campos con "las herramientas de subcomponentes", que eran precisamente estas y no tenían parámetro de campos. Ahora sugiere pedir menos elementos, menos campos o filtros más estrechos.
+
+### v1.0.22
+
+El estado de la tarea sigue ahora al avance reportado en proyectos en cascada.
+
+**Cambio de comportamiento (plataforma, sin cambios en las herramientas):**
+- Reportar avance con `create_task_progress` o `update_task_progress` pone en curso una tarea pendiente: cualquier porcentaje por encima del 0 la mueve a un estado en curso, y volver al 0 % la devuelve a pendiente. El 100 % sigue completando la tarea y bajar del 100 % sigue reabriéndola.
+- Cuando una cuenta tiene varios estados de un mismo tipo se aplica el estado predeterminado de ese tipo y, si no lo hay, el más antiguo.
+- Las tareas en Backlog o Archivo mantienen su estado por debajo del 100 %, un estado puesto a mano se conserva hasta el siguiente informe de avance y las columnas de los tableros Kanban nunca cambian por esta vía.
+
+**Descripciones actualizadas (2):**
+- `create_task_progress` y `update_task_progress` describen ahora todas las transiciones de estado.
+
 ### v1.0.21
 
 Los usuarios sin login (recursos sin acceso) ya pueden asignarse a tareas.

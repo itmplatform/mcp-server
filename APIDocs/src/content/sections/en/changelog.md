@@ -1,3 +1,32 @@
+### v1.0.23
+
+Large task lists no longer fail: paged list tools return what fits and say how to continue.
+
+**Changed behaviour (paged list tools):**
+- `list_project_tasks` and `search_tasks`: when the requested tasks do not fit in the 100 KB response limit, the page comes back shorter instead of failing, with `trimmedForSize: true`, `requestedLimit`, `limit` set to the number of tasks returned, and `nextSkip` to continue. Before, the whole call failed with "Result too large" and the agent had to guess a smaller `limit`. The same applies to `get_project_risks`, `get_project_issues`, `get_project_purchases`, `get_project_revenues`, `list_service_activities`, `get_service_purchases` and `get_service_revenues`.
+- A task whose progress history alone is over the limit comes with its newest `progressReports`, plus `progressReportsTotal` and `progressReportsTruncated: true`. Every other field is returned whole.
+- Paged list results are compact JSON (no indentation), so about a fifth more items fit per page. The content is unchanged.
+- `search_tasks` breaks end-date ties by task id, so consecutive pages neither repeat nor skip tasks.
+
+**Extended tools (3):**
+- `list_project_tasks` and `search_tasks`: new optional `fields` parameter returns only the task fields you name (for example `["name", "statusLabel", "endDate"]`; `id` is always included). Without it, tasks are returned whole as before.
+- `list_task_progress`: new optional `limit` and `skip` page the history. Without them it still returns the whole history as an array, unless the history is over the size limit, in which case it returns a trimmed page.
+
+**Fixed:**
+- The "Result too large" message advised narrowing fields with "the dedicated subcomponent tools", which were these same tools and had no fields parameter. It now suggests fewer items, fewer fields, or narrower filters.
+
+### v1.0.22
+
+Task status now follows reported progress on Waterfall projects.
+
+**Changed behaviour (platform, no tool changes):**
+- Reporting progress through `create_task_progress` or `update_task_progress` now also starts a pending task: any percentage above 0 moves it to an in-progress status, and returning to 0% sends it back to pending. Reaching 100% still completes the task and dropping below 100% still reopens it.
+- Where an account has several statuses of a type, the account default of that type is applied, otherwise the oldest one.
+- Backlog and archived tasks keep their status below 100%, a status set by hand holds until the next progress report, and Kanban board columns are never changed this way.
+
+**Updated descriptions (2):**
+- `create_task_progress` and `update_task_progress` now state the full set of status transitions.
+
 ### v1.0.21
 
 Non-login users (resources without a login) can now be assigned to tasks.

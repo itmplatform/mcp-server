@@ -7,7 +7,7 @@ La IA puede modificar sus datos de ITM Platform, no solo leerlos. Las operacione
 | **Crear proyecto** | Crea un proyecto Waterfall o Kanban; se crea con el estado predeterminado de la cuenta y el usuario creador como jefe de proyecto |
 | **Crear tarea** | Agrega una tarea, hito o tarea resumen a un proyecto; ParentId construye la jerarquía del Gantt en proyectos Waterfall |
 | **Actualizar tarea** | Cambia nombre, estado, prioridad, fechas, tipo de elemento o tarea padre |
-| **Crear seguimiento de tarea** | Reporta el avance de una tarea (porcentaje, valoración, notas). Dispara los mismos efectos que reportar avance en la aplicación: transiciones de estado, propagación a tareas resumen y avance automático del proyecto |
+| **Crear seguimiento de tarea** | Reporta el avance de una tarea (porcentaje, valoración, notas). Dispara los mismos efectos que reportar avance en la aplicación: transiciones de estado, propagación a tareas resumen y avance automático del proyecto. En proyectos en cascada el estado sigue al porcentaje: el 100 % completa la tarea, el primer avance por encima del 0 % pone en curso una tarea pendiente y el 0 % la devuelve a pendiente |
 | **Actualizar seguimiento de tarea** | Corrige una entrada de seguimiento existente |
 | **Crear seguimiento de proyecto** | Reporta el estado a nivel de proyecto (Seguimiento): porcentaje completado, evaluación y descripción del estado. Una entrada al 100% cierra automáticamente el proyecto |
 | **Actualizar seguimiento de proyecto** | Corrige un seguimiento de proyecto existente |

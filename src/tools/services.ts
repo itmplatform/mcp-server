@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Clients } from '../clients/index.js';
 import { COMPONENTS_QUERY, COMPONENT_QUERY, AGGREGATE_QUERY, DEFAULT_PROJECT_FIELDS, MAX_LIST_LIMIT, clampLimit, buildSubcomponentCountPipeline } from './graphql-queries.js';
-import { fetchSubcomponentPage } from './subcomponent-page.js';
+import { fetchSubcomponentPage, pageToolResult } from './subcomponent-page.js';
 
 interface SearchServicesArgs {
   query?: string;
@@ -121,7 +121,7 @@ export function registerServiceTools(server: McpServer, clients: Clients) {
     },
     async (args) => {
       const page = await fetchSubcomponentPage(clients, args.serviceId, 'activities', args.limit, args.skip);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+      return pageToolResult(page);
     },
   );
 
@@ -137,7 +137,7 @@ export function registerServiceTools(server: McpServer, clients: Clients) {
     },
     async (args) => {
       const page = await fetchSubcomponentPage(clients, args.serviceId, 'purchases', args.limit, args.skip);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+      return pageToolResult(page);
     },
   );
 
@@ -153,7 +153,7 @@ export function registerServiceTools(server: McpServer, clients: Clients) {
     },
     async (args) => {
       const page = await fetchSubcomponentPage(clients, args.serviceId, 'revenues', args.limit, args.skip);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+      return pageToolResult(page);
     },
   );
 }

@@ -7,7 +7,7 @@ The AI can modify your ITM Platform data, not just read it. Write operations cov
 | **Create project** | Create a Waterfall or Kanban project; it starts with the account default status and the creating user as project manager |
 | **Create task** | Add a task, milestone, or summary task to a project; ParentId builds Gantt hierarchy on Waterfall projects |
 | **Update task** | Change task name, status, priority, dates, kind, or parent |
-| **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress |
+| **Create task progress** | Report progress on a task (percentage, assessment rating, notes). Triggers the same side effects as reporting progress in the app: status transitions, parent rollups, and automatic project progress. On Waterfall projects the task status follows the percentage: 100% completes it, the first progress above 0% starts a pending task, and 0% returns it to pending |
 | **Update task progress** | Correct an existing progress entry |
 | **Create project progress** | Report project-level status (Seguimiento): completion percentage, assessment rating, and status description. A 100% entry automatically closes the project |
 | **Update project progress** | Correct an existing project progress entry |

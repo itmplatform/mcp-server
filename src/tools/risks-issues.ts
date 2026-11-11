@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Clients } from '../clients/index.js';
-import { fetchSubcomponentPage } from './subcomponent-page.js';
+import { fetchSubcomponentPage, pageToolResult } from './subcomponent-page.js';
 
 export function registerRisksIssuesTools(server: McpServer, clients: Clients) {
   server.registerTool(
@@ -16,7 +16,7 @@ export function registerRisksIssuesTools(server: McpServer, clients: Clients) {
     },
     async (args) => {
       const page = await fetchSubcomponentPage(clients, args.projectId, 'risks', args.limit, args.skip);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+      return pageToolResult(page);
     },
   );
 
@@ -66,7 +66,7 @@ export function registerRisksIssuesTools(server: McpServer, clients: Clients) {
     },
     async (args) => {
       const page = await fetchSubcomponentPage(clients, args.projectId, 'issues', args.limit, args.skip);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(page, null, 2) }] };
+      return pageToolResult(page);
     },
   );
 }

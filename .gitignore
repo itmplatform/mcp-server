@@ -7,3 +7,7 @@ dist/
 nul
 NUL
 .playwright-mcp
+
+# Specifications and tickets stay in local working copies: the repository is mirrored to a public GitHub repository.
+zz_Specifications/
+zz_Tickets/

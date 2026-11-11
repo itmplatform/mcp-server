@@ -10,6 +10,11 @@ import {
   type VerificationField,
 } from './write-tools.js';
 import { fetchNormalizedProgressEntries } from './project-progress.js';
+import { buildPageResult, fitPageToBudget, pageToolResult } from './subcomponent-page.js';
+import { MAX_LIST_LIMIT, clampLimit } from './graphql-queries.js';
+import { PAGE_BUDGET_BYTES } from '../validation/result-size-guard.js';
+
+const PROGRESS_PAGE_HINT = 'Progress history trimmed to stay within the response size limit. Continue with skip=nextSkip.';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -67,15 +72,36 @@ export function registerProgressTools(
   server.registerTool(
     'list_task_progress',
     {
-      description: 'List the progress (seguimiento/follow-up) history for a task, newest first. Task progress is a time-series of entries, not a single task field; this is why update_task rejects PercentComplete.',
+      description: 'List the progress (seguimiento/follow-up) history for a task, newest first. Task progress is a time-series of entries, not a single task field; this is why update_task rejects PercentComplete. '
+        + 'Without limit or skip it returns the whole history as an array. With limit or skip, or when the whole history exceeds the response size limit, '
+        + 'it returns { items, total, limit, skip, hasMore }; a page shortened for size adds trimmedForSize: true and nextSkip to continue.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to list progress entries for'),
+        limit: z.number().optional().describe('Max entries to return (default 50, max 200); returns a page instead of the whole array'),
+        skip: z.number().optional().describe('Number of entries to skip (for pagination)'),
       },
     },
     async (args) => {
       const data = await clients.rest.get(`projects/${args.projectId}/tasks/${args.taskId}/progress`);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      const paged = args.limit !== undefined || args.skip !== undefined;
+      if (!Array.isArray(data)) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      }
+      if (!paged) {
+        const text = JSON.stringify(data, null, 2);
+        if (Buffer.byteLength(text, 'utf8') <= PAGE_BUDGET_BYTES) {
+          return { content: [{ type: 'text' as const, text }] };
+        }
+        return pageToolResult(fitPageToBudget(buildPageResult(data, data.length, data.length, 0), PAGE_BUDGET_BYTES, {
+          hint: PROGRESS_PAGE_HINT,
+        }));
+      }
+      const limit = clampLimit(args.limit, MAX_LIST_LIMIT);
+      const skip = args.skip ?? 0;
+      return pageToolResult(fitPageToBudget(buildPageResult(data.slice(skip, skip + limit), data.length, limit, skip), PAGE_BUDGET_BYTES, {
+        hint: PROGRESS_PAGE_HINT,
+      }));
     },
   );
 
@@ -108,7 +134,7 @@ export function registerProgressTools(
   server.registerTool(
     'create_task_progress',
     {
-      description: 'Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task\'s completion percentage: it triggers task status transitions (100% completes the task, dropping below 100% reopens it), parent task rollups, automatic project progress, events, and notifications. Discover assessmentId values with get_reference_data entity "assessments".',
+      description: 'Report progress on a task by creating a new progress (seguimiento/follow-up) entry. This is the correct way to set a task\'s completion percentage: it triggers task status transitions, parent task rollups, automatic project progress, events, and notifications. On Waterfall projects this moves the task status: 100% completes the task, dropping below 100% reopens it as in progress, the first progress above 0% starts a pending task, and returning to 0% sends it back to pending. Backlog and archived tasks keep their status below 100%, and Kanban board columns never change this way. Discover assessmentId values with get_reference_data entity "assessments".',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID to report progress on'),
@@ -133,7 +159,7 @@ export function registerProgressTools(
   server.registerTool(
     'update_task_progress',
     {
-      description: 'Update an existing task progress (seguimiento/follow-up) entry via PATCH; send only the fields to change. Find the progressId with list_task_progress.',
+      description: 'Update an existing task progress (seguimiento/follow-up) entry via PATCH; send only the fields to change. Find the progressId with list_task_progress. Correcting the percentage applies the same status rules as a new entry: On Waterfall projects this moves the task status: 100% completes the task, dropping below 100% reopens it as in progress, the first progress above 0% starts a pending task, and returning to 0% sends it back to pending. Backlog and archived tasks keep their status below 100%, and Kanban board columns never change this way.',
       inputSchema: {
         projectId: z.number().describe('The project ID containing the task'),
         taskId: z.number().describe('The task ID the progress entry belongs to'),

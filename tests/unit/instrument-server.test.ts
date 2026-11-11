@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { instrumentServer } from '../../src/instrument-server.js';
+import { markResultTrimmed } from '../../src/validation/result-size-guard.js';
 import type { AuditClient } from '../../src/clients/audit-client.js';
 
 function mockLogger() {
@@ -143,7 +144,7 @@ describe('instrumentServer', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('110000');
-    expect(result.content[0].text).toContain('subcomponent');
+    expect(result.content[0].text).toContain('limit/skip');
   });
 
   it('passes normal-sized results through unchanged', async () => {
@@ -167,6 +168,18 @@ describe('instrumentServer', () => {
         wasTruncated: false,
       }),
     );
+  });
+
+  it('audits a result trimmed by the tool as successful and truncated, and logs it', async () => {
+    const trimmed = markResultTrimmed({ content: [{ type: 'text', text: '{"items":[],"trimmedForSize":true}' }] });
+    const handler = vi.fn().mockResolvedValue(trimmed);
+    const wrapped = registerAndGetWrapped(handler);
+
+    const result = await wrapped({}, {});
+
+    expect(result).toBe(trimmed);
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ success: true, wasTruncated: true }));
+    expect(log.info).toHaveBeenCalledWith(expect.objectContaining({ tool: 'test_tool' }), 'Tool result trimmed to fit the size budget');
   });
 
   it('audits isError result as failure', async () => {

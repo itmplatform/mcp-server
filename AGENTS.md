@@ -8,7 +8,7 @@ Before investigating, planning, or changing anything:
 2. Read `../README.md` for platform-wide context and documentation routing.
 3. Read this repository's `README.md`.
 4. Read `../test-and-build.md` before building or testing.
-5. Read the active specification and `zz_Specifications/INDEX.md` when a task changes a documented MCP contract.
+5. Read the active specification and `zz_Specifications/INDEX.md` when a task changes a documented MCP contract. `zz_Specifications/` and `zz_Tickets/` are gitignored because this repository is mirrored to a public GitHub repository: they exist only in local working copies, and customer data must never be committed elsewhere in this repository.
 
 Only this repository's root README is mandatory. Nested READMEs are contextual
 and should only be read when the task directly concerns their directory.
@@ -45,14 +45,15 @@ npm test
 npm run build
 ```
 
-- `npm run build` increments `package.json` and regenerates `dist/` before TypeScript compilation. Review the version and generated output; do not leave a validation-only version bump behind.
+- `npm run build` increments `package.json` and `server.json` and regenerates `dist/` before TypeScript compilation. Review the version and generated output; do not leave a validation-only version bump behind.
 - `npm run test:integration` and `npm run test:e2e` can call configured services and create data. Run them only against an explicitly named non-production environment with approved credentials and verified cleanup.
 - Update unit, scope-enforcement, manifest, integration, and E2E expectations whenever a tool or resource changes. A passing unit suite does not prove the gateway, OAuth, deployed package, or downstream API contract.
 
 ## Deployment and publishing
 
-- `origin` is the private Azure DevOps repository; `github` is the public distribution repository. Confirm the intended branch and release flow before pushing either remote.
+- `origin` is the private Azure DevOps repository; `github` is the public distribution repository, where each push to `main` publishes a new npm version and its MCP Registry entry. Confirm the intended branch and release flow before pushing either remote.
 - Follow the parent promotion and pipeline rules. Do not publish npm, push a release tag, deploy, or promote branches unless the task explicitly authorizes it.
+- The stage and prod pipelines run `npm run build`, which bumps the version once more: the repository carries N (use N in the changelog), the deployed server and the npm package carry N+1.
 - Verify the exact deployed revision and advertised tool catalog, authenticate through the intended transport, exercise authorized read and write paths with canonical readback, inspect redacted logs, and confirm cleanup. Verify npm contents with `npm pack --dry-run` before publishing.
 
 Credentials and URLs are documented in `../ENVIRONMENTS-AND-ACCESS.md`; never copy secret values into source, tests, logs, tickets, commands, or chat.

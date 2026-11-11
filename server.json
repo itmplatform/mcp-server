@@ -3,7 +3,7 @@
   "name": "io.github.itmplatform/mcp-server",
   "title": "ITM Platform",
   "description": "Connect AI assistants to ITM Platform projects, tasks, budgets, risks, and team workload.",
-  "version": "1.0.3",
+  "version": "1.0.23",
   "websiteUrl": "https://developers.itmplatform.com/mcp/",
   "repository": {
     "url": "https://github.com/itmplatform/mcp-server",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@itm-platform/mcp-server",
-      "version": "1.0.3",
+      "version": "1.0.23",
       "transport": {
         "type": "stdio"
       },

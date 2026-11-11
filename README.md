@@ -100,9 +100,9 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 | `get_project` | Retrieve project details with subcomponent counts and optional budget |
 | `search_services` | Find services by name, status, type, or date range |
 | `get_service` | Retrieve service details with subcomponent counts and optional budget |
-| `list_project_tasks` | List tasks for a project with pagination |
+| `list_project_tasks` | List tasks for a project with pagination; optional `fields` returns only the task fields you need |
 | `get_task` | Retrieve full detail of a single task |
-| `search_tasks` | Search tasks across all projects by name, status, assignee, kind, or date range |
+| `search_tasks` | Search tasks across all projects by name, status, assignee, kind, or date range; optional `fields` as in `list_project_tasks` |
 | `get_project_budget` | Get budget, actuals, revenue, cost, and margin information |
 | `get_project_purchases` | List purchase orders for a project with pagination |
 | `get_project_revenues` | List revenue items for a project with pagination |
@@ -110,7 +110,7 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 | `get_project_issues` | List project issues with pagination |
 | `get_risk` | Retrieve full detail of a single risk, including mitigation and contingency plans |
 | `get_issue` | Retrieve full detail of a single issue, including resolution and impact fields |
-| `list_task_progress` | List the progress (follow-up) history for a task |
+| `list_task_progress` | List the progress (follow-up) history for a task, optionally paged with `limit` and `skip` |
 | `get_task_effort` | Get a task's effort breakdown per team member and per professional category; doubles as the task team list |
 | `get_project_progress` | Get project progress report: expected, baseline, and actual curves; optionally the full project Seguimiento entries |
 | `list_service_activities` | List activities for a service with pagination |
@@ -150,11 +150,12 @@ The server exposes 47 MCP tools, 6 resources, and 4 prompt templates.
 | `bulk_update_activity_status` | Apply one status to up to 100 activities of a service in a single call |
 
 Write operations confirm the saved state from the ITM Platform REST API. DataMart-backed search results may take up to 60 seconds to reflect recent writes.
+Each tool result stays under 100 KB. Paged list tools return the items that fit and mark the page with `trimmedForSize` and `nextSkip` instead of failing; a task whose progress history alone is over the limit comes with its newest progress reports and `progressReportsTotal`.
 Validation failures include the actionable message returned by REST instead of only the HTTP status.
 
 ### Data source routing
 
-Reads come from DataMart whenever DataMart holds the data (quota-free, portfolio-wide); REST is reserved for data DataMart lacks, single-item authoritative reads (`get_task`), write readbacks, and reference data. Writes always go to REST. When DataMart gains a dataset, the matching GET tools must migrate to DataMart. Full rule and current routing map: [zz_Specifications/progress-history-reads-from-datamart.md](zz_Specifications/progress-history-reads-from-datamart.md).
+Reads come from DataMart where its dataset is complete enough for the tool's contract: searches, subcomponent lists, project and service detail, portfolio aggregates, and `query_datamart` (quota-free, portfolio-wide). REST serves canonical single-record reads that need current state or feed a write (`get_task`, `get_risk`, `get_issue`, task and project progress history), data DataMart lacks, reference data, and every write readback, because DataMart lags writes by up to 60 seconds. Writes always go to REST. DataMart gaining a dataset does not by itself move a REST tool: progress history, for example, is in DataMart and reachable through `query_datamart`, while the progress tools stay on REST.
 
 When the account defines custom fields, each session is enriched with per-account context: the server lists the DataMart `customFields` keys actually in use in the MCP initialize instructions and in the `query_datamart` tool description, so agents can read and filter custom field values without prior discovery.
 

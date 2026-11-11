@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { guardResultSize } from '../../../src/validation/result-size-guard.js';
+import { guardResultSize, PAGE_BUDGET_BYTES, RESULT_HARD_BYTES } from '../../../src/validation/result-size-guard.js';
 
 function textResult(text: string) {
   return { content: [{ type: 'text' as const, text }] };
@@ -24,7 +24,9 @@ describe('guardResultSize', () => {
     expect(guard.wasTruncated).toBe(true);
     expect(guard.responseBytes).toBe(Buffer.byteLength(big, 'utf8'));
     expect(guard.result.content[0].text).toContain('110000');
-    expect(guard.result.content[0].text).toContain('subcomponent');
+    expect(guard.result.content[0].text).toContain('maximum 100000');
+    expect(guard.result.content[0].text).toContain('limit/skip');
+    expect(guard.result.content[0].text).not.toContain('subcomponent tools');
     expect((guard.result as any).isError).toBe(true);
   });
 
@@ -88,5 +90,12 @@ describe('guardResultSize', () => {
 
     expect(guard.responseBytes).toBe(0);
     expect(guard.wasTruncated).toBe(false);
+  });
+});
+
+describe('size budget constants', () => {
+  it('keeps the page budget below the hard limit', () => {
+    expect(RESULT_HARD_BYTES).toBe(100_000);
+    expect(PAGE_BUDGET_BYTES).toBeLessThan(RESULT_HARD_BYTES);
   });
 });

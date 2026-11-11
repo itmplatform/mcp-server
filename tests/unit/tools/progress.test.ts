@@ -5,6 +5,7 @@ import {
   registerProgressTools,
   TASK_PROGRESS_VERIFICATION_FIELDS,
 } from '../../../src/tools/progress.js';
+import { PAGE_BUDGET_BYTES } from '../../../src/validation/result-size-guard.js';
 import { verifyRequestedFields, STALE_AFTER_WRITE_NOTICE } from '../../../src/tools/write-tools.js';
 import type { EffectiveUserContext } from '../../../src/auth/effective-user-context.js';
 
@@ -136,6 +137,35 @@ describe('registerProgressTools', () => {
 
     expect(clients.rest.get).toHaveBeenCalledWith('projects/100/tasks/42/progress');
     expect(JSON.parse(result.content[0].text)).toEqual([{ TaskFollowUpId: 9, Percentage: 50 }]);
+  });
+
+  it('list_task_progress pages the history when limit or skip is given', async () => {
+    const { server, tools } = createFakeServer();
+    const clients = createFakeClients();
+    clients.rest.get.mockResolvedValue(Array.from({ length: 30 }, (_, i) => ({ TaskFollowUpId: 100 - i })));
+    registerProgressTools(server, clients);
+
+    const result = await tools.get('list_task_progress')!.cb({ projectId: 100, taskId: 42, limit: 10, skip: 10 });
+    const page = JSON.parse(result.content[0].text);
+
+    expect(page.items.map((e: any) => e.TaskFollowUpId)).toEqual(Array.from({ length: 10 }, (_, i) => 90 - i));
+    expect(page).toMatchObject({ total: 30, limit: 10, skip: 10, hasMore: true });
+  });
+
+  it('list_task_progress returns a trimmed page when the full history exceeds the size budget', async () => {
+    const { server, tools } = createFakeServer();
+    const clients = createFakeClients();
+    clients.rest.get.mockResolvedValue(Array.from({ length: 400 }, (_, i) => ({ TaskFollowUpId: i, Description: 'd'.repeat(500) })));
+    registerProgressTools(server, clients);
+
+    const result = await tools.get('list_task_progress')!.cb({ projectId: 100, taskId: 42 });
+    const page = JSON.parse(result.content[0].text);
+
+    expect(page.trimmedForSize).toBe(true);
+    expect(page.total).toBe(400);
+    expect(page.items[0].TaskFollowUpId).toBe(0);
+    expect(page.nextSkip).toBe(page.items.length);
+    expect(Buffer.byteLength(result.content[0].text)).toBeLessThanOrEqual(PAGE_BUDGET_BYTES);
   });
 
   it('get_project_progress GETs the progressreports path', async () => {

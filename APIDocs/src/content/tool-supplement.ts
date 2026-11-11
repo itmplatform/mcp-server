@@ -66,12 +66,16 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   list_project_tasks: {
     category: 'Tasks',
     narrative:
-      'When you ask "What tasks are in the Website Redesign project?" or "Show me overdue tasks," the AI calls this tool to list all tasks for a project.',
+      'When you ask "What tasks are in the Website Redesign project?" or "Show me overdue tasks," the AI calls this tool to list the tasks of a project, page by page. Each response stays under 100 KB: when the requested tasks do not fit, the page comes back shorter with nextSkip to continue, and the optional fields parameter returns only the task fields the AI needs, so more tasks fit per page.',
     exampleResponse: {
-      tasks: [
-        { taskId: 112233, name: 'Design wireframes', statusLabel: 'Completed', percentComplete: 100 },
-        { taskId: 112234, name: 'Develop homepage', statusLabel: 'In Progress', percentComplete: 40 },
+      items: [
+        { id: 112233, name: 'Design wireframes', statusLabel: 'Completed', percentComplete: 100 },
+        { id: 112234, name: 'Develop homepage', statusLabel: 'In Progress', percentComplete: 40 },
       ],
+      total: 2,
+      limit: 50,
+      skip: 0,
+      hasMore: false,
     },
   },
   get_task: {
@@ -90,7 +94,7 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   search_tasks: {
     category: 'Tasks',
     narrative:
-      'When you ask "What is assigned to Daniel across all projects?" or "Which milestones land this month?", the AI searches tasks account-wide by name, status, assignee, kind, or date range, without walking projects one by one. Each result carries the project it belongs to.',
+      'When you ask "What is assigned to Daniel across all projects?" or "Which milestones land this month?", the AI searches tasks account-wide by name, status, assignee, kind, or date range, without walking projects one by one. Each result carries the project it belongs to. Like list_project_tasks, it accepts fields and returns a shorter page with nextSkip when the results do not fit in one response.',
     exampleResponse: {
       items: [
         { projectId: 75868, projectName: 'Website Redesign', task: { id: 112234, name: 'Develop homepage', statusLabel: 'In Progress' } },
@@ -358,7 +362,7 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   list_task_progress: {
     category: 'Tasks',
     narrative:
-      'When you ask "How has the API migration task progressed?", the AI lists the task\'s progress (follow-up) history, newest first. Task progress is a time-series of dated entries, not a single field on the task.',
+      'When you ask "How has the API migration task progressed?", the AI lists the task\'s progress (follow-up) history, newest first. Task progress is a time-series of dated entries, not a single field on the task. For long histories the AI pages with limit and skip.',
     exampleResponse: [
       { TaskFollowUpId: 9012, Percentage: 60, ShortDescription: 'Backend done', ReportDate: '2026-07-10T09:30:00' },
       { TaskFollowUpId: 8998, Percentage: 30, ShortDescription: 'Kickoff', ReportDate: '2026-07-01T14:00:00' },
@@ -377,7 +381,7 @@ export const toolSupplement: Record<string, ToolEditorial> = {
   create_task_progress: {
     category: 'Write Operations',
     narrative:
-      'When you say "Report 60% progress on the API migration task," the AI creates a progress entry with a date, percentage, assessment rating, and summary. This is the correct way to set task completion: it triggers status transitions, parent rollups, and automatic project progress. Assessment ratings are discovered with get_reference_data.',
+      'When you say "Report 60% progress on the API migration task," the AI creates a progress entry with a date, percentage, assessment rating, and summary. This is the correct way to set task completion: it triggers status transitions, parent rollups, and automatic project progress. On Waterfall projects the status follows the percentage: 100% completes the task, the first progress above 0% starts a pending one, and returning to 0% sends it back to pending. Assessment ratings are discovered with get_reference_data.',
     exampleResponse: {
       TaskFollowUpId: 9013,
       TaskId: 1859241,

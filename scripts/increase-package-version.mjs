@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packagePath = path.join(repoRoot, 'package.json');
 const lockPath = path.join(repoRoot, 'package-lock.json');
+const serverPath = path.join(repoRoot, 'server.json');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -34,6 +35,18 @@ if (fs.existsSync(lockPath)) {
     lockJson.packages[''].version = newVersion;
   }
   writeJson(lockPath, lockJson);
+}
+
+// The MCP Registry manifest must reference the npm version being published.
+if (fs.existsSync(serverPath)) {
+  const serverJson = readJson(serverPath);
+  serverJson.version = newVersion;
+  for (const pkg of serverJson.packages ?? []) {
+    if (pkg.registryType === 'npm' && pkg.identifier === packageJson.name) {
+      pkg.version = newVersion;
+    }
+  }
+  writeJson(serverPath, serverJson);
 }
 
 console.log('New version is', newVersion);

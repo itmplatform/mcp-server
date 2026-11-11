@@ -34,6 +34,18 @@ jobs:
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
         run: npm publish --provenance --access public
+      - name: Publish to MCP Registry
+        if: steps.check.outputs.published == 'false'
+        run: |
+          VERSION=${{ steps.check.outputs.version }}
+          # The registry rejects versions npm does not serve yet.
+          for i in $(seq 1 20); do
+            npm view @itm-platform/mcp-server@$VERSION mcpName 2>/dev/null | grep -q . && break
+            sleep 6
+          done
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.7.9/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
       - name: Skip publish (version already exists)
         if: steps.check.outputs.published == 'true'
         run: echo "Version ${{ steps.check.outputs.version }} is already published, skipping."
